@@ -1,0 +1,168 @@
+/* ===== API 接入面板 ===== */
+.api-section {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-light);
+}
+.api-section:last-child { border-bottom: none; margin-bottom: 0; }
+
+.api-section-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.api-section-icon { font-size: 14px; }
+.api-section-title { font-size: 13px; font-weight: 600; color: var(--text-primary); flex: 1; }
+
+.api-status {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--fill);
+  color: var(--text-tertiary);
+}
+.api-status.ok { background: rgba(0,179,101,0.1); color: var(--success); }
+
+.api-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 22px;
+}
+
+.api-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.api-field label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  width: 36px;
+  flex-shrink: 0;
+}
+
+.api-input {
+  flex: 1;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0 8px;
+  font-size: 11px;
+  font-family: var(--font);
+  outline: none;
+  background: rgba(255,255,255,0.6);
+  transition: border-color var(--duration-fast);
+}
+.api-input:focus { border-color: var(--brand); }
+.api-input::placeholder { color: var(--text-quaternary); }
+
+.api-select {
+  flex: 1;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0 24px 0 8px;
+  font-size: 11px;
+  font-family: var(--font);
+  outline: none;
+  background: rgba(255,255,255,0.6);
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%2386868B'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  cursor: pointer;
+}
+.api-select:focus { border-color: var(--brand); }
+
+.api-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.api-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--brand);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+.api-btn:hover { background: var(--brand); color: #fff; }
+.api-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.api-btn.danger { border-color: var(--error); color: var(--error); }
+.api-btn.danger:hover { background: var(--error); color: #fff; }
+
+.api-test-result {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+.api-test-result.ok { color: var(--success); }
+.api-test-result.err { color: var(--error); }
+
+.api-hint {
+  font-size: 10px;
+  color: var(--text-quaternary);
+}
+
+/* ===== 供应商快速切换 chip ===== */
+.api-providers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-left: 22px;
+  margin-bottom: 6px;
+}
+
+.api-provider-chip {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.6);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+  white-space: nowrap;
+}
+
+.api-provider-chip:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.api-provider-chip.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(0,118,255,0.2);
+}
+
+.api-provider-hint {
+  padding: 0 22px 8px 22px;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+}
+
+.api-link {
+  color: var(--brand);
+  text-decoration: none;
+  font-weight: 500;
+}
+.api-link:hover {
+  text-decoration: underline;
+}

@@ -1,0 +1,272 @@
+/* 生图执行区样式 */
+
+.visual-executor {
+  background: #F8FAFC;
+  border: 1px solid #E1E6EB;
+  border-radius: 12px;
+  padding: 12px;
+  margin: 8px 0;
+}
+
+.ve-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d1d1f;
+  margin-bottom: 8px;
+}
+
+.ve-demand-brief {
+  font-size: 11px;
+  color: #5A6066;
+  background: #fff;
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+/* 方式 Tab */
+.ve-method-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.ve-tab {
+  flex: 1;
+  padding: 6px 4px;
+  border: 1px solid #E1E6EB;
+  border-radius: 6px;
+  background: #fff;
+  color: #5A6066;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.ve-tab.active {
+  background: #0076FF;
+  color: #fff;
+  border-color: #0076FF;
+}
+
+.ve-tab:hover:not(.active) {
+  border-color: #0076FF;
+  color: #0076FF;
+}
+
+/* 方式面板 */
+.ve-method-panel {
+  display: none;
+}
+
+.ve-method-panel.active {
+  display: block;
+}
+
+/* 表单元素 */
+.ve-label {
+  display: block;
+  font-size: 11px;
+  color: #879099;
+  margin-bottom: 3px;
+  margin-top: 6px;
+}
+
+.ve-prompt,
+.ve-negative,
+.ve-feedback {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #E1E6EB;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #1d1d1f;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.4;
+}
+
+.ve-prompt:focus,
+.ve-negative:focus,
+.ve-feedback:focus {
+  outline: none;
+  border-color: #0076FF;
+  box-shadow: 0 0 0 2px rgba(0, 118, 255, 0.1);
+}
+
+.ve-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.ve-field {
+  flex: 1;
+}
+
+.ve-field select {
+  width: 100%;
+  padding: 5px 6px;
+  border: 1px solid #E1E6EB;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #1d1d1f;
+  background: #fff;
+}
+
+/* 素材库 */
+.ve-assets-hint {
+  font-size: 11px;
+  color: #879099;
+  margin-bottom: 6px;
+}
+
+.ve-assets-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.ve-asset-item {
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #E1E6EB;
+  border-radius: 6px;
+  font-size: 11px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.ve-asset-item:hover {
+  border-color: #0076FF;
+}
+
+.ve-assets-note {
+  font-size: 10px;
+  color: #BCC4CC;
+  margin-top: 6px;
+  font-style: italic;
+}
+
+/* Skill 列表 */
+.ve-skill-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ve-skill-item {
+  padding: 6px 10px;
+  border: 1px solid #E1E6EB;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ve-skill-item:hover {
+  border-color: #0076FF;
+  color: #0076FF;
+}
+
+.ve-skill-item.selected {
+  background: #EBF4FF;
+  border-color: #0076FF;
+  color: #0076FF;
+}
+
+.ve-empty {
+  font-size: 11px;
+  color: #879099;
+  text-align: center;
+  padding: 12px;
+}
+
+/* 生成按钮 */
+.ve-generate-btn {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin-top: 10px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #0076FF, #1492FF);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.ve-generate-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.ve-generate-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 结果区 */
+.ve-result {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #E1E6EB;
+}
+
+.ve-result-img-wrap {
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.ve-result-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 8px;
+}
+
+.ve-feedback-area {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ve-result-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.ve-iterate-btn,
+.ve-save-btn {
+  flex: 1;
+  padding: 7px;
+  border: 1px solid #E1E6EB;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ve-iterate-btn:hover {
+  border-color: #0076FF;
+  color: #0076FF;
+}
+
+.ve-save-btn:hover {
+  border-color: #00B365;
+  color: #00B365;
+}
+
+.ve-iterate-btn:disabled,
+.ve-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

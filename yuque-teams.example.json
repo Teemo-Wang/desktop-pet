@@ -1,0 +1,4 @@
+{
+  "_comment": "复制本文件为 yuque-teams.local.json 并填入真实 token。该文件不会被提交到 git。",
+  "teamId示例": { "token": "你的语雀团队Token", "repo": "默认知识库slug", "name": "团队名称" }
+}

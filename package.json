@@ -1,0 +1,13 @@
+{
+  "name": "hellobike-desktop-pet",
+  "version": "1.0.0",
+  "description": "哈啰桌面AI机器人 - IP形象Demo",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-reload": "^2.0.0-alpha.1"
+  }
+}

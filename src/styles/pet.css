@@ -1,0 +1,139 @@
+/* ===== 桌宠形象 ===== */
+.pet-area {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+}
+
+.pet-image {
+  width: 130px;
+  height: 150px;
+  object-fit: contain;
+  animation: pet-float 3.5s ease-in-out infinite;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.15));
+  transition: filter var(--duration-normal) ease;
+}
+
+.pet-area:hover .pet-image {
+  filter: drop-shadow(0 10px 20px rgba(0, 118, 255, 0.2));
+}
+
+@keyframes pet-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes pet-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+@keyframes pet-bounce {
+  0%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-10px); }
+  50% { transform: translateY(0); }
+  75% { transform: translateY(-5px); }
+}
+
+.pet-shadow {
+  width: 44px;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 50%;
+  margin-top: -2px;
+  animation: shadow-float 3.5s ease-in-out infinite;
+}
+
+@keyframes shadow-float {
+  0%, 100% { transform: scale(1); opacity: 0.25; }
+  50% { transform: scale(0.75); opacity: 0.1; }
+}
+
+/* 消息反馈动画 */
+.pet-image.react-bounce {
+  animation: react-bounce 0.5s var(--ease-spring);
+}
+.pet-image.react-shake {
+  animation: react-shake 0.4s ease;
+}
+.pet-image.react-glow {
+  filter: drop-shadow(0 0 16px rgba(0, 118, 255, 0.5)) !important;
+}
+
+@keyframes react-bounce {
+  0% { transform: translateY(0); }
+  40% { transform: translateY(-14px); }
+  70% { transform: translateY(-4px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes react-shake {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-4deg); }
+  75% { transform: rotate(4deg); }
+}
+
+
+/* ===== 贴边收纳（docked） ===== */
+.pet-area.pet-anim {
+  transition: left 280ms cubic-bezier(0.34, 1.56, 0.64, 1),
+              top 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 拖拽预览：即将吸附时给一个轻微暗示 */
+.pet-area.will-dock-left .pet-image,
+.pet-area.will-dock-right .pet-image {
+  filter: drop-shadow(0 0 18px rgba(0, 118, 255, 0.45));
+  transform: scale(0.95);
+}
+
+/* 已收纳状态：暂停浮动 / 减小阴影 / 半透明 */
+.pet-area.docked .pet-image {
+  animation: none !important;
+  filter: drop-shadow(-2px 4px 8px rgba(0, 0, 0, 0.18));
+  opacity: 0.85;
+  transition: opacity 200ms ease, filter 200ms ease, transform 200ms ease;
+}
+.pet-area.docked .pet-shadow { display: none; }
+
+/* 左侧收纳：图片向右半切，hover 时微微外探 */
+.pet-area.docked-left .pet-image {
+  border-radius: 0 60% 60% 0 / 0 50% 50% 0;
+  filter: drop-shadow(2px 4px 8px rgba(0, 0, 0, 0.18));
+}
+.pet-area.docked-left:hover .pet-image {
+  transform: translateX(8px) scale(1.02);
+  opacity: 1;
+}
+
+/* 右侧收纳 */
+.pet-area.docked-right .pet-image {
+  border-radius: 60% 0 0 60% / 50% 0 0 50%;
+}
+.pet-area.docked-right:hover .pet-image {
+  transform: translateX(-8px) scale(1.02);
+  opacity: 1;
+}
+
+/* 收纳状态点击提示：附一个小圆点 */
+.pet-area.docked::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  background: var(--brand);
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(0, 118, 255, 0.6);
+  animation: dock-pulse 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+.pet-area.docked-left::before { right: 4px; transform: translateY(-50%); }
+.pet-area.docked-right::before { left: 4px; transform: translateY(-50%); }
+
+@keyframes dock-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}

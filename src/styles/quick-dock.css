@@ -1,0 +1,154 @@
+/* ===== 快捷标签 Dock ===== */
+.quick-dock {
+  position: absolute;
+  bottom: 168px;
+  right: 0;
+  width: 340px;
+  height: 36px;
+  display: flex;
+  gap: 0;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 88;
+  background: rgba(245, 245, 247, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 0 0 12px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.quick-dock.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.dock-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 100%;
+  padding: 0 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background var(--duration-fast);
+  font-family: var(--font);
+  position: relative;
+}
+
+.quick-dock:not(.visible) .dock-item {
+  opacity: 0;
+}
+
+.dock-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.dock-item:active {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* 选中态：浅蓝背景 */
+.dock-item.active {
+  background: rgba(0, 118, 255, 0.06);
+}
+
+.dock-item.active .dock-item-label {
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.dock-item-icon {
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.dock-item-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+
+/* 滑动指示条 */
+.dock-indicator {
+  position: absolute;
+  top: 0;
+  height: 2.5px;
+  background: var(--brand);
+  border-radius: 0 0 2px 2px;
+  transition: left 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 2;
+}
+
+
+/* 标签红点 badge */
+.dock-badge {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  min-width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  background: #FF3B30;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  line-height: 1;
+}
+
+
+/* 系统面板的底部装饰条（API/偏好设置） */
+.system-dock {
+  position: absolute;
+  right: 0;
+  bottom: 168px;
+  width: 340px;
+  height: 36px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(245, 245, 247, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 0 0 12px 12px;
+  z-index: 88;
+}
+
+.system-dock.visible { display: flex; }
+
+.system-dock-icon {
+  font-size: 13px;
+}
+
+.system-dock-text {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
+
+/* dock 标签使用本地图片图标 */
+.dock-item-img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+  -webkit-user-drag: none;
+  transition: transform var(--duration-fast);
+}
+.dock-item:hover .dock-item-img { transform: scale(1.08); }
+.dock-item.active .dock-item-img { transform: scale(1.1); }

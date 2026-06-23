@@ -1,0 +1,313 @@
+/* 项目工作台样式 */
+
+.ws-body {
+  padding: 12px;
+  overflow-y: auto;
+  max-height: calc(100% - 44px);
+}
+
+/* 区块 */
+.ws-section {
+  margin-bottom: 16px;
+}
+
+.ws-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.ws-section-head h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.ws-toggle-view {
+  font-size: 11px;
+  color: #0076FF;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.ws-toggle-view:hover {
+  background: #EBF4FF;
+}
+
+.ws-empty {
+  font-size: 12px;
+  color: #879099;
+  text-align: center;
+  padding: 16px 0;
+}
+
+/* 待办条目 */
+.ws-todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ws-todo-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+.ws-todo-item:hover {
+  background: #F5F7FA;
+}
+.ws-todo-item.done {
+  opacity: 0.5;
+}
+.ws-todo-item.overdue {
+  background: #FFF0EF;
+}
+
+.ws-todo-check {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  border: none;
+  background: none;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 20px;
+  text-align: center;
+  border-radius: 50%;
+  color: #BCC4CC;
+  transition: color 0.15s;
+}
+.ws-todo-check:hover {
+  color: #0076FF;
+}
+.ws-todo-item.done .ws-todo-check {
+  color: #00B365;
+}
+
+.ws-todo-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.ws-todo-title {
+  font-size: 13px;
+  color: #111;
+  display: block;
+  line-height: 1.4;
+}
+.ws-todo-item.done .ws-todo-title {
+  text-decoration: line-through;
+  color: #879099;
+}
+
+.ws-todo-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 11px;
+  color: #879099;
+}
+
+.ws-todo-deadline {
+  color: #5A6066;
+}
+.ws-todo-deadline.overdue {
+  color: #FF3B30;
+  font-weight: 500;
+}
+
+.ws-todo-project {
+  color: #0076FF;
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.ws-todo-project:hover {
+  background: #EBF4FF;
+}
+
+.ws-pri-high { color: #FF3B30; }
+.ws-pri-medium { color: #FF9500; }
+.ws-pri-low { color: #007AFF; }
+
+/* 新增按钮 */
+.ws-add-btn {
+  width: 100%;
+  padding: 8px;
+  border: 1px dashed #D3DAE0;
+  border-radius: 8px;
+  background: none;
+  color: #5A6066;
+  font-size: 12px;
+  cursor: pointer;
+  margin-top: 6px;
+  transition: border-color 0.15s, color 0.15s;
+}
+.ws-add-btn:hover {
+  border-color: #0076FF;
+  color: #0076FF;
+}
+
+.ws-add-project {
+  width: auto;
+  border: none;
+  padding: 2px 8px;
+  margin-top: 0;
+  font-size: 11px;
+  color: #0076FF;
+}
+.ws-add-project:hover {
+  background: #EBF4FF;
+  border-radius: 4px;
+}
+
+/* 项目卡片 */
+.ws-project-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ws-project-card {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #F5F7FA;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.ws-project-card:hover {
+  background: #EBF4FF;
+  transform: translateY(-1px);
+}
+.ws-project-card.archived {
+  opacity: 0.6;
+}
+
+.ws-card-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #111;
+  margin-bottom: 4px;
+}
+
+.ws-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #879099;
+}
+
+.ws-card-progress {
+  color: #5A6066;
+}
+
+/* 归档折叠 */
+.ws-archived {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #879099;
+}
+.ws-archived summary {
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+/* 详情页 */
+.ws-detail-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.ws-back-btn {
+  background: none;
+  border: none;
+  color: #0076FF;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.ws-back-btn:hover {
+  background: #EBF4FF;
+}
+
+.ws-archive-btn {
+  background: none;
+  border: 1px solid #D3DAE0;
+  color: #5A6066;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+.ws-archive-btn:hover {
+  border-color: #FF9500;
+  color: #FF9500;
+}
+
+/* 信息区 */
+.ws-info-sections {
+  margin-bottom: 16px;
+}
+
+.ws-info-field {
+  margin-bottom: 10px;
+}
+
+.ws-info-label {
+  font-size: 11px;
+  color: #879099;
+  margin-bottom: 3px;
+  font-weight: 500;
+}
+
+.ws-info-value {
+  font-size: 12px;
+  color: #1d1d1f;
+  line-height: 1.5;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #F5F7FA;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ws-info-value:hover {
+  background: #EBF4FF;
+}
+.ws-info-value.empty {
+  color: #BCC4CC;
+  font-style: italic;
+}
+
+/* 已完成折叠 */
+.ws-done-group {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #879099;
+}
+.ws-done-group summary {
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+/* 更多提示 */
+.ws-more {
+  font-size: 11px;
+  color: #879099;
+  text-align: center;
+  padding: 4px;
+}

@@ -1,0 +1,83 @@
+/* ===== 消息通知气泡 ===== */
+.notify-bubble {
+  position: absolute;
+  bottom: 195px;
+  left: 50%;
+  transform: translateX(-50%) translateY(6px) scale(0.9);
+  background: linear-gradient(135deg, #0076FF, #1492FF);
+  border-radius: 14px;
+  padding: 8px 14px;
+  font-family: -apple-system, 'PingFang SC', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: #ffffff;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0, 118, 255, 0.3);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 50;
+}
+
+.notify-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #0076FF;
+}
+
+.notify-bubble.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+/* 气泡出现时的脉冲动画 */
+.notify-bubble.visible::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 17px;
+  background: rgba(0, 118, 255, 0.2);
+  animation: notify-pulse 2s ease-in-out infinite;
+  z-index: -1;
+}
+
+@keyframes notify-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.4; }
+  50% { transform: scale(1.08); opacity: 0; }
+}
+
+/* ===== 桌宠消息反馈动画 ===== */
+.pet-image.reaction-bounce {
+  animation: pet-bounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pet-image.reaction-shake {
+  animation: pet-shake 0.5s ease;
+}
+
+.pet-image.reaction-glow {
+  filter: drop-shadow(0 0 20px rgba(0, 118, 255, 0.6)) !important;
+  transition: filter 0.3s ease;
+}
+
+@keyframes pet-bounce {
+  0% { transform: translateY(0); }
+  30% { transform: translateY(-16px); }
+  50% { transform: translateY(-4px); }
+  70% { transform: translateY(-10px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes pet-shake {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-5deg); }
+  40% { transform: rotate(5deg); }
+  60% { transform: rotate(-3deg); }
+  80% { transform: rotate(3deg); }
+}

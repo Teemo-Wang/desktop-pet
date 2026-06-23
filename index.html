@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>哈啰桌面助手</title>
+  <link rel="stylesheet" href="src/styles/base.css">
+  <link rel="stylesheet" href="src/styles/pet.css">
+  <link rel="stylesheet" href="src/styles/panels.css">
+  <link rel="stylesheet" href="src/styles/menu.css">
+  <link rel="stylesheet" href="src/styles/chat.css">
+  <link rel="stylesheet" href="src/styles/notification.css">
+  <link rel="stylesheet" href="src/styles/api-connect.css">
+  <link rel="stylesheet" href="src/styles/preferences.css">
+  <link rel="stylesheet" href="src/styles/quick-dock.css">
+  <link rel="stylesheet" href="src/styles/todos.css">
+  <link rel="stylesheet" href="src/styles/skills.css">
+  <link rel="stylesheet" href="src/styles/daily-brief.css">
+  <link rel="stylesheet" href="src/styles/yuque.css">
+  <link rel="stylesheet" href="src/styles/workspace.css">
+  <link rel="stylesheet" href="src/styles/demand-card.css">
+  <link rel="stylesheet" href="src/styles/visual-executor.css">
+</head>
+<body>
+  <div class="app">
+    <!-- AI 聊天面板 -->
+    <div class="panel chat-panel" id="chatPanel">
+      <div class="panel-head">
+        <span class="panel-head-title"><img class="panel-head-icon" src="icon/Ai.png" alt="">AI 助手</span>
+        <button class="takeover-btn" id="globalTakeover" title="AI 接管钉钉消息">
+          <span class="takeover-dot"></span>
+          <span class="takeover-label">接管</span>
+        </button>
+        <button class="btn-icon">✕</button>
+      </div>
+      <div class="chat-messages"></div>
+      <div class="quick-cmds"></div>
+      <div class="chat-pending-preview" style="display:none"></div>
+      <div class="chat-input-row">
+        <input class="chat-input" placeholder="问我任何设计相关的问题..." autocomplete="off">
+        <button class="chat-upload-btn" title="上传图片素材">
+          <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+        </button>
+        <input type="file" class="chat-file-input" accept="image/*" multiple style="display:none">
+        <button class="chat-send-btn"><svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button>
+      </div>
+    </div>
+
+    <!-- 钉钉面板 -->
+    <div class="panel" id="dtPanel"></div>
+
+    <!-- 语雀面板 -->
+    <div class="panel" id="yqPanel"></div>
+
+    <!-- API 接入面板 -->
+    <div class="panel" id="apiPanel"></div>
+
+    <!-- 偏好设置面板 -->
+    <div class="panel" id="prefPanel"></div>
+
+    <!-- 待办面板 -->
+    <div class="panel" id="todosPanel"></div>
+
+    <!-- 技能面板 -->
+    <div class="panel" id="skillsPanel"></div>
+
+    <!-- 项目工作台面板 -->
+    <div class="panel" id="workspacePanel"></div>
+
+    <!-- 通知气泡 -->
+    <div class="notify-bubble" id="notifyBubble"></div>
+
+    <!-- 系统面板的装饰底条 -->
+    <div class="system-dock" id="systemDock">
+      <span class="system-dock-icon">⚙️</span>
+      <span class="system-dock-text" id="systemDockText">系统设置</span>
+    </div>
+
+    <!-- 悬停气泡 -->
+    <div class="hover-bubble" id="hoverBubble">点我开始聊天 💬</div>
+
+    <!-- 桌宠 -->
+    <div class="pet-area" id="petArea">
+      <img class="pet-image" src="pet.png" alt="哈啰AI助手" draggable="false">
+      <div class="pet-shadow"></div>
+    </div>
+
+    <!-- 图片放大预览 -->
+    <div class="img-lightbox" id="imgLightbox">
+      <button class="img-lightbox-close" id="imgLightboxClose">✕</button>
+      <img id="imgLightboxImg" src="" alt="预览">
+      <div class="img-lightbox-bar">
+        <button class="img-lightbox-btn" id="imgLightboxDownload">⬇ 下载图片</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 模块加载 -->
+  <script src="src/stores/settings.js"></script>
+  <script src="src/services/ai.js"></script>
+  <script src="src/services/ai-takeover.js"></script>
+  <script src="src/services/skills.js"></script>
+  <script src="src/services/projects.js"></script>
+  <script src="src/services/visual-gen.js"></script>
+  <script src="src/services/todos.js"></script>
+  <script src="src/services/work-stats.js"></script>
+  <script src="src/services/dingtalk.js"></script>
+  <script src="src/services/yuque-url.js"></script>
+  <script src="src/services/yuque-api.js"></script>
+  <script src="src/services/yuque-cache.js"></script>
+  <script src="src/services/yuque.js"></script>
+  <script src="src/services/yuque-search.js"></script>
+  <script src="src/services/chat-history.js"></script>
+  <script src="src/services/daily-brief.js"></script>
+  <script src="src/utils/context-builder.js"></script>
+  <script src="src/utils/markdown.js"></script>
+  <script src="src/components/pet.js"></script>
+  <script src="src/components/menu.js"></script>
+  <script src="src/components/chat.js"></script>
+  <script src="src/components/dingtalk.js"></script>
+  <script src="src/components/yuque.js"></script>
+  <script src="src/components/todos.js"></script>
+  <script src="src/components/skills.js"></script>
+  <script src="src/components/workspace.js"></script>
+  <script src="src/components/demand-card.js"></script>
+  <script src="src/components/visual-executor.js"></script>
+  <script src="src/components/notification.js"></script>
+  <script src="src/components/quick-dock.js"></script>
+  <script src="src/components/daily-brief.js"></script>
+  <script src="src/components/api-connect.js"></script>
+  <script src="src/components/preferences.js"></script>
+  <script src="src/components/panel-resizer.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+/* 需求卡片样式 */
+
+.demand-card {
+  background: #F8FAFC;
+  border: 1px solid #E8ECF0;
+  border-radius: 12px;
+  padding: 12px;
+  margin: 8px 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.demand-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--dc-color, #0076FF);
+  border-radius: 3px 0 0 3px;
+}
+
+/* 来源标识 */
+.dc-source {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding-left: 4px;
+}
+
+.dc-source-icon {
+  font-size: 12px;
+}
+
+.dc-source-text {
+  font-size: 11px;
+  color: var(--dc-color, #0076FF);
+  font-weight: 500;
+}
+
+/* 总结内容 */
+.dc-summary {
+  font-size: 12px;
+  color: #1d1d1f;
+  line-height: 1.6;
+  margin-bottom: 8px;
+  padding-left: 4px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.dc-summary h1,
+.dc-summary h2,
+.dc-summary h3 {
+  font-size: 12px;
+  font-weight: 600;
+  margin: 6px 0 2px;
+}
+
+.dc-summary ul,
+.dc-summary ol {
+  padding-left: 16px;
+  margin: 4px 0;
+}
+
+.dc-summary li {
+  margin: 2px 0;
+}
+
+/* 类型标签 */
+.dc-type-tag {
+  display: inline-block;
+  font-size: 11px;
+  color: #5A6066;
+  background: #EBF4FF;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  margin-left: 4px;
+}
+
+/* 操作建议 */
+.dc-suggestion {
+  font-size: 11px;
+  color: #5A6066;
+  background: #FFF7E6;
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin: 6px 0;
+  line-height: 1.4;
+}
+
+/* 生图按钮 */
+.dc-gen-btn {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  margin-top: 8px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #0076FF, #1492FF);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.dc-gen-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.dc-gen-btn:active {
+  transform: translateY(0);
+  opacity: 0.8;
+}

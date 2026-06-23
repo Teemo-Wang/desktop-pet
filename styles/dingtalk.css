@@ -1,0 +1,293 @@
+/* ===== 钉钉消息面板 ===== */
+.dingtalk-panel {
+  position: absolute;
+  bottom: 180px;
+  left: 10px;
+  right: 10px;
+  height: 380px;
+  transform-origin: bottom center;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: scale(0.8) translateY(20px);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 90;
+}
+
+.dingtalk-panel.open {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* 头部 */
+.dt-header {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
+}
+
+.dt-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1D1D1F;
+  flex: 1;
+}
+
+.dt-unread-total {
+  font-size: 11px;
+  color: #0076FF;
+  font-weight: 500;
+}
+
+.dt-close {
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.06);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #86868B;
+  transition: background 0.2s;
+}
+
+.dt-close:hover { background: rgba(0, 0, 0, 0.1); }
+
+.dt-back {
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.04);
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  color: #0076FF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.dt-back:hover { background: rgba(0, 118, 255, 0.08); }
+
+/* 连接状态 */
+.dt-status {
+  padding: 6px 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
+}
+
+.dt-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #AEAEB2;
+}
+
+.dt-status-dot.connected { background: #00B365; }
+.dt-status-dot.error { background: #FF3B30; }
+
+.dt-status-text {
+  font-size: 11px;
+  color: #86868B;
+}
+
+/* 会话列表 */
+.dt-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.dt-list::-webkit-scrollbar { width: 4px; }
+.dt-list::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 2px; }
+
+.dt-conv-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.dt-conv-item:hover {
+  background: rgba(0, 118, 255, 0.04);
+}
+
+.dt-conv-item:active {
+  background: rgba(0, 118, 255, 0.08);
+}
+
+/* 头像 */
+.dt-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+/* 会话信息 */
+.dt-conv-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.dt-conv-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.dt-conv-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1D1D1F;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dt-conv-item.unread .dt-conv-name {
+  font-weight: 600;
+}
+
+.dt-conv-time {
+  font-size: 11px;
+  color: #AEAEB2;
+  flex-shrink: 0;
+}
+
+.dt-conv-bottom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dt-conv-summary {
+  flex: 1;
+  font-size: 12px;
+  color: #86868B;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dt-conv-item.unread .dt-conv-summary {
+  color: #3A3A3C;
+}
+
+.dt-conv-badge {
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: #FF3B30;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
+/* 消息详情 */
+.dt-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dt-messages::-webkit-scrollbar { width: 4px; }
+.dt-messages::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 2px; }
+
+.dt-msg {
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 12px;
+  border-bottom-left-radius: 4px;
+}
+
+.dt-msg-sender {
+  font-size: 11px;
+  font-weight: 600;
+  color: #0076FF;
+  margin-bottom: 2px;
+}
+
+.dt-msg-content {
+  font-size: 13px;
+  color: #1D1D1F;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.dt-msg-time {
+  font-size: 10px;
+  color: #AEAEB2;
+  margin-top: 4px;
+  text-align: right;
+}
+
+
+/* 操作按钮栏 */
+.dt-actions {
+  padding: 10px 16px;
+  display: flex;
+  gap: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
+}
+
+.dt-action-btn {
+  flex: 1;
+  height: 34px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  color: #3A3A3C;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dt-action-btn:hover { background: rgba(0, 0, 0, 0.04); }
+
+.dt-action-btn.primary {
+  background: #0076FF;
+  color: #fff;
+  border-color: #0076FF;
+}
+
+.dt-action-btn.primary:hover { background: #0061D1; }

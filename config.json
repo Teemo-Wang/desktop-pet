@@ -1,0 +1,10 @@
+{
+  "api": {
+    "baseUrl": "https://api.openai.com/v1",
+    "apiKey": "sk-your-api-key-here",
+    "model": "gpt-4o-mini",
+    "systemPrompt": "你是哈啰出行的AI助手，名叫哈啰小哈。你性格活泼友好，回答简洁有用。"
+  },
+  "proxy": "",
+  "_proxyHelp": "留空 = 跟随系统代理；指定地址 = 使用该代理。例：http://127.0.0.1:7890"
+}

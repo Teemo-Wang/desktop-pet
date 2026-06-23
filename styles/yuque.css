@@ -1,0 +1,215 @@
+/* ===== 语雀文档面板 ===== */
+.yuque-panel {
+  position: absolute;
+  bottom: 180px;
+  left: 10px;
+  right: 10px;
+  height: 380px;
+  transform-origin: bottom center;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: scale(0.8) translateY(20px);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 90;
+}
+
+.yuque-panel.open {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* 头部 */
+.yq-header {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
+}
+
+.yq-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1D1D1F;
+  flex: 1;
+}
+
+.yq-title-sm { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.yq-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.yq-status-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: #AEAEB2;
+}
+.yq-status-dot.connected { background: #00B365; }
+
+.yq-status-text { font-size: 11px; color: #86868B; }
+
+.yq-close, .yq-back {
+  width: 24px; height: 24px; border-radius: 12px;
+  background: rgba(0, 0, 0, 0.06); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: #86868B; transition: background 0.2s;
+}
+.yq-close:hover, .yq-back:hover { background: rgba(0, 0, 0, 0.1); }
+.yq-back { font-size: 18px; color: #0076FF; width: 28px; height: 28px; border-radius: 14px; }
+
+/* 输入区 */
+.yq-input-area {
+  padding: 10px 16px;
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
+}
+
+.yq-url-input {
+  flex: 1;
+  height: 32px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  background: rgba(255, 255, 255, 0.8);
+  transition: border-color 0.2s;
+}
+.yq-url-input:focus { border-color: #0076FF; }
+
+.yq-fetch-btn {
+  padding: 0 14px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: #0076FF;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.yq-fetch-btn:hover { background: #0061D1; }
+.yq-fetch-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 内容区 */
+.yq-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+}
+.yq-body::-webkit-scrollbar { width: 4px; }
+.yq-body::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 2px; }
+
+/* 空状态 */
+.yq-empty {
+  text-align: center;
+  padding: 40px 0;
+}
+.yq-empty-icon { font-size: 32px; margin-bottom: 8px; }
+.yq-empty-text { font-size: 13px; color: #3A3A3C; font-weight: 500; }
+.yq-empty-hint { font-size: 11px; color: #86868B; margin-top: 4px; }
+
+/* 最近记录 */
+.yq-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #86868B;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.yq-recent-item {
+  padding: 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-bottom: 4px;
+}
+.yq-recent-item:hover { background: rgba(0, 118, 255, 0.04); }
+
+.yq-recent-title { font-size: 13px; font-weight: 500; color: #1D1D1F; margin-bottom: 2px; }
+.yq-recent-meta { font-size: 11px; color: #86868B; }
+
+/* 文档详情 */
+.yq-doc-meta {
+  padding: 8px 16px;
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+  color: #86868B;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
+}
+
+.yq-doc-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #1D1D1F;
+}
+.yq-doc-content::-webkit-scrollbar { width: 4px; }
+.yq-doc-content::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 2px; }
+
+.yq-md-h1 { font-size: 15px; font-weight: 600; margin: 12px 0 6px; color: #1D1D1F; }
+.yq-md-h2 { font-size: 13px; font-weight: 600; margin: 10px 0 4px; color: #3A3A3C; }
+.yq-md-h3 { font-size: 12px; font-weight: 600; margin: 8px 0 4px; color: #3A3A3C; }
+.yq-md-li { padding-left: 12px; margin: 2px 0; color: #3A3A3C; }
+.yq-md-p { margin: 3px 0; }
+.yq-md-br { height: 6px; }
+
+/* 操作按钮 */
+.yq-doc-actions {
+  padding: 10px 16px;
+  display: flex;
+  gap: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
+}
+
+.yq-action-btn {
+  flex: 1;
+  height: 34px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  color: #3A3A3C;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.yq-action-btn:hover { background: rgba(0, 0, 0, 0.04); }
+.yq-action-btn.primary {
+  background: #0076FF;
+  color: #fff;
+  border-color: #0076FF;
+}
+.yq-action-btn.primary:hover { background: #0061D1; }
+
+/* 错误提示 */
+.yq-error {
+  text-align: center;
+  padding: 20px;
+  font-size: 13px;
+  color: #FF3B30;
+}

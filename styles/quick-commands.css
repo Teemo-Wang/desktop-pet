@@ -1,0 +1,46 @@
+/* ===== 快捷指令区域 ===== */
+.quick-commands {
+  padding: 8px 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 72px;
+  overflow-y: auto;
+}
+
+.quick-commands::-webkit-scrollbar { height: 0; width: 0; }
+
+.quick-cmd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid rgba(0, 118, 255, 0.15);
+  border-radius: 14px;
+  background: rgba(0, 118, 255, 0.04);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.quick-cmd-btn:hover {
+  background: rgba(0, 118, 255, 0.1);
+  border-color: rgba(0, 118, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.quick-cmd-btn:active {
+  transform: scale(0.95);
+}
+
+.quick-cmd-icon {
+  font-size: 12px;
+}
+
+.quick-cmd-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #0076FF;
+}
