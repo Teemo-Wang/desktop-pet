@@ -4,22 +4,123 @@
  * Claude 协议待后续单独适配
  */
 (function() {
+  /**
+   * 读取图片真实宽高（渲染进程用 Image 加载，支持 http(s) URL 和 data URL）
+   * @param {string} src
+   * @returns {Promise<{w:number,h:number}|null>}
+   */
+  function _measureImageSize(src) {
+    return new Promise((resolve) => {
+      try {
+        if (typeof Image === 'undefined' || !src) return resolve(null);
+        const img = new Image();
+        const timer = setTimeout(() => resolve(null), 8000);
+        img.onload = () => { clearTimeout(timer); resolve({ w: img.naturalWidth, h: img.naturalHeight }); };
+        img.onerror = () => { clearTimeout(timer); resolve(null); };
+        img.src = src;
+      } catch (e) { resolve(null); }
+    });
+  }
+
+  /**
+   * 将图片精确缩放到目标宽高（canvas 降采样）。
+   * 远程 url 可能因跨域污染 canvas，故先经主进程下载成 dataURL（若可用）再画。
+   * @returns {Promise<string|null>} 目标尺寸的 PNG dataURL
+   */
+  async function _resizeToExact(src, w, h) {
+    if (!src || !w || !h) return null;
+    let usable = src;
+    // 远程图先转 dataURL，规避 canvas 跨域污染导致 toDataURL 抛错
+    if (!/^data:/.test(src) && window.materialService && window.materialService.fetchImageAsDataUrl) {
+      try { const d = await window.materialService.fetchImageAsDataUrl(src); if (d) usable = d; } catch (e) { /* 用原 src 兜底 */ }
+    }
+    return new Promise((resolve) => {
+      try {
+        if (typeof Image === 'undefined' || typeof document === 'undefined') return resolve(null);
+        const img = new Image();
+        const timer = setTimeout(() => resolve(null), 12000);
+        img.onload = () => {
+          clearTimeout(timer);
+          try {
+            const c = document.createElement('canvas');
+            c.width = w; c.height = h;
+            const ctx = c.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(c.toDataURL('image/png'));
+          } catch (e) { resolve(null); }
+        };
+        img.onerror = () => { clearTimeout(timer); resolve(null); };
+        img.src = usable;
+      } catch (e) { resolve(null); }
+    });
+  }
+
+  /**
+   * 把原图宽高等比缩放到 seedream 的合规尺寸范围，保留原始比例。
+   * seedream 约束：总像素需在 [3686400(约1920²), 16777216(约4096²)] 之间，单边不超过 4096。
+   * @returns {string|null} "宽x高"
+   */
+  function _fitImageGenSize(w, h) {
+    if (!w || !h) return null;
+    const MIN = 3686400, MAX = 16777216, SIDE_MAX = 4096;
+    let ww = w, hh = h;
+    // 小于最小像素 → 等比放大（留 2% 余量，避免取整后又低于阈值）
+    if (ww * hh < MIN) { const s = Math.sqrt((MIN * 1.02) / (ww * hh)); ww = Math.round(ww * s); hh = Math.round(hh * s); }
+    // 大于最大像素 → 等比缩小
+    if (ww * hh > MAX) { const s = Math.sqrt(MAX / (ww * hh)); ww = Math.round(ww * s); hh = Math.round(hh * s); }
+    // 单边超上限 → 等比压到 4096 内
+    if (ww > SIDE_MAX || hh > SIDE_MAX) { const s = SIDE_MAX / Math.max(ww, hh); ww = Math.round(ww * s); hh = Math.round(hh * s); }
+    // 压缩后若又跌破最小像素（极端长条比例），再放大一次
+    if (ww * hh < MIN) { const s = Math.sqrt((MIN * 1.02) / (ww * hh)); ww = Math.round(ww * s); hh = Math.round(hh * s); }
+    return `${ww}x${hh}`;
+  }
+
   class AIService {
     constructor() { this.config = null; this.useMock = true; }
 
     /** 配置/重新配置当前供应商。无 apiKey 时自动回退 mock 数据 */
-    configure(cfg) { this.config = cfg; this.useMock = !cfg.apiKey; }
+    configure(cfg) {
+      this.config = cfg;
+      // 哈啰 AI 应用平台用 applicationGuid（复用"模型"字段），不需要 apiKey；
+      // 因此真实模式的判断基于是否填了 applicationGuid，而非 apiKey
+      if (cfg && cfg.baseUrl && /aibrain-ai-application/.test(cfg.baseUrl)) {
+        this.useMock = !cfg.modelName;
+      } else {
+        this.useMock = !cfg.apiKey;
+      }
+    }
 
-    /** 非流式发送 */
-    async send(messages) {
+    /** 是否为哈啰 AI 应用平台（自定义 execute 协议，非 OpenAI 兼容） */
+    _isAIBrain() {
+      return !!(this.config && this.config.baseUrl && /aibrain-ai-application/.test(this.config.baseUrl));
+    }
+
+    /** 非流式发送（opts.timeout 可自定义超时毫秒，默认 40s；慢网关/长提示词场景可放宽） */
+    async send(messages, opts = {}) {
       if (this.useMock) return this._mock(messages);
+      if (this._isAIBrain()) return this._aibrainExecute(messages, null);
       if (!this.config.apiKey) throw new Error('⚠️ 请先配置 API Key');
-      const res = await fetch(this.config.baseUrl + '/chat/completions', {
-        method: 'POST',
-        headers: this._buildHeaders(),
-        body: JSON.stringify({ model: this.config.modelName, messages, max_tokens: 2048, temperature: 0.7 }),
-        signal: AbortSignal.timeout(60000),
-      });
+      const timeoutMs = opts.timeout || 40000;
+      // 仅对"连接被重置/GOAWAY"这类快速失败重试；超时不重试（超时说明网关慢，重试只会叠加等待）
+      let res, lastErr;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          res = await fetch(this.config.baseUrl + '/chat/completions', {
+            method: 'POST',
+            headers: this._buildHeaders(),
+            body: JSON.stringify({ model: this.config.modelName, messages, max_tokens: 2048, temperature: 0.7 }),
+            signal: AbortSignal.timeout(timeoutMs),
+          });
+          break;
+        } catch (e) {
+          lastErr = e;
+          const isTimeout = (e && (e.name === 'TimeoutError' || /timed?\s*out|abort/i.test(e.message || '')));
+          console.warn('[ai.send] 第 ' + attempt + ' 次请求失败:', e && (e.message || e.name), isTimeout ? '(超时，不重试)' : '');
+          if (isTimeout) break;   // 超时直接放弃，避免长时间"假死"
+          await new Promise(r => setTimeout(r, 600));
+        }
+      }
+      if (!res) throw (lastErr || new Error('网络请求失败'));
       if (!res.ok) throw new Error(await this._formatHttpError(res));
       const data = await res.json();
       const msg = data.choices?.[0]?.message || {};
@@ -48,16 +149,42 @@
      */
     async stream(messages, onChunk, signal) {
       if (this.useMock) return this._mockStream(messages, onChunk, signal);
+      // 哈啰 AI 应用平台：走自定义 execute 接口（非流式），结果一次性回调
+      if (this._isAIBrain()) {
+        const full = await this._aibrainExecute(messages, signal);
+        if (onChunk) onChunk(full, full);
+        return full;
+      }
       if (!this.config.apiKey) throw new Error('⚠️ 请先配置 API Key');
 
-      const res = await fetch(this.config.baseUrl + '/chat/completions', {
-        method: 'POST',
-        headers: this._buildHeaders(),
-        body: JSON.stringify({ model: this.config.modelName, messages, max_tokens: 2048, temperature: 0.7, stream: true }),
-        signal: signal || AbortSignal.timeout(60000),
-      });
-      if (!res.ok) throw new Error(await this._formatHttpError(res));
-      if (!res.body) throw new Error('⚠️ 不支持流式响应，请关闭流式开关');
+      let res;
+      try {
+        res = await fetch(this.config.baseUrl + '/chat/completions', {
+          method: 'POST',
+          // 流式请求必须带 Accept: text/event-stream，否则部分网关（如幻视大模型）按非流式处理，导致"憋完整段才返回"
+          headers: { ...this._buildHeaders(), 'Accept': 'text/event-stream' },
+          body: JSON.stringify({ model: this.config.modelName, messages, max_tokens: 2048, temperature: 0.7, stream: true }),
+          signal: signal || AbortSignal.timeout(60000),
+        });
+      } catch (e) {
+        // 用户主动中止（点了停止）：不降级，直接向上抛
+        if (signal && signal.aborted) throw e;
+        // 网关在响应前就断连（如 HTTP/2 GOAWAY、连接重置、拒绝 SSE）：自动降级为非流式请求
+        // 哈啰 AIBrain 大模型引擎网关不支持 SSE，会直接 GOAWAY 关闭连接，必须走此降级
+        console.warn('[ai.stream] 流式请求失败，降级为非流式:', e && (e.message || e.name || e));
+        return await this._streamFallback(messages, onChunk, signal);
+      }
+      // 部分企业网关不支持流式（SSE），会返回 405/400；此时自动降级为非流式请求
+      if (!res.ok) {
+        if (res.status === 405 || res.status === 400 || res.status === 501) {
+          return await this._streamFallback(messages, onChunk, signal);
+        }
+        throw new Error(await this._formatHttpError(res));
+      }
+      // 响应体不可读（网关不返回流）时，同样降级为非流式
+      if (!res.body) {
+        return await this._streamFallback(messages, onChunk, signal);
+      }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder('utf-8');
@@ -118,8 +245,124 @@
       return full || '⚠️ 模型无响应';
     }
 
+    /**
+     * 流式降级：网关不支持 SSE 时，改用非流式请求，一次性把完整回复通过 onChunk 输出
+     * @param {Array} messages
+     * @param {(chunk:string,full:string)=>void} onChunk
+     * @param {AbortSignal} [signal]
+     * @returns {Promise<string>} 完整文本
+     */
+    async _streamFallback(messages, onChunk, signal) {
+      const res = await fetch(this.config.baseUrl + '/chat/completions', {
+        method: 'POST',
+        headers: this._buildHeaders(),
+        body: JSON.stringify({ model: this.config.modelName, messages, max_tokens: 2048, temperature: 0.7 }),
+        signal: signal || AbortSignal.timeout(60000),
+      });
+      if (!res.ok) throw new Error(await this._formatHttpError(res));
+      const data = await res.json();
+      const msg = data.choices?.[0]?.message || {};
+      let full = '';
+      if (Array.isArray(msg.content)) {
+        // 多模态：图片 + 文本混合
+        for (const part of msg.content) {
+          if (part.type === 'image_url' && part.image_url?.url) full += `\n![生成图片](${part.image_url.url})\n`;
+          else if (part.type === 'text' && part.text) full += part.text;
+        }
+      } else {
+        // 推理模型正文在 content，思考过程在 reasoning_content
+        full = msg.content || msg.reasoning_content || '';
+      }
+      full = full || '⚠️ 模型无响应';
+      // 一次性把完整结果交给上层渲染（模拟流式回调的最终态）
+      if (onChunk) onChunk(full, full);
+      return full;
+    }
+
+    /**
+     * 哈啰 AI 应用平台执行接口（自定义协议，非 OpenAI 兼容）
+     * POST {base_url}/AIBrainAIApplication/api/v1/run/execute
+     * body: { applicationGuid, prompt, imageList?, stream, userInfo? }
+     * @param {Array} messages - 标准 messages，会抽取最后一条 user 作为 prompt
+     * @param {AbortSignal} [signal]
+     * @returns {Promise<string>} 应用输出文本
+     */
+    async _aibrainExecute(messages, signal) {
+      const { prompt, images } = this._extractPrompt(messages);
+      const base = this.config.baseUrl.replace(/\/+$/, '');
+      const url = base + '/AIBrainAIApplication/api/v1/run/execute';
+      const body = {
+        applicationGuid: this.config.modelName,   // 复用"模型"字段填 applicationGuid（应用ID）
+        prompt: prompt || '',
+        stream: false,
+      };
+      // AIBrain 的 imageList 要求是 http(s) 图片 URL，不支持 base64 data URL
+      const urlImages = (images || []).filter(u => /^https?:\/\//.test(u));
+      if (urlImages.length) body.imageList = urlImages;
+      // 若配置了用户邮箱（知识库授权场景需要），带上 userInfo
+      if (this.config.userEmail) body.userInfo = { email: this.config.userEmail };
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify(body),
+        signal: signal || AbortSignal.timeout(120000),
+      });
+      if (!res.ok) throw new Error(await this._formatHttpError(res));
+      const json = await res.json();
+      const code = json.code;
+      // 成功码兼容 0 / 200（字符串或数字）
+      if (code !== 0 && code !== 200 && code !== '0' && code !== '200') {
+        throw new Error('⚠️ ' + (json.msg || json.errorMsg || ('应用返回错误 code=' + code)));
+      }
+      return this._aibrainAnswer(json);
+    }
+
+    /** 从标准 messages 抽取最后一条 user 消息作为 prompt（兼容多模态） */
+    _extractPrompt(messages) {
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role !== 'user') continue;
+        const c = messages[i].content;
+        if (typeof c === 'string') return { prompt: c, images: [] };
+        if (Array.isArray(c)) {
+          let text = ''; const images = [];
+          for (const part of c) {
+            if (part.type === 'text') text += (part.text || '');
+            else if (part.type === 'image_url' && part.image_url?.url) images.push(part.image_url.url);
+          }
+          return { prompt: text, images };
+        }
+      }
+      return { prompt: '', images: [] };
+    }
+
+    /** 解析 AIBrain 返回，取出真正的答案文本（response 可能是嵌套 JSON 字符串） */
+    _aibrainAnswer(json) {
+      let ans = json.response;
+      if (typeof ans === 'string') {
+        const t = ans.trim();
+        if (t.startsWith('{')) {
+          try {
+            const inner = JSON.parse(t);
+            if (inner && typeof inner.response === 'string') ans = inner.response;
+          } catch (e) { /* 非嵌套 JSON，保持原样 */ }
+        }
+      }
+      return (ans && String(ans).trim()) || json.reasoningContent || '⚠️ 应用无响应';
+    }
+
     /** 测试连接：优先 /models 端点；不支持时降级用一次极简 chat 探活 */
     async test() {
+      // 哈啰 AI 应用平台：用一次极简 execute 探活
+      if (this._isAIBrain()) {
+        if (!this.config.modelName) return { ok: false, msg: '请在「模型」框填应用ID(applicationGuid)' };
+        try {
+          const r = await this._aibrainExecute([{ role: 'user', content: '你好' }], AbortSignal.timeout(30000));
+          return r ? { ok: true, msg: '连接成功' } : { ok: false, msg: '应用无响应' };
+        } catch (e) {
+          return { ok: false, msg: String(e.message || e).replace(/^⚠️\s*/, '') };
+        }
+      }
       if (!this.config?.apiKey) return { ok: false, msg: '未配置 Key' };
       try {
         // 超时放宽到 15s，国内代理首包慢
@@ -162,10 +405,11 @@
         });
         if (res.ok) return { ok: true, msg: '连接成功' };
         if (res.status === 401 || res.status === 403) return { ok: false, msg: 'API Key 无效或权限不足' };
-        if (res.status === 404) return { ok: false, msg: '模型名/接入点不存在，请检查模型 ID' };
         if (res.status === 429) return { ok: false, msg: '请求过于频繁' };
-        const detail = await this._formatHttpError(res);
-        return { ok: false, msg: detail.replace(/^⚠️\s*/, '') };
+        // 其余错误（含 404）直接暴露网关返回原文，便于排查真实原因（路径错 vs 模型错）
+        let raw = '';
+        try { raw = await res.text(); } catch (e) { /* ignore */ }
+        return { ok: false, msg: `HTTP ${res.status}：${(raw || '无响应体').slice(0, 200)}` };
       } catch (e) {
         return { ok: false, msg: String(e.message || e.name || '探活失败') };
       }
@@ -186,30 +430,67 @@
      * @returns {Promise<{url?:string, b64?:string}>} 生成结果
      */
     async generateImage(options = {}) {
-      if (!this.config?.apiKey) throw new Error('⚠️ 请先配置 API Key');
-
       // 优先用专门的生图模型配置
       const imgCfg = this.imageConfig || {};
+      // 生图专用 Key / 地址：填了就用生图服务自己的（如公司另一个生图接口），没填则复用对话配置
+      const imgApiKey = imgCfg.apiKey || this.config?.apiKey;
+      const imgBaseUrl = imgCfg.baseUrl || this.config?.baseUrl;
+      if (!imgApiKey) throw new Error('⚠️ 请先配置 API Key');
+      if (!imgBaseUrl) throw new Error('⚠️ 请先配置生图地址');
       const model = options.model || imgCfg.modelName || this.config.imageModel || this.config.modelName;
       const body = {
         model,
         prompt: options.prompt || '哈啰骑行场景，品牌风格',
         n: options.n || 1,
-        response_format: 'url',
+        // 注意：不固定传 response_format —— 部分模型（如 GPT-Image 系列）不支持该参数会报
+        // 400 Unknown parameter。默认返回 url（seedream）或 b64（gpt-image），下方统一兼容。
       };
 
-      // 火山方舟 seedream 要求 size 像素总数 ≥ 3686400（约 1920×1920）
-      body.size = options.size || imgCfg.size || '2048x2048';
-
       // 如果有参考图（image-to-image 编辑），加入 image 字段
-      if (options.imageUrl) {
-        body.image = options.imageUrl;
+      // 模型 family 判断：不同生图模型对「参考图」和「尺寸」的参数要求不同
+      const isGptImage = /gpt-?image/i.test(String(model));
+
+      const cfgSize = String(options.size || imgCfg.size || '').trim();
+      const isAdaptive = !cfgSize || cfgSize === '0' || cfgSize === '0x0' || cfgSize.toLowerCase() === 'adaptive';
+      // 用户显式指定的精确目标尺寸（如 702x180）：接口有最小像素限制，先按比例放大生成、最后降采样到精确尺寸
+      let exactW = 0, exactH = 0;
+      const _em = cfgSize.match(/^(\d+)\s*[x×*]\s*(\d+)$/i);
+      if (!isAdaptive && _em) { exactW = parseInt(_em[1], 10); exactH = parseInt(_em[2], 10); }
+
+      if (isGptImage) {
+        // GPT-Image 系列：/images/generations 端点不接受 image 参数（图生图需走 /images/edits，此处不支持）；
+        // 尺寸只认固定集合，其余一律用 auto。
+        const GPT_SIZES = ['1024x1024', '1024x1536', '1536x1024', 'auto'];
+        body.size = (!isAdaptive && GPT_SIZES.includes(cfgSize)) ? cfgSize : 'auto';
+        // 注意：不发送 body.image —— 带参考图的「图生图」请改用 seedream 系列模型
+      } else {
+        // seedream 等：支持参考图，尺寸支持「宽x高 / 2k / 3k / 4k」
+        if (options.imageUrl) body.image = options.imageUrl;
+        if (!isAdaptive) {
+          // 显式「宽x高」按该比例适配到合规像素范围（如 702x180 会等比放大到满足最小像素，比例不变）；
+          // 2k/3k/4k/auto 等关键字原样传
+          const m = cfgSize.match(/^(\d+)\s*[x×*]\s*(\d+)$/i);
+          body.size = m ? (_fitImageGenSize(parseInt(m[1], 10), parseInt(m[2], 10)) || cfgSize) : cfgSize;
+        } else if (options.imageUrl) {
+          // 改图：按原图真实宽高等比适配到合规范围，保证输出与原图比例一致（否则默认出正方形）
+          try {
+            const dim = await _measureImageSize(options.imageUrl);
+            const fitted = dim && _fitImageGenSize(dim.w, dim.h);
+            if (fitted) body.size = fitted;
+          } catch (e) { /* 量不到就不传，用模型默认 */ }
+        }
       }
 
-      const endpoint = this.config.baseUrl.replace(/\/+$/, '') + '/images/generations';
+      // 图生图但选了 GPT-Image：该端点不支持编辑原图，明确报错引导换模型，避免"忽略原图静默生成新图"的误导
+      if (options.imageUrl && isGptImage) {
+        throw new Error('当前生图模型（GPT-Image 系列）不支持「图生图 / 改图」，请切换到 Doubao-Seedream 系列再试');
+      }
+
+      const endpoint = imgBaseUrl.replace(/\/+$/, '') + '/images/generations';
       const res = await fetch(endpoint, {
         method: 'POST',
-        headers: this._buildHeaders(),
+        // 用生图专用 Key（未单独配置则复用对话 Key）
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + imgApiKey },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(120000), // 生图可能较慢
       });
@@ -230,8 +511,17 @@
       const data = await res.json();
       // OpenAI 格式：data.data[0].url 或 data.data[0].b64_json
       const result = data.data?.[0] || {};
+      // 有的模型只返回 b64（如 GPT-Image 系列），转成 data URL，让下游按 url 直接展示
+      let url = result.url || (result.b64_json ? `data:image/png;base64,${result.b64_json}` : null);
+      // 精确尺寸：接口按合规大尺寸出图后，降采样到用户要求的精确宽高（比例一致，不变形）
+      if (url && exactW && exactH) {
+        try {
+          const resized = await _resizeToExact(url, exactW, exactH);
+          if (resized) url = resized;
+        } catch (e) { console.warn('[generateImage] 精确缩放失败，返回原图:', e && e.message); }
+      }
       return {
-        url: result.url || null,
+        url,
         b64: result.b64_json || null,
       };
     }
@@ -254,7 +544,7 @@
         if (status === 429) return '⚠️ 请求过于频繁或速率超限：' + (detail || '请稍后重试');
       } catch (e) { /* 响应不是 JSON，忽略 */ }
       if (status === 401 || status === 403) return '⚠️ 鉴权失败 (' + status + ')：' + (detail || 'API Key 无效');
-      if (status >= 500) return '⚠️ 服务端错误 (' + status + ')';
+      if (status >= 500) return '⚠️ 服务端错误 (' + status + ')' + (detail ? '：' + detail : '（网关未返回详情，多为模型名不对或该模型服务异常）');
       return '⚠️ 请求失败 (' + status + ')' + (detail ? '：' + detail : '');
     }
 

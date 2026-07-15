@@ -14,3 +14,6 @@ npm-debug.log*
 
 # 本地用户数据
 config.local.json
+
+# 打包产物（体积大，且可能打包进本地凭据，不入库）
+dist/

@@ -85,12 +85,14 @@
           // 先从最近找，再从收藏找
           let doc = this.service.getRecent().find(d => d.id === id);
           if (!doc && this.service.getFavorites) doc = this.service.getFavorites().find(d => d.id === id);
-          if (doc && content) this._renderDoc({ title: doc.title, content, id: doc.id, slug: doc.slug, author: doc.author, updated: doc.updated, words: doc.words });
+          if (doc && content) this._renderDoc({ ...doc, content });
         });
       });
 
       // 收藏 / 取消收藏 / 删除按钮
       this._bindItemActions();
+      // 右键改备注
+      this._bindDocContextMenu();
       // 推荐示例 / 搜索结果项
       this.panel.querySelectorAll('.list-item[data-example-url]').forEach(el => {
         el.addEventListener('click', async () => {
@@ -129,6 +131,57 @@
           this.activeCategory = cat;
           this.searchState = null; // 切换分类时清除搜索状态
           this._refreshMain();
+        });
+      });
+    }
+
+    /** 自定义文本输入弹层（Electron 不支持 window.prompt，需自建） */
+    _askText(message, defaultVal) {
+      return new Promise((resolve) => {
+        const mask = document.createElement('div');
+        mask.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;';
+        const box = document.createElement('div');
+        box.style.cssText = 'width:280px;max-width:80vw;background:#fff;border-radius:12px;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,0.2);font-size:13px;';
+        box.innerHTML = `
+          <div style="font-weight:600;margin-bottom:10px;color:#111;line-height:1.5;">${message}</div>
+          <input type="text" class="yq-ask-input" value="${String(defaultVal || '').replace(/"/g, '&quot;')}" maxlength="40" placeholder="留空可清除备注"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d3dae0;border-radius:8px;font-size:13px;outline:none;">
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">
+            <button class="yq-ask-cancel" style="padding:6px 14px;border:1px solid #d3dae0;background:#fff;border-radius:8px;cursor:pointer;font-size:13px;">取消</button>
+            <button class="yq-ask-ok" style="padding:6px 14px;border:none;background:#0076FF;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;">确定</button>
+          </div>`;
+        mask.appendChild(box);
+        document.body.appendChild(mask);
+        const input = box.querySelector('.yq-ask-input');
+        setTimeout(() => { input.focus(); input.select(); }, 30);
+        const close = (val) => { mask.remove(); resolve(val); };
+        box.querySelector('.yq-ask-cancel').onclick = () => close(null);
+        box.querySelector('.yq-ask-ok').onclick = () => close(input.value);
+        input.addEventListener('keydown', (e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter') close(input.value);
+          else if (e.key === 'Escape') close(null);
+        });
+        mask.addEventListener('click', (e) => { if (e.target === mask) close(null); });
+      });
+    }
+
+    /** 绑定列表项右键：设置/清除自定义备注（自定义主标题，方便记录查找） */
+    _bindDocContextMenu() {
+      this.panel.querySelectorAll('.list-item[data-id]').forEach(el => {
+        el.addEventListener('contextmenu', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const id = el.dataset.id;
+          if (!id) return;
+          const origTitle = el.dataset.title || '';
+          const cur = this.service.getAlias ? this.service.getAlias(id) : '';
+          const input = await this._askText(`给「${origTitle}」加个备注<br>（自定义主标题，方便查找；留空可清除）`, cur);
+          if (input === null) return;   // 用户取消
+          this.service.setAlias(id, input);
+          const alias = this.service.getAlias(id);
+          const titleEl = el.querySelector('.list-item-title');
+          if (titleEl) titleEl.textContent = alias ? '📝 ' + alias : origTitle;
         });
       });
     }
@@ -220,7 +273,7 @@
           const content = await this.service.getContent(id);
           let doc = this.service.getRecent().find(d => d.id === id);
           if (!doc) doc = this.service.getFavorites().find(d => d.id === id);
-          if (doc && content) this._renderDoc({ title: doc.title, content, id: doc.id, slug: doc.slug, author: doc.author, updated: doc.updated, words: doc.words });
+          if (doc && content) this._renderDoc({ ...doc, content });
         });
       });
       this.panel.querySelectorAll('.list-item[data-example-url]').forEach(el => {
@@ -230,6 +283,7 @@
         });
       });
       this._bindItemActions();
+      this._bindDocContextMenu();
     }
 
     /**
@@ -270,19 +324,22 @@
       if (favorites.length === 0) return this._renderCatEmpty('⭐', '还没有收藏的文档');
       return `
         <div class="list-section-title">收藏</div>
-        ${favorites.map(d => `
-          <div class="list-item" data-id="${d.id}" data-fav="1">
+        ${favorites.map(d => {
+          const alias = this.service.getAlias ? this.service.getAlias(d.id) : '';
+          return `
+          <div class="list-item" data-id="${d.id}" data-fav="1" data-title="${(d.title || '').replace(/"/g, '&quot;')}" title="右键可改备注">
             <div class="list-item-avatar" style="background:linear-gradient(135deg,#FF9500,#FFCC00);">⭐</div>
             <div class="list-item-body">
-              <div class="list-item-title">${d.title}</div>
-              <div class="list-item-meta">${d.author || ''}</div>
+              <div class="list-item-title">${alias ? '📝 ' + alias : (d.title || '')}</div>
+              <div class="list-item-meta">${alias ? (d.title || '') + ' · ' : ''}${d.author || ''}</div>
             </div>
             <div class="list-item-actions">
               <button class="yq-item-btn yq-unfav-btn" data-id="${d.id}" title="取消收藏"><img src="icon/pin-2.png" alt="已收藏"></button>
               <button class="yq-item-btn yq-del-fav-btn" data-id="${d.id}" title="删除"><img src="icon/del.png" alt="删除"></button>
             </div>
           </div>
-        `).join('')}`;
+        `;
+        }).join('')}`;
     }
 
     /** 分类：最近读取 */
@@ -290,19 +347,22 @@
       if (!recent || recent.length === 0) return this._renderCatEmpty('📄', '最近还没有读取过文档');
       return `
         <div class="list-section-title">最近读取</div>
-        ${recent.map(d => `
-          <div class="list-item" data-id="${d.id}">
+        ${recent.map(d => {
+          const alias = this.service.getAlias ? this.service.getAlias(d.id) : '';
+          return `
+          <div class="list-item" data-id="${d.id}" data-title="${(d.title || '').replace(/"/g, '&quot;')}" title="右键可改备注">
             <div class="list-item-avatar" style="background:linear-gradient(135deg,#0076FF,#5AC8FA);">📄</div>
             <div class="list-item-body">
-              <div class="list-item-title">${d.title}</div>
-              <div class="list-item-meta">${d.time}</div>
+              <div class="list-item-title">${alias ? '📝 ' + alias : (d.title || '')}</div>
+              <div class="list-item-meta">${alias ? (d.title || '') + ' · ' : ''}${d.time}</div>
             </div>
             <div class="list-item-actions">
               <button class="yq-item-btn yq-fav-btn ${this.service.isFavorited && this.service.isFavorited(d.id) ? 'active' : ''}" data-id="${d.id}" title="收藏"><img src="${this.service.isFavorited && this.service.isFavorited(d.id) ? 'icon/pin-2.png' : 'icon/pin-1.png'}" alt="收藏"></button>
               <button class="yq-item-btn yq-del-recent-btn" data-id="${d.id}" title="删除"><img src="icon/del.png" alt="删除"></button>
             </div>
           </div>
-        `).join('')}`;
+        `;
+        }).join('')}`;
     }
 
     /** 分类：推荐 */
@@ -348,24 +408,30 @@
     /** 搜索结果列表 */
     _renderSearchResults() {
       const { mode, results, query } = this.searchState;
-      const modeLabel = mode === 'ai' ? '🤖 AI 语义匹配' : '🎯 关键词匹配';
+      const modeLabel = mode === 'fulltext' ? '🔎 全文检索'
+        : mode === 'ai' ? '🤖 AI 语义匹配'
+        : '🎯 关键词匹配';
       return `
         <div class="yq-search-meta">
           <span class="yq-search-meta-mode">${modeLabel}</span>
           <span class="yq-search-meta-query">「${query}」共 ${results.length} 条</span>
           <button class="yq-search-meta-clear" id="yqClearSearch">清除</button>
         </div>
-        ${results.map(r => `
-          <div class="list-item" data-example-url="hellobike.yuque.com/zo0rpl/am5rev/${r.slug}">
+        ${results.map(r => {
+          // 优先用检索返回的真实文档链接；本地/AI 结果无 url 时兜底按 slug 拼（旧行为）
+          const link = r.url || `hellobike.yuque.com/zo0rpl/am5rev/${r.slug}`;
+          const meta = [r.author, r.updated].filter(Boolean).join(' · ');
+          return `
+          <div class="list-item" data-example-url="${link}">
             <div class="list-item-avatar" style="background:rgba(0,118,255,0.12);color:var(--brand);">📘</div>
             <div class="list-item-body">
               <div class="list-item-title">${r.title}</div>
-              <div class="list-item-desc">${r.reason || r.excerpt}</div>
-              <div class="list-item-meta">${r.author} · ${r.updated}</div>
+              <div class="list-item-desc">${r.reason || r.excerpt || ''}</div>
+              ${meta ? `<div class="list-item-meta">${meta}</div>` : ''}
             </div>
             ${r.score ? `<div class="list-item-right"><div class="yq-score">${r.score}</div></div>` : ''}
-          </div>
-        `).join('')}
+          </div>`;
+        }).join('')}
       `;
     }
 
@@ -451,6 +517,10 @@
 
     _renderDoc(doc) {
       this.currentDoc = doc;
+      // 计算"打开原文"链接：优先 doc.url，其次用 namespace+slug 兜底拼接
+      const openUrl = doc.url
+        || (doc.namespace && doc.slug ? `https://hellobike.yuque.com/${doc.namespace}/${doc.slug}` : '');
+      doc._openUrl = openUrl;
       // 用统一 Markdown 渲染器：支持图片、链接、标题、列表、代码块等
       const html = window.Markdown
         ? window.Markdown.render(doc.content)
@@ -467,6 +537,7 @@
         <div class="panel-foot">
           <button class="btn-action" data-a="fav">${this.service.isFavorited && this.service.isFavorited(doc.id) ? '★ 已收藏' : '☆ 收藏'}</button>
           <button class="btn-action" data-a="copy">📋 复制</button>
+          ${openUrl ? `<button class="btn-action" data-a="open">🔗 打开原文</button>` : ''}
           <button class="btn-action primary" data-a="ai">🤖 AI 总结</button>
         </div>`;
 
@@ -480,6 +551,10 @@
             btn.textContent = nowFav ? '★ 已收藏' : '☆ 收藏';
           }
           if (btn.dataset.a === 'ai' && this.onSendToAI) this.onSendToAI(doc.title, doc.content);
+          if (btn.dataset.a === 'open' && openUrl) {
+            try { require('electron').shell.openExternal(openUrl); }
+            catch (e) { window.open(openUrl, '_blank'); }
+          }
         });
       });
     }

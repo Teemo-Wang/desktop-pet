@@ -1,13 +1,72 @@
 {
   "name": "hellobike-desktop-pet",
-  "version": "1.0.0",
-  "description": "哈啰桌面AI机器人 - IP形象Demo",
+  "version": "1.1.1",
+  "description": "哈啰桌面AI机器人 - 设计助手",
   "main": "main.js",
+  "author": "Teemo Wang",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "dist": "electron-builder --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:win": "electron-builder --win --publish never",
+    "release": "electron-builder --publish always"
+  },
+  "build": {
+    "appId": "cn.hellobike.desktop-pet",
+    "productName": "哈啰设计助手",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "files": [
+      "main.js",
+      "dingtalk-bridge.js",
+      "material-bridge.js",
+      "index.html",
+      "config.json",
+      "yuque-teams.local.json",
+      "pet.png",
+      "styles.css",
+      "src/**/*",
+      "js/**/*",
+      "styles/**/*",
+      "icon/**/*",
+      "!**/*.map",
+      "!**/.DS_Store"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Teemo-Wang",
+        "repo": "desktop-pet"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "icon/app.icns",
+      "target": [
+        { "target": "dmg", "arch": ["universal"] },
+        { "target": "zip", "arch": ["universal"] }
+      ]
+    },
+    "dmg": {
+      "title": "${productName} ${version}"
+    },
+    "win": {
+      "icon": "icon/LOGO.png",
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   },
   "devDependencies": {
     "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
     "electron-reload": "^2.0.0-alpha.1"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9",
+    "ws": "^8.21.0"
   }
 }

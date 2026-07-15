@@ -150,6 +150,30 @@ textarea.skill-input {
   color: var(--error);
 }
 
+/* 卡片导出按钮 */
+.skill-card-export {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  opacity: 0;
+  transition: all var(--duration-fast);
+}
+.skill-card:hover .skill-card-export { opacity: 1; }
+/* 自定义卡片同时有删除按钮时，导出按钮左移让位 */
+.skill-card-custom .skill-card-export { right: 28px; }
+.skill-card-export:hover {
+  background: rgba(0, 118, 255, 0.1);
+  color: var(--brand);
+}
+
 /* 上传表单 */
 .skill-upload-form {
   display: flex;

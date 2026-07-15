@@ -43,10 +43,14 @@
           </div>
 
           <div class="pref-group">
-            <div class="pref-group-title">快捷标签</div>
-            <div class="pref-hint">左键点击桌宠弹出的快捷入口</div>
-            ${this._renderDockItems()}
+            <div class="pref-group-title">机器人对话</div>
+            ${this._toggle('work','allowChitchat','允许闲聊',w.allowChitchat)}
+            <div class="pref-hint">开启后，与哈啰/设计无关的话题（闲聊、通用知识等）会用通用 AI 自由回答；关闭则只聚焦工作话题，其它礼貌婉拒。</div>
+            ${this._select('work','editMethod','改图方式',w.editMethod||'designhub',[['designhub','DesignHub 智能改图'],['model','自带生图模型']])}
+            <div class="pref-hint">改图用哪个引擎：DesignHub 擅长改文案/换配色、保真度高；自带生图模型更灵活、支持纯文生图。主要作用于钉钉机器人改图（含整组/多图）；本地聊天上传图改图仍走自带生图模型。</div>
           </div>
+
+
 
           <div class="pref-group">
             <div class="pref-group-title">窗口</div>

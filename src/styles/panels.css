@@ -353,3 +353,30 @@
   cursor: zoom-in;
   display: block;
 }
+
+/* 钉钉详情底栏：4 个操作按钮，2×2 网格排布，避免单行拥挤 */
+.panel-foot.dt-foot {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.panel-foot.dt-foot .btn-action {
+  flex: none;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+/* 钉钉回复：markdown 小图 + 折叠 + 链接 */
+.dt-md-imgs, .dt-md-fold { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.dt-md-img {
+  width: 88px; height: 88px; object-fit: cover;
+  border-radius: 6px; border: 1px solid var(--border, #e1e6eb);
+  background: #f5f7fa; cursor: pointer;
+}
+.dt-md-more {
+  margin-top: 6px; font-size: 11px; padding: 3px 10px;
+  border: 1px solid var(--border, #e1e6eb); border-radius: 6px;
+  background: transparent; color: var(--brand, #0076ff); cursor: pointer;
+}
+.dt-link { color: var(--brand, #0076ff); cursor: pointer; text-decoration: none; }
+.dt-link:hover { text-decoration: underline; }

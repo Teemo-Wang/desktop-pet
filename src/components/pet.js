@@ -159,6 +159,16 @@
         b.style.bottom = (window.innerHeight - this._posY + 4) + 'px';
         b.style.transform = 'translateX(-50%)';
       });
+
+      // 今日简报卡片同步：IP 上方居中（与 DailyBriefCard._syncPosition 保持一致）
+      const brief = document.getElementById('dailyBriefCard');
+      if (brief) {
+        const cardW = 320;
+        const briefLeft = Math.max(8, this._posX + (PET_W / 2) - cardW / 2);
+        brief.style.left = Math.min(briefLeft, window.innerWidth - cardW - 8) + 'px';
+        brief.style.right = 'auto';
+        brief.style.bottom = (window.innerHeight - this._posY + 12) + 'px';
+      }
     }
 
     _bind() {

@@ -11,7 +11,7 @@
   const DEFAULTS = {
     general: { alwaysOnTop:true, opacity:100, scale:100 },
     appearance: { idleAnimation:'float', messageReaction:'bounce' },
-    work: { dingtalkNotify:true, aiAssistant:true, yuqueAccess:true, dndEnabled:false, dndStart:'22:00', dndEnd:'08:00', showMsgContent:true },
+    work: { dingtalkNotify:true, aiAssistant:true, yuqueAccess:true, dndEnabled:false, dndStart:'22:00', dndEnd:'08:00', showMsgContent:true, allowChitchat:true, editMethod:'designhub' },
     model: { provider:'deepseek', apiKey:'', modelName:'deepseek-chat', baseUrl:'https://api.deepseek.com/v1', systemPrompt:`你是哈啰出行两轮事业部的设计工作 AI 助手，名叫"小哈"。你的直属用户是一位视觉设计师。
 
 ## 你的核心能力
@@ -38,9 +38,17 @@
 - 对话中如果用户提到具体的钉钉消息或语雀文档内容，紧密围绕那些信息回答，不要泛泛而谈
 - 如果信息不足，主动追问而不是猜测` },
     yuque: { token:'', baseUrl:'https://www.yuque.com', userLogin:'', userName:'' },
-    imageModel: { modelName:'doubao-seedream-4-5-251128', size:'2048x2048' },
+    // 钉钉机器人（实名 AI 助理）：Stream 模式接入凭据 + 回复策略
+    // replyMode: 'confirm'=人工确认后再发（默认，更稳妥） | 'auto'=自动回复 + 可随时接管
+    dingtalk: { appKey:'', appSecret:'', robotCode:'', robotName:'', replyMode:'confirm', autoEnabled:false },
+    // 素材库（DesignHub 团队素材管理工具）：登录邮箱 + 本地缓存的 session token
+    material: { dhEmail:'', dhToken:'', dhUserName:'' },
+    // 生图模型：modelName=当前生效的模型；options=可切换的模型名列表；apiKey/baseUrl 留空则复用对话配置
+    imageModel: { modelName:'doubao-seedream-4-5-251128', size:'2048x2048', apiKey:'', baseUrl:'', options:[] },
     // 各供应商独立配置（apiKey/modelName/baseUrl 互不干扰）
     providerConfigs: {},
+    // 用户自建的 API 供应商：{ [id]: { label, baseUrl, modelName, hint } }，可自定义命名
+    customProviders: {},
     dock: { items: [
       { id:'chat', icon:'🤖', label:'AI' },
       { id:'dingtalk', icon:'💬', label:'钉钉' },
@@ -69,6 +77,8 @@
     }
     get(g) { return g ? this.data[g] : this.data; }
     set(g, k, v) { if(this.data[g]) { this.data[g][k]=v; this._save(); } }
+    /** 整组替换（用于自定义供应商等需要增删键的场景） */
+    setGroup(g, obj) { this.data[g] = obj || {}; this._save(); }
     _save() { try { fs.writeFileSync(FILE, JSON.stringify(this.data,null,2),'utf-8'); } catch(e){} }
   }
   window.SettingsStore = SettingsStore;

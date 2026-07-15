@@ -33,7 +33,31 @@
       const q = String(query || '').trim();
       if (!q) return { mode: 'empty', results: [] };
 
-      // 第一步：关键词初筛
+      // 第一步：语雀官方全文检索（按标题/正文跨团队检索，最贴近用户预期）
+      if (this.yq.searchDocs) {
+        try {
+          const res = await this.yq.searchDocs(q);
+          if (res && res.ok && res.results && res.results.length) {
+            return {
+              mode: 'fulltext',
+              results: res.results.map(r => ({
+                slug: r.slug || '',
+                title: r.title,
+                author: r.teamName || '',
+                updated: '',
+                excerpt: r.summary || '',
+                url: r.url || '',
+                score: 100,
+                reason: '标题或正文匹配关键词',
+              })),
+            };
+          }
+        } catch (e) {
+          console.warn('[yuque-search] 官方全文检索失败，降级本地/AI:', e);
+        }
+      }
+
+      // 第二步：本地关键词初筛（最近读取 + 收藏）
       const keywordHits = this.yq.keywordFilter(q);
       if (keywordHits.length > 0) {
         return {
@@ -42,7 +66,7 @@
         };
       }
 
-      // 第二步：AI 语义搜索
+      // 第三步：AI 语义搜索
       try {
         const aiResults = await this._aiSearch(q);
         return { mode: 'ai', results: aiResults };

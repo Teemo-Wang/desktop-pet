@@ -3,6 +3,14 @@
  * 列表视图 / 详情视图 / 结果视图
  */
 (function() {
+  const { ipcRenderer } = require('electron');
+
+  function _esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
 
   class SkillsComponent {
     constructor(panelEl, service) {
@@ -44,6 +52,7 @@
           <div class="skill-grid">
             ${skills.map(s => `
               <div class="skill-card${s.custom ? ' skill-card-custom' : ''}" data-id="${s.id}">
+                <button class="skill-card-export" data-export="${s.id}" title="导出分享">⬇</button>
                 ${s.custom ? `<button class="skill-card-del" data-del="${s.id}" title="删除">🗑</button>` : ''}
                 <div class="skill-icon">${s.icon}</div>
                 <div class="skill-name">${s.name}</div>
@@ -60,7 +69,7 @@
       });
       this.panel.querySelectorAll('.skill-card').forEach(c => {
         c.addEventListener('click', e => {
-          if (e.target.closest('[data-del]')) return; // 让 del 按钮独立处理
+          if (e.target.closest('[data-del]') || e.target.closest('[data-export]')) return; // 让操作按钮独立处理
           this.currentSkill = this.service.get(c.dataset.id);
           this.view = 'detail';
           this._renderDetail();
@@ -72,6 +81,32 @@
           this.service.remove(btn.dataset.del);
         });
       });
+      this.panel.querySelectorAll('[data-export]').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          this._exportSkill(btn.dataset.export);
+        });
+      });
+    }
+
+    /** 导出技能为 SKILL.md 文件，供分享给团队成员（对方用"上传新技能"导入） */
+    async _exportSkill(id) {
+      const data = this.service.exportMarkdown(id);
+      if (!data) { alert('导出失败：技能不存在'); return; }
+      try {
+        const res = await ipcRenderer.invoke('save-text-file', {
+          text: data.content,
+          suggestedName: data.filename,
+          filters: [{ name: 'Markdown', extensions: ['md'] }],
+        });
+        if (res && res.ok) {
+          alert('已导出：' + res.path + '\n把这个 .md 文件发给同事，对方在「技能中心 → ＋ 上传新技能」里导入即可。');
+        } else if (res && res.error && res.error !== '已取消') {
+          alert('导出失败：' + res.error);
+        }
+      } catch (e) {
+        alert('导出失败：' + (e.message || e));
+      }
     }
 
     /** 上传/创建自定义 skill 表单 */
@@ -252,6 +287,9 @@
         </div>
         <div class="panel-body" style="padding:12px 14px;">
           <div class="skill-desc-full">${s.desc}</div>
+          <button class="skill-run-btn" id="skExport" style="margin-bottom:10px;background:rgba(0,118,255,0.08);color:var(--brand);">⬇ 导出分享（SKILL.md）</button>
+          ${s.id === 'skill1' ? `<button class="skill-run-btn" id="skEditRules" style="margin-bottom:10px;background:rgba(0,118,255,0.08);color:var(--brand);">✏️ 编辑规则</button>` : ''}
+          ${s.custom ? `<button class="skill-run-btn" id="skEditCustomRules" style="margin-bottom:10px;background:rgba(0,118,255,0.08);color:var(--brand);">✏️ 查看/编辑内容</button>` : ''}
           <div class="skill-form">
             ${s.inputs.map(inp => `
               <div class="skill-field">
@@ -271,6 +309,94 @@
 
       this.panel.querySelector('#skBack').addEventListener('click', () => { this.view = 'list'; this._renderList(); });
       this.panel.querySelector('#skRun').addEventListener('click', () => this._execute());
+      const exportBtn = this.panel.querySelector('#skExport');
+      if (exportBtn) exportBtn.addEventListener('click', () => this._exportSkill(s.id));
+      const editBtn = this.panel.querySelector('#skEditRules');
+      if (editBtn) editBtn.addEventListener('click', () => this._renderRulesEdit());
+      const editCustomBtn = this.panel.querySelector('#skEditCustomRules');
+      if (editCustomBtn) editCustomBtn.addEventListener('click', () => this._renderCustomRulesEdit());
+    }
+
+    /** 自定义技能内容编辑：编辑 systemPrompt 正文；规范类保存后即作为机器人回复参考 */
+    _renderCustomRulesEdit() {
+      const s = this.currentSkill;
+      const rules = s.systemPrompt || '';
+      const isRule = s.category === 'rule';
+      const tip = isRule
+        ? '这套规则会作为机器人回复的<strong>参考规范</strong>（独立于默认回复规则），可随时调整或清空（Markdown 格式）。'
+        : '这是该技能的<strong>内容/指令正文</strong>（执行时作为系统提示词），可随时编辑（Markdown 格式）。';
+      const delLabel = isRule ? '🗑 删除此规范' : '🗑 删除此技能';
+      const delConfirm = isRule
+        ? `确定删除规范技能「${s.name}」？删除后机器人回复将不再参考这套规则。`
+        : `确定删除技能「${s.name}」？`;
+      this.panel.innerHTML = `
+        <div class="panel-head">
+          <button class="btn-icon btn-back" id="cRulesBack">‹</button>
+          <span class="panel-head-title">${s.icon} 编辑内容</span>
+          <button class="btn-icon" onclick="document.dispatchEvent(new CustomEvent('panel-close-all'))">✕</button>
+        </div>
+        <div class="panel-body" style="padding:12px 14px;display:flex;flex-direction:column;gap:10px;height:100%;box-sizing:border-box;">
+          <div class="skill-desc-full" style="margin:0;">${tip}</div>
+          <textarea class="skill-up-input" id="cRulesText" style="flex:1;min-height:320px;font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.6;resize:none;">${_esc(rules)}</textarea>
+          <div class="skill-up-actions">
+            <button class="skill-up-btn" id="cRulesDelete" style="color:#d33;">${delLabel}</button>
+            <button class="skill-up-btn" id="cRulesCancel">取消</button>
+            <button class="skill-up-btn primary" id="cRulesSave">保存并生效</button>
+          </div>
+        </div>
+        <div class="rz rz-t"></div><div class="rz rz-l"></div><div class="rz rz-tl"></div>
+      `;
+      this.panel.querySelector('#cRulesBack').addEventListener('click', () => { this.view = 'detail'; this._renderDetail(); });
+      this.panel.querySelector('#cRulesCancel').addEventListener('click', () => { this.view = 'detail'; this._renderDetail(); });
+      this.panel.querySelector('#cRulesSave').addEventListener('click', () => {
+        const t = this.panel.querySelector('#cRulesText').value;
+        this.service.updateCustomSystemPrompt(s.id, t);
+        this.currentSkill = this.service.get(s.id);
+        this.view = 'detail';
+        this._renderDetail();
+      });
+      this.panel.querySelector('#cRulesDelete').addEventListener('click', () => {
+        if (!confirm(delConfirm)) return;
+        this.service.remove(s.id);
+        this.view = 'list';
+        this._renderList();
+      });
+    }
+
+    /** skill1 规则编辑界面：直接编辑机器人回复规则（Markdown），保存后实时生效 */
+    _renderRulesEdit() {
+      const rules = this.service.getRules ? this.service.getRules() : '';
+      this.panel.innerHTML = `
+        <div class="panel-head">
+          <button class="btn-icon btn-back" id="rulesBack">‹</button>
+          <span class="panel-head-title">📋 编辑机器人回复规则</span>
+          <button class="btn-icon" onclick="document.dispatchEvent(new CustomEvent('panel-close-all'))">✕</button>
+        </div>
+        <div class="panel-body" style="padding:12px 14px;display:flex;flex-direction:column;gap:10px;height:100%;box-sizing:border-box;">
+          <div class="skill-desc-full" style="margin:0;">编辑后保存即生效，会影响机器人在钉钉/对话里的回复方式（Markdown 格式）。</div>
+          <textarea class="skill-up-input" id="rulesText" style="flex:1;min-height:340px;font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.6;resize:none;">${_esc(rules)}</textarea>
+          <div class="skill-up-actions">
+            <button class="skill-up-btn" id="rulesReset">恢复默认</button>
+            <button class="skill-up-btn" id="rulesCancel">取消</button>
+            <button class="skill-up-btn primary" id="rulesSave">保存并生效</button>
+          </div>
+        </div>
+        <div class="rz rz-t"></div><div class="rz rz-l"></div><div class="rz rz-tl"></div>
+      `;
+      this.panel.querySelector('#rulesBack').addEventListener('click', () => { this.view = 'detail'; this._renderDetail(); });
+      this.panel.querySelector('#rulesCancel').addEventListener('click', () => { this.view = 'detail'; this._renderDetail(); });
+      this.panel.querySelector('#rulesSave').addEventListener('click', () => {
+        const t = this.panel.querySelector('#rulesText').value;
+        this.service.saveRules(t);
+        this.currentSkill = this.service.get('skill1');
+        this.view = 'detail';
+        this._renderDetail();
+      });
+      this.panel.querySelector('#rulesReset').addEventListener('click', () => {
+        if (!confirm('确定恢复为默认规则？当前编辑会被覆盖。')) return;
+        this.service.resetRules();
+        this.panel.querySelector('#rulesText').value = this.service.getRules();
+      });
     }
 
     async _execute() {

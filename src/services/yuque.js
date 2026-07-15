@@ -48,12 +48,35 @@
       this.favorites = this._loadFavorites();
       // 恢复回收站列表（最近删除）
       this.trash = this._loadTrash();
+      // 恢复自定义备注（按文档 id → 备注文本）
+      this.aliases = this._loadAliases();
     }
 
     // localStorage 键名
     static get RECENT_KEY() { return 'yq_recent_docs'; }
     static get FAV_KEY() { return 'yq_favorite_docs'; }
     static get TRASH_KEY() { return 'yq_trash_docs'; }
+    static get ALIAS_KEY() { return 'yq_doc_aliases'; }
+
+    /** 读取自定义备注表 { [id]: alias } */
+    _loadAliases() {
+      try { return JSON.parse(localStorage.getItem(YuqueService.ALIAS_KEY) || '{}') || {}; }
+      catch (e) { return {}; }
+    }
+    _saveAliases() {
+      try { localStorage.setItem(YuqueService.ALIAS_KEY, JSON.stringify(this.aliases || {})); } catch (e) {}
+    }
+    /** 获取某文档的自定义备注（没有返回空串） */
+    getAlias(id) { return (this.aliases && this.aliases[id]) || ''; }
+    /** 设置/清除某文档的自定义备注（传空则清除） */
+    setAlias(id, text) {
+      if (!id) return;
+      if (!this.aliases) this.aliases = {};
+      const t = String(text || '').trim();
+      if (t) this.aliases[id] = t.slice(0, 40);
+      else delete this.aliases[id];
+      this._saveAliases();
+    }
 
     /** 从 localStorage 读取最近文档列表 */
     _loadRecent() {
@@ -249,17 +272,26 @@
      * @returns {Promise<{id, title, author, updated, words, content}>}
      */
     async getDocByUrl(url) {
+      // 原始链接归一化为 https 绝对地址，挂到返回的 doc 上（供"打开原文"跳转）
+      const fullUrl = /^https?:\/\//i.test(url) ? url : ('https://' + String(url || '').replace(/^\/+/, ''));
+      const _p = (window.YuqueUrl && window.YuqueUrl.parseYuqueUrl) ? window.YuqueUrl.parseYuqueUrl(url) : null;
+      const withUrl = (doc) => {
+        if (doc && !doc.url) doc.url = fullUrl;
+        if (doc && !doc.namespace && _p && _p.namespace) doc.namespace = _p.namespace;
+        return doc;
+      };
+
       // 优先：主进程 IPC（复用 dragon-mcp 团队 Token，无需用户配置、自动绕过 CORS / 证书拦截）
       if (this.ipc) {
         const parsed = window.YuqueUrl.parseYuqueUrl(url);
         if (parsed) {
           // 命中缓存
           const cached = this.cache.get(parsed.namespace, parsed.slug);
-          if (cached) { this._addRecent(cached); return cached; }
+          if (cached) { this._addRecent(cached); return withUrl(cached); }
 
           const res = await this.ipc.invoke('yuque-fetch-doc', url);
           if (res && res.ok) {
-            const doc = this._normalizeIpc(res.doc, parsed.slug);
+            const doc = withUrl(this._normalizeIpc(res.doc, parsed.slug));
             this.cache.set(parsed.namespace, parsed.slug, doc);
             this._addRecent(doc);
             return doc;
@@ -278,12 +310,12 @@
         const cached = this.cache.get(parsed.namespace, parsed.slug);
         if (cached) {
           this._addRecent(cached);
-          return cached;
+          return withUrl(cached);
         }
 
         // 调 API
         const raw = await this.api.getDoc(parsed.namespace, parsed.slug);
-        const doc = this._normalize(raw);
+        const doc = withUrl(this._normalize(raw));
         this.cache.set(parsed.namespace, parsed.slug, doc);
         this._addRecent(doc);
         return doc;
@@ -293,7 +325,7 @@
       await this._delay(300);
       const key = Object.keys(MOCK_DOCS).find(k => url.includes(k));
       if (!key) throw new Error('Mock 数据中未找到该文档（请配置 Token 使用真实 API）');
-      const doc = MOCK_DOCS[key];
+      const doc = withUrl(MOCK_DOCS[key]);
       this._addRecent(doc);
       return doc;
     }
@@ -315,6 +347,25 @@
 
     getRecent() {
       return this.recent;
+    }
+
+    /**
+     * 语雀全文检索（按标题/正文，跨已配置团队）
+     * 走主进程 IPC 调官方 /api/v2/search，复用团队 Token
+     * @param {string} query
+     * @returns {Promise<{ok:boolean, results:Array<{title,summary,url,teamName,slug}>, error?:string}>}
+     */
+    async searchDocs(query) {
+      const q = String(query || '').trim();
+      if (!q) return { ok: true, results: [] };
+      if (!this.ipc) return { ok: false, results: [], error: '当前环境不支持全文检索' };
+      try {
+        const res = await this.ipc.invoke('yuque-search', { query: q });
+        if (res && res.ok) return { ok: true, results: Array.isArray(res.results) ? res.results : [] };
+        return { ok: false, results: [], error: (res && res.error) || '搜索失败' };
+      } catch (e) {
+        return { ok: false, results: [], error: e.message || '搜索失败' };
+      }
     }
 
     /**
@@ -359,8 +410,15 @@
     keywordFilter(query) {
       if (!query) return [];
       const q = query.toLowerCase().trim();
-      const source = this.connected
-        ? this.recent
+      // 语料：优先用本地已有的真实文档（最近读取 + 收藏，按 id 去重），
+      // 都为空时才退回 Mock 演示数据（避免 IPC 模式下 connected=false 只搜到假数据）
+      const local = [];
+      const seen = new Set();
+      for (const d of [...(this.recent || []), ...(this.favorites || [])]) {
+        if (d && !seen.has(d.id)) { seen.add(d.id); local.push(d); }
+      }
+      const source = local.length
+        ? local
         : Object.entries(MOCK_DOCS).map(([slug, d]) => ({ ...d, slug }));
       return source.filter(d => {
         return (d.title || '').toLowerCase().includes(q)
@@ -446,7 +504,7 @@
     _addRecent(doc) {
       const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
       this.recent = [
-        { id: doc.id, slug: doc.slug, title: doc.title, time, content: doc.content, author: doc.author, updated: doc.updated, words: doc.words },
+        { id: doc.id, slug: doc.slug, title: doc.title, time, content: doc.content, author: doc.author, updated: doc.updated, words: doc.words, url: doc.url, namespace: doc.namespace },
         ...this.recent.filter(d => d.id !== doc.id),
       ].slice(0, 8);
       this._saveRecent();

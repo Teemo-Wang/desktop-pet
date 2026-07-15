@@ -8,6 +8,17 @@
       this.service = service;
       this.isOpen = false;
       this.onAction = null; // (action, conv) => void
+      this._view = 'list';   // 'list' | 'detail'
+      this._curId = null;    // 当前详情会话 ID
+
+      // 实时消息到达：面板打开时自动刷新当前视图
+      if (service.onIncoming) {
+        service.onIncoming((payload) => {
+          if (!this.isOpen) return;
+          if (this._view === 'list') this._renderList();
+          else if (this._view === 'detail' && this._curId === payload.convId) this._renderDetail(this._curId);
+        });
+      }
     }
 
     async open() {
@@ -19,6 +30,8 @@
     close() { this.isOpen = false; this.panel.classList.remove('open'); }
 
     async _renderList() {
+      this._view = 'list';
+      this._curId = null;
       this.panel.innerHTML = '<div class="state-loading">加载中</div>';
       const convs = await this.service.getConversations();
       const unread = convs.reduce((s,c) => s + c.unread, 0);
@@ -55,6 +68,8 @@
     async _renderDetail(id) {
       const conv = await this.service.getConversation(id);
       if (!conv) return;
+      this._view = 'detail';
+      this._curId = id;
       await this.service.markRead(id);
 
       this.panel.innerHTML = `
@@ -76,10 +91,8 @@
             <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
           </button>
         </div>
-        <div class="panel-foot">
-          <button class="btn-action" data-a="takeover">🤖 AI接管</button>
-          <button class="btn-action primary" data-a="analyze">🔍 需求分析</button>
-        </div>`;
+        `;
+        // 已按需求移除会话操作按钮（智能解读 / 拟回复 / 提取任务 / 接管）
 
       this.panel.querySelector('#dtBack').addEventListener('click', () => this._renderList());
       this.panel.querySelector('#dtClose2').addEventListener('click', () => document.dispatchEvent(new CustomEvent('panel-close-all')));
@@ -93,6 +106,24 @@
         // 在下一帧滚动，确保 DOM 已布局
         requestAnimationFrame(() => {
           msgsContainer.scrollTop = msgsContainer.scrollHeight;
+        });
+        // 加载消息中的素材小图
+        this._hydrateImages(msgsContainer);
+        // 折叠展开 / 链接打开（事件委托）
+        msgsContainer.addEventListener('click', (e) => {
+          const foldBtn = e.target.closest('[data-act="dt-fold"]');
+          if (foldBtn) {
+            const fold = foldBtn.previousElementSibling;
+            if (fold) {
+              const show = fold.style.display === 'none';
+              fold.style.display = show ? 'flex' : 'none';
+              foldBtn.textContent = show ? '收起' : foldBtn.textContent;
+              if (show) this._hydrateImages(fold);
+            }
+            return;
+          }
+          const link = e.target.closest('.dt-link[data-open]');
+          if (link) { try { require('electron').shell.openExternal(link.dataset.open); } catch (err) {} }
         });
       }
 
@@ -197,6 +228,61 @@
       });
     }
 
+    /**
+     * 渲染回复正文：markdown 图片 → 小图（最多 2 张，其余折叠），链接 → 可点击，其余按文本
+     * 图片用 data-src 占位，随后 _hydrateImages 带 token 加载
+     */
+    _renderReplyBody(content) {
+      const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const images = [];
+      // 抽取 markdown 图片
+      let text = content.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (m, alt, url) => {
+        images.push({ alt: alt || '素材', url });
+        return '';
+      });
+      // 链接 [text](url) → 占位标记，稍后转可点击
+      const links = [];
+      text = text.replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, (m, t, url) => {
+        links.push({ t: t || url, url });
+        return `\u0001L${links.length - 1}\u0001`;
+      });
+      // 文本转义 + 还原链接为按钮 + 换行
+      let html = esc(text)
+        .replace(/\u0001L(\d+)\u0001/g, (m, i) => {
+          const l = links[+i];
+          return `<a class="dt-link" data-open="${esc(l.url)}">${esc(l.t)} ↗</a>`;
+        })
+        .replace(/\n{2,}/g, '<br>')
+        .replace(/\n/g, '<br>');
+
+      // 图片区：前 2 张直显，其余折叠
+      let imgHtml = '';
+      if (images.length) {
+        const one = (im) => `<img class="dt-md-img" data-src="${esc(im.url)}" alt="${esc(im.alt)}" title="${esc(im.alt)}">`;
+        imgHtml += `<div class="dt-md-imgs">${images.slice(0, 2).map(one).join('')}</div>`;
+        if (images.length > 2) {
+          imgHtml += `<div class="dt-md-fold" style="display:none">${images.slice(2).map(one).join('')}</div>`;
+          imgHtml += `<button class="dt-md-more" data-act="dt-fold">展开剩余 ${images.length - 2} 张</button>`;
+        }
+      }
+      return html + imgHtml;
+    }
+
+    /** 给 data-src 的图片带 token 拉取并显示（复用素材服务） */
+    _hydrateImages(root) {
+      const svc = window.materialService;
+      const imgs = Array.from((root || this.panel).querySelectorAll('.dt-md-img[data-src]'));
+      imgs.forEach(async (img) => {
+        const src = img.getAttribute('data-src');
+        if (!src) return;
+        img.removeAttribute('data-src');
+        try {
+          const dataUrl = svc && svc.fetchThumb ? await svc.fetchThumb(src) : '';
+          img.src = dataUrl || src;
+        } catch (e) { img.src = src; }
+      });
+    }
+
     /** 渲染单条消息（区分自己/对方） */
     _renderMessage(m, isMine) {
       const cls = isMine || m.isMine ? 'dt-msg dt-msg-mine' : 'dt-msg';
@@ -206,8 +292,8 @@
       if (m.image) {
         contentHtml = `<div class="dt-msg-content"><img class="dt-msg-img" src="${m.image}" alt="图片"></div>`;
       } else {
-        const safe = String(m.content).replace(/</g, '&lt;');
-        contentHtml = `<div class="dt-msg-content">${safe}</div>`;
+        // 富文本：解析 markdown 图片（小图，最多 2 张，其余折叠）与链接
+        contentHtml = `<div class="dt-msg-content">${this._renderReplyBody(String(m.content || ''))}</div>`;
       }
       return `
         <div class="${cls}">
@@ -225,22 +311,44 @@
      * @param {string} text - 文字内容
      * @param {string} [image] - 图片 dataUrl（可选）
      */
-    sendReply(convId, text, image) {
-      const msg = {
-        sender: '我',
-        content: text || '',
-        time: _hhmm(),
-        isMine: true,
-      };
-      if (image) msg.image = image;
-      // 写入 service 的 mock 数据
-      this.service.appendMessage && this.service.appendMessage(convId, msg);
-      // 如果当前正打开这个会话，追加到 DOM
+    async sendReply(convId, text, image) {
+      // 图片 / 空文字：sessionWebhook 不支持图片，仅本地展示
+      if (image || !text) {
+        const msg = { sender: '我', content: text || '', time: _hhmm(), isMine: true };
+        if (image) msg.image = image;
+        this.service.appendMessage && this.service.appendMessage(convId, msg);
+        this._appendMsgDom(msg);
+        return { ok: true };
+      }
+
+      // 文字：通过 service 真正发送到钉钉（POST sessionWebhook）
+      let res;
+      if (this.service.reply) {
+        res = await this.service.reply(convId, text);
+      } else {
+        res = { ok: false, error: '服务不可用' };
+      }
+
+      if (res.ok) {
+        // service.reply 成功时内部已写入数据模型，这里仅补充 DOM 即时展示
+        this._appendMsgDom({ sender: '我', content: text, time: _hhmm(), isMine: true });
+      } else {
+        // 发送失败：界面明确提示，避免"看起来发了其实没发"
+        this._appendMsgDom({ sender: '系统', content: '⚠️ 发送失败：' + (res.error || '未知错误'), time: _hhmm(), isMine: false });
+      }
+      return res;
+    }
+
+    /** 把一条消息追加到当前会话 DOM（若正打开该会话） */
+    _appendMsgDom(msg) {
       const msgs = this.panel.querySelector('#dtMessages');
-      if (msgs) {
-        const div = document.createElement('div');
-        div.innerHTML = this._renderMessage(msg, true);
-        msgs.appendChild(div.firstElementChild);
+      if (!msgs) return;
+      const div = document.createElement('div');
+      div.innerHTML = this._renderMessage(msg, msg.isMine);
+      if (div.firstElementChild) {
+        const node = div.firstElementChild;
+        msgs.appendChild(node);
+        this._hydrateImages(node);
         msgs.scrollTop = msgs.scrollHeight;
       }
     }

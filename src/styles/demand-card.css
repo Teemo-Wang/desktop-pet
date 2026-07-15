@@ -117,3 +117,76 @@
   transform: translateY(0);
   opacity: 0.8;
 }
+
+/* ===== 素材库结果卡片 ===== */
+.material-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 12px);
+  padding: 10px 12px;
+  background: var(--fill-hover, rgba(0,0,0,0.02));
+}
+.material-card .mc-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.material-card .mc-title { font-weight: 600; font-size: 13px; }
+.material-card .mc-meta { font-size: 11px; color: var(--text-secondary, #879099); }
+.material-card .mc-empty { font-size: 12px; color: var(--text-secondary, #879099); padding: 12px 0; text-align: center; }
+.material-card .mc-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.material-card .mc-item {
+  border: 1px solid var(--border, #e1e6eb);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  display: flex; flex-direction: column;
+}
+.material-card .mc-thumb {
+  position: relative;
+  width: 100%; aspect-ratio: 1/1;
+  background: #f5f7fa;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.material-card .mc-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.material-card .mc-thumb img:not([src]) { display: none; }
+.material-card .mc-loading { position: absolute; font-size: 10px; color: #879099; }
+.material-card .mc-noimg { font-size: 12px; color: #879099; }
+.material-card .mc-type {
+  position: absolute; right: 4px; bottom: 4px;
+  font-size: 9px; padding: 1px 4px; border-radius: 4px;
+  background: rgba(0,0,0,0.55); color: #fff;
+}
+.material-card .mc-name {
+  font-size: 11px; padding: 4px 6px 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.material-card .mc-ops { display: flex; gap: 4px; padding: 0 6px 6px; }
+.material-card .mc-btn {
+  flex: 1; font-size: 10px; padding: 3px 0;
+  border: 1px solid var(--border, #e1e6eb); border-radius: 6px;
+  background: transparent; color: var(--text-secondary, #5a6066); cursor: pointer;
+}
+.material-card .mc-btn:hover { border-color: var(--brand, #0076ff); color: var(--brand, #0076ff); }
+.material-card .mc-more { font-size: 10px; color: var(--text-secondary, #879099); text-align: center; margin-top: 6px; }
+.material-card .mc-open-hub {
+  width: 100%; margin-top: 8px; padding: 7px 0; font-size: 12px; font-weight: 500;
+  border: 1px solid var(--brand, #0076ff); border-radius: 8px;
+  background: transparent; color: var(--brand, #0076ff); cursor: pointer;
+}
+.material-card .mc-open-hub:hover { background: var(--brand, #0076ff); color: #fff; }
+
+/* ===== 素材库「打开搜索」入口卡 ===== */
+.material-launch .ml-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.material-launch .ml-icon { font-size: 22px; }
+.material-launch .ml-title { font-size: 13px; font-weight: 600; }
+.material-launch .ml-sub { font-size: 11px; color: var(--text-secondary, #879099); margin-top: 2px; }
+.material-launch .ml-btn {
+  width: 100%; padding: 8px 0; font-size: 12px; font-weight: 500;
+  border: 1px solid var(--brand, #0076ff); border-radius: 8px;
+  background: var(--brand, #0076ff); color: #fff; cursor: pointer;
+}
+.material-launch .ml-btn:hover { background: var(--brand-dark, #0061d1); }

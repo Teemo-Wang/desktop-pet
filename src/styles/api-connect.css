@@ -1,7 +1,7 @@
 /* ===== API 接入面板 ===== */
 .api-section {
-  margin-bottom: 14px;
-  padding-bottom: 12px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--border-light);
 }
 .api-section:last-child { border-bottom: none; margin-bottom: 0; }
@@ -10,7 +10,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .api-section-icon { font-size: 14px; }
@@ -151,12 +151,49 @@
   box-shadow: 0 1px 4px rgba(0,118,255,0.2);
 }
 
+/* 新建自定义 API 按钮：虚线样式，区别于供应商 chip */
+.api-provider-chip.api-provider-add {
+  border-style: dashed;
+  color: var(--brand);
+  font-weight: 600;
+}
+.api-provider-chip.api-provider-add:hover {
+  background: rgba(0,118,255,0.06);
+}
+
 .api-provider-hint {
-  padding: 0 22px 8px 22px;
+  padding: 0 22px 5px 22px;
   font-size: 10px;
   color: var(--text-tertiary);
-  line-height: 1.5;
+  line-height: 1.4;
 }
+
+/* 生图模型标签：名称 + 删除× */
+.img-model-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.img-model-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0.55;
+  transition: all var(--duration-fast);
+}
+.img-model-del:hover {
+  opacity: 1;
+  background: rgba(255,59,48,0.15);
+  color: var(--error);
+}
+/* 选中态标签里的 × 用反色，保证可见 */
+.img-model-chip.active .img-model-del { color: #fff; }
+.img-model-chip.active .img-model-del:hover { background: rgba(255,255,255,0.25); color: #fff; }
 
 .api-link {
   color: var(--brand);
@@ -166,3 +203,20 @@
 .api-link:hover {
   text-decoration: underline;
 }
+
+
+/* ===== 钉钉配置码 · 团队分发 ===== */
+.api-cred-share {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(0, 118, 255, 0.02);
+}
+.api-cred-share-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--brand);
+  margin-bottom: 2px;
+}
+.api-cred-import-row .api-input { flex: 1; }
