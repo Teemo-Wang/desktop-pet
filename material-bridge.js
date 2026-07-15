@@ -263,26 +263,28 @@ async function _measureSize(url, token) {
   return '';
 }
 
-async function dhGenerateVariant({ token, referenceImageUrl, prompt, size = '', count = 1, assetId = '' }) {
+async function dhGenerateVariant({ token, referenceImageUrl, prompt, size = '', count = 1, assetId = '', preserveTemplateLayout = false }) {
   if (!referenceImageUrl) return { ok: false, error: '缺少参考图' };
   if (!prompt) return { ok: false, error: '缺少修改描述' };
   // DesignHub 自有素材必须用「相对路径」作参考图：生成后端从外部拉取绝对内网地址会超时（400 Timeout while downloading url）
   // 外部图片（钉钉/火山等公网直链）保持原样，后端可正常下载
-  let refUrl = String(referenceImageUrl).replace(/^https?:\/\/designhub\.hellobike\.cn/i, '');
+  const refUrl = String(referenceImageUrl).replace(/^https?:\/\/designhub\.hellobike\.cn/i, '');
   referenceImageUrl = refUrl;
-  // 是否为用户显式指定的目标尺寸（决定 prompt 用「保持原比例」还是「按新尺寸重排版式」）
-  const userSpecifiedSize = !!size;
-  // 未显式指定尺寸时，实测参考图真实宽高作为目标尺寸，避免模型用默认方图导致比例走样
-  if (!size) {
-    size = await _measureSize(referenceImageUrl, token);
-    if (size) console.log('[dhGenerateVariant] 锁定原图尺寸 size=' + size);
+  const lockTemplateLayout = preserveTemplateLayout === true;
+  const userSpecifiedSize = !!size && !lockTemplateLayout;
+  let originalSize = '';
+  if (lockTemplateLayout || !size) {
+    originalSize = await _measureSize(referenceImageUrl, token);
+    if (originalSize) console.log('[dhGenerateVariant] ' + (lockTemplateLayout ? '使用 DesignHub 原始尺寸锁定模板' : '锁定原图尺寸') + ' size=' + originalSize);
   } else {
     console.log('[dhGenerateVariant] 使用用户指定尺寸 size=' + size);
   }
-  // 约束语：用户要改尺寸 → 允许重排版式适配新比例；否则严格保持原样
-  const sizeClause = userSpecifiedSize
-    ? `【尺寸要求】请输出目标尺寸 ${size}，并按该比例重新合理排布版式（元素位置/大小自适应新画幅）；保持品牌风格、配色、主体视觉与文案信息一致，不要生硬拉伸或变形。`
-    : `【硬性要求】严格保持原图的画面比例与尺寸、整体版式布局、字体与字号层级、配色风格，以及所有未被要求修改的元素（背景、人物、图形、logo、按钮等）保持不变；新内容需自适应原有文字区域，避免溢出、遮挡或变形。`;
+  // DesignHub UI 的“原始尺寸”不能传入目标 size；否则服务会重排模板。最终资源位缩放在渲染层完成。
+  const sizeClause = lockTemplateLayout
+    ? `【DesignHub 原始尺寸智能改图】保持参考图的原始尺寸、完整画布比例和所有版式坐标。Logo、主标题、CTA、文字安全区、装饰线和主视觉的位置、大小、对齐与留白必须保持不变；只替换用户要求的文案与画面内容。禁止重新排版、缩放信息组件、文字溢出、遮挡或新增无关框线。`
+    : userSpecifiedSize
+      ? `【尺寸要求】请输出目标尺寸 ${size}，并按该比例重新合理排布版式（元素位置/大小自适应新画幅）；保持品牌风格、配色、主体视觉与文案信息一致，不要生硬拉伸或变形。`
+      : `【硬性要求】严格保持原图的画面比例与尺寸、整体版式布局、字体与字号层级、配色风格，以及所有未被要求修改的元素（背景、人物、图形、logo、按钮等）保持不变；新内容需自适应原有文字区域，避免溢出、遮挡或变形。`;
   try {
     // AI 生成耗时较长（豆包 Seedream，通常 1~3 分钟），超时放宽到 180s，与前端一致
     const { statusCode, json } = await netJSON({
@@ -292,7 +294,7 @@ async function dhGenerateVariant({ token, referenceImageUrl, prompt, size = '', 
       body: {
         referenceImageUrl,
         prompt: `${prompt}\n\n${sizeClause}`,
-        size: size || '',
+        size: lockTemplateLayout ? '' : (size || ''),
         count: count || 1,
         assetId: assetId || '',
       },

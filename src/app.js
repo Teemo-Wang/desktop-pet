@@ -743,8 +743,8 @@
   async function _specVisualFromTemplate(convId, text, cfg, userRef, composeOpts) {
     const tc = window.taskContext;
     const tag = '[specVisual:' + cfg.taskName + ']';
-    // 用户显式指定尺寸优先，否则用板块默认尺寸
-    const size = _extractReqSize(text) || cfg.size;
+    // 头图等明确标记为固定尺寸时，忽略消息中的尺寸，保证资源位最终输出规格一致。
+    const size = cfg.forceSize ? cfg.size : (_extractReqSize(text) || cfg.size);
     const title = _extractTitle(text);
     const subject = _extractSubject(text);
     const modelReady = !!(window.aiService && window.aiService.config && !window.aiService.useMock);
@@ -800,10 +800,10 @@
     }
     const items = (res && res.ok && res.items) ? res.items : [];
     if (!items.length) return null;
-    // 优先命中该板块标准命名的模板
+    // 优先命中该板块标准命名的模板。
     let tpls = items.filter(it => cfg.tplFilter.test(((it.name || '') + ' ' + (it.category || ''))));
     if (!tpls.length) tpls = items;
-    // 选模板：主体命中优先；否则随机。并额外挑一张「不同的」模板，让 2 版基于不同参考、差异更大
+    // 截图版本的选图逻辑：从首个可用模板组随机选择两张不同模板，不附加场景方向约束。
     const shuffled = tpls.slice().sort(() => Math.random() - 0.5);
     const picks = [];
     if (subject) {
@@ -814,23 +814,34 @@
       if (picks.length >= 2) break;
       if (!picks.includes(it)) picks.push(it);
     }
+    if (!picks.length) return null;
     const pick = picks[0];
     const ref = pick.cdnUrl || pick.url || pick.thumb;
     if (!ref) return null;
-    console.warn(tag + ' 选中模板=' + picks.map(p => p.name || '').join(' / ') + ' ref=' + String(ref).slice(0, 50));
-    const prompt = _injectSpecRule(cfg.buildPrompt(title, subject), cfg.ruleKeywords);
+    console.warn(tag + ' 截图版本模板组=' + tpls.length + ' 选中=' + picks.map(p => p.name || '').join(' / ') + ' ref=' + String(ref).slice(0, 50));
+    let prompt = _injectSpecRule(cfg.buildPrompt(title, subject), cfg.ruleKeywords);
+    if (cfg.taskName === '规范banner') {
+      // 补充版式规范：全出血主视觉、手写粗体标题、手绘弧线、镂空胶囊按钮、不加色块底板。
+      prompt += '\n\n【版式规范，最高优先级】'
+        + '画面结构：主视觉（骑行人物+场景+背景）铺满整张画布（全出血），不做左右色块分割；人物/自行车主体偏右侧，为左侧文字区自然留白。'
+        + '品牌信息叠加在左侧（继承模板对应位置和层级，只替换内容）：'
+        + '① 左上白色小字「|: 蓝莓骑行」logo；'
+        + '② logo 下方大字白色主标题，字体必须是手写感/粗笔触（马克笔或毛笔粗体质感），两行、左对齐，不用普通黑体；'
+        + '③ 主标题旁一道手绘感弧形曲线（颜色与画面色调协调，绿色调→草绿，暖色→金黄，蓝色→浅蓝）；'
+        + '④ 主标题下方白色胶囊镂空边框 CTA「立即查看 >」，无填充色，轻盈感；'
+        + '禁止新增色块底板、矩形框、红色描边；禁止复制参考图旧文字；无错别字。';
+    }
 
-    // 优先「seedream 图生图」：模板下载成图片当参考，AI 发挥空间更大（DesignHub 改图偏忠实编辑，内容放不开）
+    // 头图和其他资源位统一走 Seedream 图生图：模板提供版式骨架，模型重构主视觉与场景。
     if (modelReady) {
       try {
-        // 每版用不同模板作参考（picks[0]、picks[1]），拉开构图/内容差异
         const outs = [];
-        for (let i = 0; i < 2; i++) {
-          const tpl = picks[i] || picks[0];
+        for (let i = 0; i < picks.length; i++) {
+          const tpl = picks[i];
           const tplRef = tpl.cdnUrl || tpl.url || tpl.thumb;
           if (!tplRef) continue;
           let refData = tplRef;
-          // DesignHub 内网图先经主进程下载成 dataURL，避免生图服务拉不到内网地址
+          // DesignHub 内网图先经主进程下载成 dataURL，避免生图服务拉不到内网地址。
           if (materialService.fetchImageAsDataUrl) {
             try { const d = await materialService.fetchImageAsDataUrl(tplRef); if (d) refData = d; } catch (e) {}
           }
@@ -838,14 +849,14 @@
             const r = await window.aiService.generateImage({ prompt, imageUrl: refData, size });
             const u = r && (r.url || (r.b64 ? `data:image/png;base64,${r.b64}` : ''));
             if (u) outs.push(u);
-          } catch (e) { console.warn(tag + ' 图生图单张失败:', e && e.message); }
+          } catch (e) { console.warn(tag + ' 截图版本图生图单张失败:', e && e.message); }
         }
         if (outs.length) return _done(outs, pick.name, ref);
         console.warn(tag + ' 图生图无结果，回退 DesignHub 改图');
       } catch (e) { console.warn(tag + ' 图生图异常，回退 DesignHub 改图:', e && e.message); }
     }
 
-    // 兜底：DesignHub AI 改图（构图忠实，但内容自由度较低）
+    // 截图版本兜底：同一参考模板生成两版。
     const gen = await materialService.generateVariant({ referenceImageUrl: ref, prompt, size, count: 2 });
     if (gen && gen.ok && gen.images && gen.images.length) return _done(gen.images, pick.name, ref);
     if (gen && gen.needAuth) return { markdown: false, text: '素材库登录过期了，麻烦到「API 接入 → 素材库」重登后再试～' };
@@ -853,42 +864,47 @@
   }
 
   /**
-   * 规范 banner（左文右图头部视觉，1170×879）：通用引擎的 banner 板块配置。
+   * 规范 banner（左文右图头部视觉，780×586）：通用引擎的 banner 板块配置。
    * @returns {Promise<object|null>}
    */
   async function _specBannerFromTemplate(convId, text, userRef) {
     return _specVisualFromTemplate(convId, text, {
       searchKeywords: ['蓝莓骑行 顶部氛围', '顶部氛围', '首页顶部氛围', '头部视觉 1170'],
       tplFilter: /1170|顶部氛围|头部|头图|首页顶部|氛围图/i,
-      size: '1170x879',
+      size: '780x586',
+      forceSize: true,
       taskName: '规范banner',
-      // 关联「蓝莓头图banner规范」技能：命中则把其正文注入生图提示词（改 md 即改生图）
       ruleKeywords: ['蓝莓头图', '头图banner', '头图 banner', 'banner规范', '头部视觉规范'],
-      // 用户主视觉合成版式：主视觉贴右侧，左侧留白给文案
       compose: { region: 'right', coverage: 0.56, pad: 0 },
       buildPrompt: (title, subject) => [
-        '以这张蓝莓骑行「左文右图」头部视觉的构图与排版为骨架参考，重新创作一张全新的高质量头部视觉 banner。',
-        '构图骨架（需遵循）：左文右图布局；左上角蓝莓骑行 logo；主标题大字在左侧中上部、左对齐；「立即查看」按钮在左下；主视觉（人物+自行车）在画面中右侧；比例 1170×879；核心信息在安全区内。',
-        title ? `主标题文案："${title}"。文字的字体、字重、艺术效果可自由发挥设计（保持左对齐与位置），追求有设计感、易读、契合品牌调性。` : '',
-        subject ? `画面主体：全新创作的「${subject}」骑行场景，人物姿态自然、自行车结构准确。` : '',
-        '画面内容（自由发挥）：背景环境、人物、光影、色彩氛围均可重新创作，不要复制参考图的具体画面；追求真实摄影质感、自然柔和光线、清新自然高端、干净有层次，避免 AI 塑料感与影棚感。',
-        '仅参考其构图与元素位置，其余内容与风格大胆重新演绎。无错别字。',
+        '以这张蓝莓骑行头部视觉的排版为版式母版，重新创作一张全新的高质量头部视觉 banner。',
+        '版式规则（必须遵守）：主视觉铺满整张画布（全出血），骑行人物+背景覆盖整图；'
+        + '人物和自行车主体偏右侧或中右，为左侧文字区自然留白；'
+        + '文字信息叠加在画面左下区域，不加色块底板，与画面自然融合。',
+        '品牌信息（继承参考模板的位置和层级，只替换内容）：'
+        + '左上位置放「|: 蓝莓骑行」白色小字 logo；'
+        + 'logo 下方大字白色主标题（手写感/粗笔触字体，有笔触质感，不用普通黑体），两行、左对齐；'
+        + '主标题旁有一道手绘感弧形曲线（颜色与画面主色调协调）；'
+        + '主标题下方为白色胶囊镂空边框 CTA 按钮「立即查看 >」（无填充色）。',
+        title ? `主标题文案："${title}"，字体保持手写粗体质感，仅替换文字内容，不改变层级和位置。` : '',
+        subject ? `画面主体：全新创作的「${subject}」骑行场景，写实质感，人物姿态自然、自行车结构准确。` : '',
+        '画面内容全新创作，不复制参考图画面；自然柔和光线，色彩有层次，高端干净；'
+        + '避免 AI 塑料感、影棚感；禁止复制旧文字和旧按钮；无错别字。',
       ].filter(Boolean).join('\n'),
-      // 用户已提供主视觉（合成图右侧为其自行车产品）：保留主视觉、补左侧文案/logo/按钮、统一光影
       buildUserRefPrompt: (title, subject) => [
-        '这是一张已按蓝莓骑行「左文右图」头部视觉版式初步合成的图：右侧是用户提供的主视觉（自行车产品），左侧为文案留白区。',
-        '请在【保持右侧主视觉产品的外观、结构、颜色与所在位置基本不变】的前提下，把它完善成一张精致完整的品牌头部视觉 banner：',
-        title ? `1) 左侧生成主标题「${title}」，大字、左对齐、位于左侧中上部，字体有设计感、易读、契合品牌调性；` : '1) 左侧预留主标题区（左对齐、左侧中上部）；',
-        '2) 左上角加「蓝莓 BLUEBERRY」logo，左下方加「立即查看」按钮；',
-        '3) 统一左右两侧的光影、色彩与背景氛围，让文案区与主视觉自然融为一体，背景柔和干净、清新高端、有层次，消除拼接痕迹与 AI 塑料感；',
-        '4) 比例 1170×879，核心信息在安全区内，无错别字。',
+        '这张图右侧已摆好用户提供的主视觉（自行车产品），左侧为留白区。',
+        '请以【主视觉铺满全图（全出血）的方式】延展背景，让产品自然融入场景，然后在左侧叠加蓝莓骑行品牌信息：',
+        '左上：「|: 蓝莓骑行」白色小字 logo；',
+        title ? `logo 下方：大字白色主标题「${title}」，手写感粗体，两行、左对齐；` : 'logo 下方：大字白色主标题，手写感粗体，两行、左对齐；',
+        '主标题旁：一道手绘感弧形曲线（颜色与画面色调协调）；',
+        '主标题下方：白色胶囊镂空 CTA「立即查看 >」（无填充色）；',
+        '统一光影和色彩氛围，消除拼接感；画面干净高端；无错别字。',
       ].filter(Boolean).join('\n'),
       tips: (count) => count > 1
-        ? '按蓝莓骑行规范构图（左文右图/1170×879）AI 重新创作了 2 版✅ 挑一版继续调整，或说「再来一版」换表现～'
-        : '已按蓝莓骑行规范构图 AI 生成✅ 不满意可说「再来一版」，或直接说要调整的地方～',
+        ? '按蓝莓骑行规范 AI 重新创作了 2 版✅ 挑一版继续调整，或说「再来一版」换表现～'
+        : '已按蓝莓骑行规范 AI 生成✅ 不满意可说「再来一版」，或直接说要调整的地方～',
     }, userRef);
   }
-
   /**
    * 规范宽幅 banner（702×180，头图延展的宽横幅）：通用引擎的宽幅板块配置。
    * 版式与头图一致：左上 logo → 左侧两行主标题(配品牌弧线) → 左下「立即查看」按钮 → 右侧主视觉。
@@ -1268,10 +1284,11 @@
     }
 
     // 「按品牌规范生成 banner」→ 全自动精选模板改图（版式/logo/按钮/安全区由模板保证，规范才能真正落地）。
-    // 优先于纯文生图；需已登录素材库。带图时同样把用户图作主视觉合成脚手架。搜不到/失败则回退。
+    // 优先于纯文生图；需已登录素材库。本条附图或明确指向已有图时才复用主视觉；普通"生成/输出"请求必须重新搜索模板，不能被上次任务结果污染。
     if (_looksLikeSpecBanner(text) && hasText && materialService.connected) {
-      const specRef = await _resolveSpecUserRef(convId, msgs, curCodes);
-      console.warn('[buildReply] 规范banner → 模板改图' + (specRef ? '（用户主视觉合成）' : ''));
+      const explicitReference = curCodes.length > 0 || /(改这张|改图|基于(?:这张|上图|刚才)|引用(?:这张|上图)|(?:这张|上图|刚才那张).{0,12}(?:改|生成|做|调整)|继续调整|延展)/.test(text);
+      const specRef = explicitReference ? await _resolveSpecUserRef(convId, msgs, curCodes) : '';
+      console.warn('[buildReply] 规范banner → 模板改图' + (specRef ? '（明确指定用户主视觉合成）' : '（重新检索模板）'));
       tc.clearActive(convId);   // 规范新图，清掉旧任务，避免复用无关旧图
       try {
         const r = await _specBannerFromTemplate(convId, text, specRef);

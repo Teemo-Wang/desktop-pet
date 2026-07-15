@@ -45,7 +45,14 @@
             const c = document.createElement('canvas');
             c.width = w; c.height = h;
             const ctx = c.getContext('2d');
-            ctx.drawImage(img, 0, 0, w, h);
+            // 保持原图比例进行 contain 缩放：不足的区域保持透明，绝不压扁/拉宽完整模板成图。
+            const scale = Math.min(w / img.naturalWidth, h / img.naturalHeight);
+            const dw = Math.round(img.naturalWidth * scale);
+            const dh = Math.round(img.naturalHeight * scale);
+            const dx = Math.round((w - dw) / 2);
+            const dy = Math.round((h - dh) / 2);
+            console.warn('[resizeImage] 原图=' + img.naturalWidth + 'x' + img.naturalHeight + ' 目标=' + w + 'x' + h + ' 绘制=' + dw + 'x' + dh);
+            ctx.drawImage(img, dx, dy, dw, dh);
             resolve(c.toDataURL('image/png'));
           } catch (e) { resolve(null); }
         };
@@ -77,6 +84,14 @@
 
   class AIService {
     constructor() { this.config = null; this.useMock = true; }
+
+    /**
+     * 仅缩放完整成图到指定像素，不叠加元素、不裁切、不改变既有版式。
+     * 用于将 DesignHub 的“原始尺寸”改图结果交付为资源位最终尺寸。
+     */
+    async resizeImageToExact(src, width, height) {
+      return await _resizeToExact(src, width, height);
+    }
 
     /** 配置/重新配置当前供应商。无 apiKey 时自动回退 mock 数据 */
     configure(cfg) {

@@ -86,7 +86,7 @@
 
     /**
      * DesignHub AI 智能改图：参考图 + 描述 → 生成变体
-     * @param {object} opts - { referenceImageUrl, prompt, size?, count?, assetId? }
+     * @param {object} opts - { referenceImageUrl, prompt, size?, count?, assetId?, preserveTemplateLayout? }
      * @returns {Promise<{ok:boolean, images?:string[], needAuth?:boolean, error?:string}>}
      */
     async generateVariant(opts = {}) {
@@ -98,6 +98,7 @@
         size: opts.size || '',
         count: opts.count || 1,
         assetId: opts.assetId || '',
+        preserveTemplateLayout: opts.preserveTemplateLayout === true,
       });
     }
   }
