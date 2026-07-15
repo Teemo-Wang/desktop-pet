@@ -1,7 +1,33 @@
 # 桌宠项目 · 继续优化指南（交接文档）
 
 > 用途：在**新对话**里用 `#File` 引用本文件（或直接把内容粘给 AI），即可快速接上进度继续优化。
-> 最后更新：2026-07（由上一轮长对话整理）
+> 最后更新：2026-07（第二轮，规范生图专项）｜当前版本 v1.1.1
+
+---
+
+## 0. 最新进度速览（第二轮，务必先读）
+
+**本轮聚焦「按品牌规范生图」，已完成：**
+
+1. **钉钉引用回复识别**（`dingtalk-bridge.js`）：新增 `_extractQuote()` 容错解析被引用消息，图片下载码并入 `imageDownloadCodes`；透出 `quotedText`；文本含疑似引用字段时打诊断日志。
+2. **发图结果记入参考图**（`app.js` `sendReplyToConv`）：机器人每次发出结果图后幂等写入 `task-context` 当前参考图 → 用户「引用这张图/按这个改」能取到正确原图（跳过找素材候选图与 data:URL）。
+3. **通用规范生图引擎** `_specVisualFromTemplate(convId, text, cfg, userRef, composeOpts)`（`app.js`）：banner/弹窗/宽幅共用；新增板块只加一份 cfg。两条路径——路径 A（用户主视觉→版式合成→图生图）、路径 B（搜 DesignHub 模板→图生图）。
+4. **三个规范板块**（都是引擎的薄配置）：
+   - 头图氛围 **1170×879** `_specBannerFromTemplate`（左文右图）
+   - 宽幅横幅 **702×180** `_specWideBannerFromTemplate`（头图延展；附图=整图合成，延展现有图=裁右侧主视觉）
+   - 弹窗 **594×790** `_specPopupFromTemplate`（竖版，主视觉居中偏下）
+5. **用户主视觉版式合成** `_composeSpecCanvas()`（Canvas）：把主视觉按规范摆位（右侧/居中偏下）+ `srcRegion` 源裁剪（延展时取右侧主视觉丢弃旧文案）+ 区域 clip（不侵入文案留白区）+ 背景采样色填充。解决「外部图直接图生图主体被放中间」。
+6. **参考图回溯** `_resolveSpecUserRef()`：当前消息没带图时回溯最近 12 条对方发的图 → 解决「图文分两条发」取不到主视觉。
+7. **规范 skill 注入生图**：新增 `skills/蓝莓头图banner规范.md`（1170×879 规范）；`_findSpecRuleText/_injectSpecRule` 按技能名找到该 skill 正文并注入 seedream 提示词（**改 md 即改生图**）。目前仅头图板块挂了 `ruleKeywords`。
+   - ⚠️ 生效前提：该 `.md` 必须**上传到技能中心**（运行时从 `~/.hellobike-pet/skills.json` 按名查找）。
+
+**🔴 当前最重要的未决事项（下一步）：头图 banner 生图质量仍不达标**
+- 现象：① 尺寸不对（非 1170×879）② 文案字体/位置不对 ③ 只是把参考图 1:1 放原位、没洗图重构。
+- 根因诊断：请求常被误路由到「原图改文案」的普通编辑分支；且**中文标题交给 seedream 画，字体/位置/错别字天生不可控**（扩散模型天花板）。
+- **结论方案（待用户拍板 A/B/C）**：改为「**AI 洗图（重绘右侧主视觉）+ 代码 Canvas 精确排版（标题/按钮/弧线/logo/尺寸全部代码画死）**」。只有代码绘制文字才能保证字体/位置。用户提供的 Lovart 洗图 Workflow 用于「AI 洗图」步骤（取其任务分类/尺寸映射/品牌检查；**不采用**其「Prompt 只机械复述、不补充视觉理解」那条——与模板化高质量生图冲突）。
+  - A（推荐）：先用文字版 logo 占位跑通链路；B：先要 logo PNG 再做；C：只修路由让它至少出 1170×879（文案仍 AI 画、不保证准）。
+
+---
 
 ---
 
@@ -22,7 +48,11 @@ docs/desktop-pet/
 ├── dingtalk-bridge.js      # 钉钉 Stream 长连接 + 单聊/群聊发消息/发图(oToMessages vs groupMessages)
 ├── material-bridge.js      # DesignHub：登录/搜索/AI改图(dhGenerateVariant)/图片下载
 ├── src/
-│   ├── app.js              # 渲染进程总入口 + 钉钉回复核心 buildTakeoverReply（改图/生图/找素材/意图路由）
+│   ├── app.js              # 渲染进程总入口 + buildTakeoverReply（意图路由）
+│   │                        #   规范生图引擎：_specVisualFromTemplate / _spec{Banner,WideBanner,Popup}FromTemplate
+│   │                        #   版式合成：_composeSpecCanvas ｜ 参考图回溯：_resolveSpecUserRef
+│   │                        #   规范注入：_findSpecRuleText / _injectSpecRule
+│   ├── ../skills/蓝莓头图banner规范.md  # 1170×879 头图规范(可编辑);需上传技能中心才生效
 │   ├── services/
 │   │   ├── ai.js           # 模型统一接入（send/stream/generateImage）；生图尺寸/模型family处理
 │   │   ├── dingtalk-ai.js  # 钉钉消息 AI 层：decideAction(意图)/suggestReply/analyze
@@ -67,8 +97,9 @@ docs/desktop-pet/
 
 | 方向 | 说明 | 优先级 |
 |------|------|--------|
-| **纯文生图无法精确还原版式** | seedream 做不到像素级"左文右图/安全区/logo位置"。已用「模板图生图」缓解 | 已缓解 |
-| **方案 B：代码排版合成（未做）** | Canvas 按规范精确排版 logo/标题/按钮 + seedream 只生成右侧主视觉大图 → 像素级合规 + 高质量主视觉。**最彻底的规范落地方案** | 高（推荐下一步） |
+| **头图 banner 生图质量（尺寸/文案字体位置/1:1未重构）** | 见 §0「最重要未决事项」，方案=AI洗图+Canvas精确排版，待拍板 A/B/C | 🔴 最高（下一步） |
+| **弹窗 594×790 / 宽幅 702×180 板块** | 已接入通用引擎，可用（真机验收待做） | 已完成 |
+| **纯文生图无法精确还原版式** | seedream 做不到像素级"左文右图/安全区/logo位置"。已用「模板图生图 + 版式合成」缓解 | 已缓解 |
 | **规范→提示词缓存** | 每次扩写慢，可把规范扩写成的提示词缓存复用 | 中 |
 | **模板选择优化** | 目前固定选第一张匹配模板，可按场景/随机/智能选 | 中 |
 | **网络稳定性** | 火山方舟/外部 API 偶发 SSL 握手失败(net_error -100)，建议查代理 | 观察 |
