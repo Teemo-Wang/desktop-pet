@@ -439,106 +439,157 @@
     }
 
     /**
-     * 调用 images/generations 端点生成图片
-     * 适用于 doubao-seedream / DALL-E 等纯生图模型
-     * @param {object} options - { prompt, model?, size?, n?, imageUrl? }
-     * @returns {Promise<{url?:string, b64?:string}>} 生成结果
+     * 统一生图入口：根据模型 family、是否有参考图、以及网关类型自动路由。
+     *
+     * 路由规则：
+     *   - GPT-Image 系列 + 有图 + OpenAI 官方网关 → /images/edits（multipart/form-data）
+     *   - GPT-Image 系列 + 有图 + 哈啰/非官方网关 → /images/generations（JSON，image 字段传 base64）
+     *   - GPT-Image 系列 + 无图                   → /images/generations（JSON）
+     *   - Seedream 等其他模型                      → /images/generations（JSON），参考图通过 body.image 传递
+     *
+     * 哈啰内部生图网关（aibrain-large-model-engine-common.hellobike.cn）只有 /images/generations，
+     * 没有 /images/edits 端点；所以只有 api.openai.com 才走 multipart edits。
+     *
+     * @param {object} options
+     *   - prompt {string}           生图或改图描述
+     *   - model {string}            覆盖模型名
+     *   - size {string}             目标尺寸，如 '1024x1024'；空/0 表示自适应
+     *   - n {number}                生成数量
+     *   - imageUrl {string|null}    参考图（data URL 或 https URL）；有值即触发改图路径
+     *   - imageUrls {string[]}      多张参考图（GPT-Image edits 支持多图）
+     * @returns {Promise<{url?:string, b64?:string}>}
      */
     async generateImage(options = {}) {
-      // 优先用专门的生图模型配置
       const imgCfg = this.imageConfig || {};
-      // 生图专用 Key / 地址：填了就用生图服务自己的（如公司另一个生图接口），没填则复用对话配置
       const imgApiKey = imgCfg.apiKey || this.config?.apiKey;
       const imgBaseUrl = imgCfg.baseUrl || this.config?.baseUrl;
       if (!imgApiKey) throw new Error('⚠️ 请先配置 API Key');
       if (!imgBaseUrl) throw new Error('⚠️ 请先配置生图地址');
       const model = options.model || imgCfg.modelName || this.config.imageModel || this.config.modelName;
-      const body = {
-        model,
-        prompt: options.prompt || '哈啰骑行场景，品牌风格',
-        n: options.n || 1,
-        // 注意：不固定传 response_format —— 部分模型（如 GPT-Image 系列）不支持该参数会报
-        // 400 Unknown parameter。默认返回 url（seedream）或 b64（gpt-image），下方统一兼容。
-      };
 
-      // 如果有参考图（image-to-image 编辑），加入 image 字段
-      // 模型 family 判断：不同生图模型对「参考图」和「尺寸」的参数要求不同
+      // 汇总所有参考图（支持单图/多图两种入参形式）
+      const inputImages = [];
+      if (options.imageUrls && Array.isArray(options.imageUrls)) inputImages.push(...options.imageUrls.filter(Boolean));
+      if (options.imageUrl && !inputImages.includes(options.imageUrl)) inputImages.push(options.imageUrl);
+
       const isGptImage = /gpt-?image/i.test(String(model));
+      const hasImages = inputImages.length > 0;
+      // 改图路径判断：
+      //   - 官方 OpenAI (api.openai.com)：走 /images/edits，JSON body，images 数组传参考图
+      //   - 哈啰及其他网关：走 /images/generations，JSON body，images 数组传参考图（路径不同，格式一样）
+      const isOfficialOpenAI = /api\.openai\.com/i.test(String(imgBaseUrl));
+      const useEditsEndpoint = isGptImage && hasImages && isOfficialOpenAI;
+      // 哈啰网关图像编辑也走 /images/generations，通过 images 数组传参考图（非 multipart）
+      const useGenerationsWithImages = isGptImage && hasImages && !isOfficialOpenAI;
 
+      console.warn('[generateImage] 模型=' + model
+        + ' isGptImage=' + isGptImage
+        + ' isOfficialOpenAI=' + isOfficialOpenAI
+        + ' 输入图片数=' + inputImages.length
+        + ' 接口=' + (useEditsEndpoint ? 'images/edits(官方)' : hasImages && isGptImage ? 'images/generations(含images数组)' : 'images/generations'));
+
+
+      // 尺寸处理
       const cfgSize = String(options.size || imgCfg.size || '').trim();
       const isAdaptive = !cfgSize || cfgSize === '0' || cfgSize === '0x0' || cfgSize.toLowerCase() === 'adaptive';
-      // 用户显式指定的精确目标尺寸（如 702x180）：接口有最小像素限制，先按比例放大生成、最后降采样到精确尺寸
       let exactW = 0, exactH = 0;
       const _em = cfgSize.match(/^(\d+)\s*[x×*]\s*(\d+)$/i);
       if (!isAdaptive && _em) { exactW = parseInt(_em[1], 10); exactH = parseInt(_em[2], 10); }
 
-      if (isGptImage) {
-        // GPT-Image 系列：/images/generations 端点不接受 image 参数（图生图需走 /images/edits，此处不支持）；
-        // 尺寸只认固定集合，其余一律用 auto。
-        const GPT_SIZES = ['1024x1024', '1024x1536', '1536x1024', 'auto'];
-        body.size = (!isAdaptive && GPT_SIZES.includes(cfgSize)) ? cfgSize : 'auto';
-        // 注意：不发送 body.image —— 带参考图的「图生图」请改用 seedream 系列模型
+      let url = null, b64 = null;
+
+      if (useEditsEndpoint) {
+        // ── GPT-Image 改图（OpenAI 官方）：/images/edits JSON body ──
+        const editsUrl = imgBaseUrl.replace(/\/+$/, '') + '/images/edits';
+        const GPT_EDIT_SIZES = ['1024x1024', '1024x1536', '1536x1024', 'auto'];
+        const editSize = (!isAdaptive && GPT_EDIT_SIZES.includes(cfgSize)) ? cfgSize : '1024x1024';
+        const editsBody = {
+          model,
+          prompt: options.prompt || '',
+          n: options.n || 1,
+          size: editSize,
+          images: inputImages.map(u => ({ image_url: u })),
+        };
+        console.warn('[generateImage] → images/edits JSON images[]=' + inputImages.length + ' size=' + editSize);
+        const res = await fetch(editsUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + imgApiKey },
+          body: JSON.stringify(editsBody),
+          signal: AbortSignal.timeout(180000),
+        });
+        if (!res.ok) {
+          let detail = '';
+          try { const e = await res.json(); detail = e?.error?.message || e?.message || JSON.stringify(e); }
+          catch (_) { detail = await res.text().catch(() => ''); }
+          console.error('[generateImage] images/edits 失败:', res.status, detail);
+          throw new Error(`改图失败 (${res.status})：${detail}`);
+        }
+        const data = await res.json();
+        console.warn('[generateImage] images/edits 返回 status=' + res.status + ' items=' + (data.data?.length || 0));
+        const r0 = data.data?.[0] || {};
+        url = r0.url || (r0.b64_json ? `data:image/png;base64,${r0.b64_json}` : null);
+        b64 = r0.b64_json || null;
+
       } else {
-        // seedream 等：支持参考图，尺寸支持「宽x高 / 2k / 3k / 4k」
-        if (options.imageUrl) body.image = options.imageUrl;
-        if (!isAdaptive) {
-          // 显式「宽x高」按该比例适配到合规像素范围（如 702x180 会等比放大到满足最小像素，比例不变）；
-          // 2k/3k/4k/auto 等关键字原样传
-          const m = cfgSize.match(/^(\d+)\s*[x×*]\s*(\d+)$/i);
-          body.size = m ? (_fitImageGenSize(parseInt(m[1], 10), parseInt(m[2], 10)) || cfgSize) : cfgSize;
-        } else if (options.imageUrl) {
-          // 改图：按原图真实宽高等比适配到合规范围，保证输出与原图比例一致（否则默认出正方形）
-          try {
-            const dim = await _measureImageSize(options.imageUrl);
-            const fitted = dim && _fitImageGenSize(dim.w, dim.h);
-            if (fitted) body.size = fitted;
-          } catch (e) { /* 量不到就不传，用模型默认 */ }
+        // ── 文生图 / 非官方网关改图：/images/generations JSON ──
+        const body = { model, prompt: options.prompt || '哈啰骑行场景，品牌风格', n: options.n || 1 };
+        if (isGptImage) {
+          const GPT_SIZES = ['1024x1024', '1024x1536', '1536x1024', 'auto'];
+          body.size = (!isAdaptive && GPT_SIZES.includes(cfgSize)) ? cfgSize : 'auto';
+          // 哈啰网关改图：使用 imageList 字段（数组，仅支持 http(s) URL，不支持 base64）
+          if (useGenerationsWithImages) {
+            const httpImages = inputImages.filter(u => /^https?:\/\//i.test(u));
+            if (httpImages.length) {
+              body.imageList = httpImages;
+              console.warn('[generateImage] GPT-Image 哈啰网关改图，imageList URL数=' + httpImages.length + '，base64跳过=' + (inputImages.length - httpImages.length));
+            } else {
+              console.warn('[generateImage] GPT-Image 哈啰网关：所有参考图均为 base64，无法通过 imageList 传递，退回文生图');
+            }
+          }
+        } else {
+          // Seedream 等：image 字段传第一张参考图
+          if (hasImages) body.image = inputImages[0];
+          if (!isAdaptive) {
+            const m = cfgSize.match(/^(\d+)\s*[x×*]\s*(\d+)$/i);
+            body.size = m ? (_fitImageGenSize(parseInt(m[1], 10), parseInt(m[2], 10)) || cfgSize) : cfgSize;
+          } else if (hasImages) {
+            try { const dim = await _measureImageSize(inputImages[0]); const fitted = dim && _fitImageGenSize(dim.w, dim.h); if (fitted) body.size = fitted; }
+            catch (e) { /* 量不到用模型默认 */ }
+          }
         }
-      }
-
-      // 图生图但选了 GPT-Image：该端点不支持编辑原图，明确报错引导换模型，避免"忽略原图静默生成新图"的误导
-      if (options.imageUrl && isGptImage) {
-        throw new Error('当前生图模型（GPT-Image 系列）不支持「图生图 / 改图」，请切换到 Doubao-Seedream 系列再试');
-      }
-
-      const endpoint = imgBaseUrl.replace(/\/+$/, '') + '/images/generations';
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        // 用生图专用 Key（未单独配置则复用对话 Key）
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + imgApiKey },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(120000), // 生图可能较慢
-      });
-
-      if (!res.ok) {
-        // 读取完整错误体，便于定位生图失败原因
-        let detail = '';
-        try {
-          const errData = await res.json();
-          detail = errData?.error?.message || errData?.message || JSON.stringify(errData);
-        } catch (e) {
-          detail = await res.text().catch(() => '');
+        const endpoint = imgBaseUrl.replace(/\/+$/, '') + '/images/generations';
+        // 有参考图（改图）耗时更长，放宽到 300s；纯文生图通常 30-60s，保持 120s 避免假等待
+        const genTimeout = (body.imageList || body.image) ? 300000 : 120000;
+        console.warn('[generateImage] → images/generations model=' + model
+          + ' size=' + (body.size || 'auto')
+          + ' imageList=' + (body.imageList ? body.imageList.length : (body.image ? 1 : 0))
+          + ' timeout=' + (genTimeout / 1000) + 's');
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + imgApiKey },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(genTimeout),
+        });
+        if (!res.ok) {
+          let detail = '';
+          try { const e = await res.json(); detail = e?.error?.message || e?.message || JSON.stringify(e); }
+          catch (_) { detail = await res.text().catch(() => ''); }
+          console.error('[generateImage] images/generations 失败:', res.status, detail, '请求体:', JSON.stringify(body).slice(0, 400));
+          throw new Error(`生图失败 (${res.status})：${detail}`);
         }
-        console.error('[generateImage] 失败:', res.status, detail, '请求体:', JSON.stringify(body).slice(0, 300));
-        throw new Error(`生图失败 (${res.status})：${detail}`);
+        const data = await res.json();
+        console.warn('[generateImage] images/generations 返回 status=' + res.status + ' items=' + (data.data?.length || 0));
+        const r0 = data.data?.[0] || {};
+        url = r0.url || (r0.b64_json ? `data:image/png;base64,${r0.b64_json}` : null);
+        b64 = r0.b64_json || null;
       }
 
-      const data = await res.json();
-      // OpenAI 格式：data.data[0].url 或 data.data[0].b64_json
-      const result = data.data?.[0] || {};
-      // 有的模型只返回 b64（如 GPT-Image 系列），转成 data URL，让下游按 url 直接展示
-      let url = result.url || (result.b64_json ? `data:image/png;base64,${result.b64_json}` : null);
-      // 精确尺寸：接口按合规大尺寸出图后，降采样到用户要求的精确宽高（比例一致，不变形）
-      if (url && exactW && exactH) {
-        try {
-          const resized = await _resizeToExact(url, exactW, exactH);
-          if (resized) url = resized;
-        } catch (e) { console.warn('[generateImage] 精确缩放失败，返回原图:', e && e.message); }
+      // 精确尺寸等比缩放（仅 Seedream 非标准尺寸时需要）
+      if (url && exactW && exactH && !isGptImage) {
+        try { const resized = await _resizeToExact(url, exactW, exactH); if (resized) url = resized; }
+        catch (e) { console.warn('[generateImage] 精确缩放失败，返回原图:', e && e.message); }
       }
-      return {
-        url,
-        b64: result.b64_json || null,
-      };
+      return { url, b64 };
     }
 
     /**

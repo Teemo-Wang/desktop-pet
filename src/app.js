@@ -792,22 +792,35 @@
       return null;
     }
 
-    // ===== 路径 B：无用户图 → 搜 DesignHub 板块模板 → 图生图 =====
-    let res = null;
+    // ===== 路径 B：无用户图 → 合并多个搜索词的候选模板 → 无偏随机选两张不同参考图 =====
+    // 合并所有搜索词结果去重，扩大候选池，避免两版都从同一系列模板里取图。
+    const allItems = [];
+    const seenIds = new Set();
     for (const kw of cfg.searchKeywords) {
-      try { res = await materialService.search(kw, { pageSize: 20 }); } catch (e) { res = null; }
-      if (res && res.ok && res.items && res.items.length) break;
+      try {
+        const r = await materialService.search(kw, { pageSize: 20 });
+        if (r && r.ok && r.items) {
+          for (const it of r.items) {
+            const key = it.id || it.cdnUrl || it.url || it.thumb || it.name;
+            if (key && !seenIds.has(key)) { seenIds.add(key); allItems.push(it); }
+          }
+        }
+      } catch (e) { /* 单个词失败不影响其他 */ }
     }
-    const items = (res && res.ok && res.items) ? res.items : [];
+    const items = allItems;
     if (!items.length) return null;
     // 优先命中该板块标准命名的模板。
     let tpls = items.filter(it => cfg.tplFilter.test(((it.name || '') + ' ' + (it.category || ''))));
     if (!tpls.length) tpls = items;
-    // 截图版本的选图逻辑：从首个可用模板组随机选择两张不同模板，不附加场景方向约束。
-    const shuffled = tpls.slice().sort(() => Math.random() - 0.5);
+    // Fisher-Yates 无偏洗牌，避免 sort(() => Math.random() - 0.5) 的分布偏差。
+    const shuffled = tpls.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
     const picks = [];
     if (subject) {
-      const bySub = tpls.find(it => (it.name || '').includes(subject.slice(0, 2)));
+      const bySub = shuffled.find(it => (it.name || '').includes(subject.slice(0, 2)));
       if (bySub) picks.push(bySub);
     }
     for (const it of shuffled) {
@@ -818,10 +831,10 @@
     const pick = picks[0];
     const ref = pick.cdnUrl || pick.url || pick.thumb;
     if (!ref) return null;
-    console.warn(tag + ' 截图版本模板组=' + tpls.length + ' 选中=' + picks.map(p => p.name || '').join(' / ') + ' ref=' + String(ref).slice(0, 50));
+    console.warn(tag + ' 候选池=' + allItems.length + ' 精准模板=' + tpls.length + ' 选中=' + (pick.name || '') + ' ref=' + String(ref).slice(0, 50));
     let prompt = _injectSpecRule(cfg.buildPrompt(title, subject), cfg.ruleKeywords);
     if (cfg.taskName === '规范banner') {
-      // 补充版式规范：全出血主视觉、手写粗体标题、手绘弧线、镂空胶囊按钮、不加色块底板。
+      // 版式规范（对两版都生效）
       prompt += '\n\n【版式规范，最高优先级】'
         + '画面结构：主视觉（骑行人物+场景+背景）铺满整张画布（全出血），不做左右色块分割；人物/自行车主体偏右侧，为左侧文字区自然留白。'
         + '品牌信息叠加在左侧（继承模板对应位置和层级，只替换内容）：'
@@ -832,28 +845,34 @@
         + '禁止新增色块底板、矩形框、红色描边；禁止复制参考图旧文字；无错别字。';
     }
 
-    // 头图和其他资源位统一走 Seedream 图生图：模板提供版式骨架，模型重构主视觉与场景。
+    // 版 A（参考图图生图）和版 B（无参考图文生图）并行执行，总耗时取较慢的一版
     if (modelReady) {
       try {
+        const imgCfg = window.aiService.imageConfig || {};
+        const activeModel = imgCfg.modelName || (window.aiService.config && window.aiService.config.modelName) || '';
+        // 版 B 专用提示词：去掉"以这张...为母版/骨架"的引导，追加独立场景指令
+        const promptB = prompt
+          .replace(/以这张[^。\n]*版式母版[^。\n]*。?\n?/, '')
+          .replace(/以这张[^。\n]*骨架参考[^。\n]*。?\n?/, '')
+          + '\n\n【独立创作，无参考图约束】请完全按上述规范独立创作，主动选择与常见林间/公园场景截然不同的骑行环境（如城市街头、海边公路、乡村田野、清晨街道、建筑广场等任意一种），让两版在场景、光线、氛围上形成明显差异。';
+        console.warn(tag + ' 并行生成：版A=参考图图生图 版B=无参考图文生图 model=' + (activeModel || 'unknown'));
+        // 并行发出两版请求
+        const [resA, resB] = await Promise.allSettled([
+          window.aiService.generateImage({ prompt, imageUrl: ref, size }),       // 版 A：CDN URL 直传
+          window.aiService.generateImage({ prompt: promptB, size }),              // 版 B：无参考图
+        ]);
         const outs = [];
-        for (let i = 0; i < picks.length; i++) {
-          const tpl = picks[i];
-          const tplRef = tpl.cdnUrl || tpl.url || tpl.thumb;
-          if (!tplRef) continue;
-          let refData = tplRef;
-          // DesignHub 内网图先经主进程下载成 dataURL，避免生图服务拉不到内网地址。
-          if (materialService.fetchImageAsDataUrl) {
-            try { const d = await materialService.fetchImageAsDataUrl(tplRef); if (d) refData = d; } catch (e) {}
-          }
-          try {
-            const r = await window.aiService.generateImage({ prompt, imageUrl: refData, size });
-            const u = r && (r.url || (r.b64 ? `data:image/png;base64,${r.b64}` : ''));
-            if (u) outs.push(u);
-          } catch (e) { console.warn(tag + ' 截图版本图生图单张失败:', e && e.message); }
-        }
+        if (resA.status === 'fulfilled') {
+          const uA = resA.value && (resA.value.url || (resA.value.b64 ? `data:image/png;base64,${resA.value.b64}` : ''));
+          if (uA) { outs.push(uA); console.warn(tag + ' 版A 成功'); }
+        } else { console.warn(tag + ' 版A 失败:', resA.reason && resA.reason.message); }
+        if (resB.status === 'fulfilled') {
+          const uB = resB.value && (resB.value.url || (resB.value.b64 ? `data:image/png;base64,${resB.value.b64}` : ''));
+          if (uB) { outs.push(uB); console.warn(tag + ' 版B 成功'); }
+        } else { console.warn(tag + ' 版B 失败:', resB.reason && resB.reason.message); }
         if (outs.length) return _done(outs, pick.name, ref);
-        console.warn(tag + ' 图生图无结果，回退 DesignHub 改图');
-      } catch (e) { console.warn(tag + ' 图生图异常，回退 DesignHub 改图:', e && e.message); }
+        console.warn(tag + ' 两版均无结果，回退 DesignHub 改图');
+      } catch (e) { console.warn(tag + ' 生图异常，回退 DesignHub 改图:', e && e.message); }
     }
 
     // 截图版本兜底：同一参考模板生成两版。

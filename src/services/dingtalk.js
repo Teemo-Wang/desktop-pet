@@ -275,6 +275,30 @@
     async getUnreadCount() { return this.convs.reduce((s, c) => s + (c.unread || 0), 0); }
     async markRead(id) { const c = this.convs.find(x => x.id === id); if (c && c.unread) { c.unread = 0; this._persist(); } }
 
+    /** 清除单条会话的所有消息记录（保留会话本身但清空 messages） */
+    clearConversation(id) {
+      const c = this.convs.find(x => x.id === id);
+      if (!c) return;
+      c.messages = [];
+      c.unread = 0;
+      c.lastMsg = '';
+      this._persist();
+    }
+
+    /** 删除单条会话（从列表移除） */
+    deleteConversation(id) {
+      const idx = this.convs.findIndex(x => x.id === id);
+      if (idx === -1) return;
+      this.convs.splice(idx, 1);
+      this._persist();
+    }
+
+    /** 清除全部会话记录（清空消息 + 列表） */
+    clearAllConversations() {
+      this.convs = [];
+      this._persist();
+    }
+
     /** 追加一条消息到会话（含"我/助理"发出的回复） */
     appendMessage(id, msg) {
       const c = this.convs.find(x => x.id === id);

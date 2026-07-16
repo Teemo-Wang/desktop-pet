@@ -40,12 +40,13 @@
         <div class="panel-head">
           <span class="panel-head-title"><img class="panel-head-icon" src="icon/钉钉.png" alt="">钉钉消息</span>
           <span class="panel-head-sub">${unread ? unread + ' 未读' : ''}</span>
+          ${convs.length > 0 ? '<button class="btn-icon dt-clear-all" title="清除全部记录" style="font-size:11px;padding:0 6px;color:var(--text-3)">清除</button>' : ''}
           <button class="btn-icon" id="dtClose">✕</button>
         </div>
         <div class="panel-body">
           ${convs.length === 0 ? '<div class="state-empty"><div class="state-empty-icon">💬</div><div class="state-empty-text">暂无消息</div></div>' :
             convs.map(c => `
-              <div class="list-item" data-id="${c.id}">
+              <div class="list-item" data-id="${c.id}" style="position:relative">
                 <div class="list-item-avatar" style="background:${c.type==='group'?'var(--brand)':'var(--success)'}">${c.type==='group'?'群':c.name[0]}</div>
                 <div class="list-item-body">
                   <div class="list-item-title">${c.name}</div>
@@ -54,12 +55,32 @@
                 <div class="list-item-right">
                   <span class="list-item-time">${c.lastTime}</span>
                   ${c.unread ? `<span class="badge">${c.unread}</span>` : ''}
+                  <button class="dt-del-conv btn-icon" data-id="${c.id}" title="删除此会话" style="font-size:13px;opacity:0.4;margin-left:4px" onclick="event.stopPropagation()">🗑</button>
                 </div>
               </div>
             `).join('')}
         </div>`;
 
       this.panel.querySelector('#dtClose').addEventListener('click', () => document.dispatchEvent(new CustomEvent('panel-close-all')));
+      // 清除全部会话记录
+      const clearAllBtn = this.panel.querySelector('.dt-clear-all');
+      if (clearAllBtn) {
+        clearAllBtn.addEventListener('click', () => {
+          if (!confirm('确认清除全部会话记录？此操作不可恢复。')) return;
+          this.service.clearAllConversations();
+          this._renderList();
+        });
+      }
+      // 删除单条会话
+      this.panel.querySelectorAll('.dt-del-conv').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = btn.dataset.id;
+          if (!confirm('确认删除此会话？')) return;
+          this.service.deleteConversation(id);
+          this._renderList();
+        });
+      });
       this.panel.querySelectorAll('.list-item').forEach(el => {
         el.addEventListener('click', () => this._renderDetail(el.dataset.id));
       });
