@@ -39,14 +39,13 @@
       this.panel.innerHTML = `
         <div class="panel-head">
           <span class="panel-head-title"><img class="panel-head-icon" src="icon/钉钉.png" alt="">钉钉消息</span>
-          <span class="panel-head-sub">${unread ? unread + ' 未读' : ''}</span>
-          ${convs.length > 0 ? '<button class="btn-icon dt-clear-all" title="清除全部记录" style="font-size:11px;padding:0 6px;color:var(--text-3)">清除</button>' : ''}
+          <span class="panel-head-sub" style="flex:1">${unread ? unread + ' 未读' : ''}</span>
           <button class="btn-icon" id="dtClose">✕</button>
         </div>
         <div class="panel-body">
           ${convs.length === 0 ? '<div class="state-empty"><div class="state-empty-icon">💬</div><div class="state-empty-text">暂无消息</div></div>' :
             convs.map(c => `
-              <div class="list-item" data-id="${c.id}" style="position:relative">
+              <div class="list-item dt-conv-item" data-id="${c.id}" style="position:relative;user-select:none">
                 <div class="list-item-avatar" style="background:${c.type==='group'?'var(--brand)':'var(--success)'}">${c.type==='group'?'群':c.name[0]}</div>
                 <div class="list-item-body">
                   <div class="list-item-title">${c.name}</div>
@@ -55,34 +54,36 @@
                 <div class="list-item-right">
                   <span class="list-item-time">${c.lastTime}</span>
                   ${c.unread ? `<span class="badge">${c.unread}</span>` : ''}
-                  <button class="dt-del-conv btn-icon" data-id="${c.id}" title="删除此会话" style="font-size:13px;opacity:0.4;margin-left:4px" onclick="event.stopPropagation()">🗑</button>
                 </div>
               </div>
             `).join('')}
         </div>`;
 
       this.panel.querySelector('#dtClose').addEventListener('click', () => document.dispatchEvent(new CustomEvent('panel-close-all')));
-      // 清除全部会话记录
-      const clearAllBtn = this.panel.querySelector('.dt-clear-all');
-      if (clearAllBtn) {
-        clearAllBtn.addEventListener('click', () => {
-          if (!confirm('确认清除全部会话记录？此操作不可恢复。')) return;
-          this.service.clearAllConversations();
-          this._renderList();
-        });
-      }
-      // 删除单条会话
-      this.panel.querySelectorAll('.dt-del-conv').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const id = btn.dataset.id;
-          if (!confirm('确认删除此会话？')) return;
-          this.service.deleteConversation(id);
-          this._renderList();
-        });
-      });
-      this.panel.querySelectorAll('.list-item').forEach(el => {
-        el.addEventListener('click', () => this._renderDetail(el.dataset.id));
+      // 长按对话框删除单条会话（替代旧的🗑图标按钮）
+      this.panel.querySelectorAll('.dt-conv-item').forEach(el => {
+        let pressTimer = null;
+        let longPressed = false;   // 标记本次是否触发了长按，避免 click 也进入详情
+        const startPress = (e) => {
+          longPressed = false;
+          pressTimer = setTimeout(() => {
+            pressTimer = null;
+            longPressed = true;
+            const id = el.dataset.id;
+            if (!confirm('确认删除此会话？')) return;
+            this.service.deleteConversation(id);
+            this._renderList();
+          }, 600);
+        };
+        const cancelPress = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } };
+        el.addEventListener('mousedown', startPress);
+        el.addEventListener('touchstart', startPress, { passive: true });
+        el.addEventListener('mouseup', cancelPress);
+        el.addEventListener('mouseleave', cancelPress);
+        el.addEventListener('touchend', cancelPress);
+        el.addEventListener('touchcancel', cancelPress);
+        // 普通点击（非长按）→ 进入详情
+        el.addEventListener('click', () => { if (longPressed) { longPressed = false; return; } this._renderDetail(el.dataset.id); });
       });
     }
 
@@ -100,7 +101,8 @@
           <button class="btn-icon" id="dtClose2">✕</button>
         </div>
         <div class="panel-body" id="dtMessages" style="padding:10px 12px;display:flex;flex-direction:column;gap:8px;">
-          ${conv.messages.map(m => this._renderMessage(m, false)).join('')}
+          ${conv.messages.length > 50 ? `<div class="dt-load-more" style="text-align:center;padding:6px 0;color:var(--text-3);font-size:12px;cursor:pointer" data-offset="${conv.messages.length - 50}">查看更早的 ${conv.messages.length - 50} 条消息 ↑</div>` : ''}
+          ${conv.messages.slice(-50).map(m => this._renderMessage(m, false)).join('')}
         </div>
         <div class="dt-reply-row">
           <input class="dt-reply-input" placeholder="发送消息给 ${conv.name}..." autocomplete="off">
@@ -117,6 +119,31 @@
 
       this.panel.querySelector('#dtBack').addEventListener('click', () => this._renderList());
       this.panel.querySelector('#dtClose2').addEventListener('click', () => document.dispatchEvent(new CustomEvent('panel-close-all')));
+
+      // 「查看更多」：点击加载更早的消息（每次追加 50 条）
+      const loadMoreBtn = this.panel.querySelector('.dt-load-more');
+      if (loadMoreBtn) {
+        loadMoreBtn.addEventListener('click', () => {
+          const offset = parseInt(loadMoreBtn.dataset.offset, 10) || 0;
+          const prevScrollHeight = msgsContainer.scrollHeight;
+          const chunk = conv.messages.slice(Math.max(0, offset - 50), offset);
+          const html = chunk.map(m => this._renderMessage(m, false)).join('');
+          const firstChild = msgsContainer.querySelector('.dt-load-more').nextElementSibling;
+          // 在现有第一条消息前插入更早的消息
+          firstChild.insertAdjacentHTML('beforebegin', html);
+          // 更新或移除「查看更多」按钮
+          const newOffset = offset - 50;
+          if (newOffset <= 0) {
+            loadMoreBtn.remove();
+          } else {
+            loadMoreBtn.dataset.offset = newOffset;
+            loadMoreBtn.textContent = `查看更早的 ${newOffset} 条消息 ↑`;
+          }
+          // 保持滚动位置（不跳到顶部）
+          msgsContainer.scrollTop = msgsContainer.scrollHeight - prevScrollHeight;
+          this._hydrateImages(msgsContainer);
+        });
+      }
       this.panel.querySelectorAll('.btn-action').forEach(btn => {
         btn.addEventListener('click', () => { if (this.onAction) this.onAction(btn.dataset.a, conv); });
       });

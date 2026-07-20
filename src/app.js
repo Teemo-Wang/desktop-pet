@@ -165,6 +165,13 @@
       document.querySelector('.pet-image').style.animationName = 'pet-' + anim;
     }
 
+    // 应用自定义 IP 形象（换肤）：选了自定义且有图 → 替换主形象图片
+    const _ap = store.get('appearance') || {};
+    if (_ap.skin === 'custom' && _ap.customSkin) {
+      const _petImg = document.querySelector('.pet-image');
+      if (_petImg) _petImg.src = _ap.customSkin;
+    }
+
     // 早安/晚报触发：今日首次唤醒 → 早安；下班时段（>=18:00）首次开 → 晚报
     statsService.recordAwake();
     setTimeout(async () => {
@@ -457,10 +464,20 @@
     return m ? m[0] : '';
   }
 
+  // 多图融合/换人物意图识别：把多张图「合成为一张」（如把 B 图人物替换进 A 图海报），
+  // 区别于「多张图各自改」。命中时应把所有图一次性喂给 GPT-Image 融合，而非逐张改。
+  function _looksLikeImageFusion(text) {
+    if (!text) return false;
+    return /(换成|替换成|替换为|替换|改成|替代).{0,14}(这(张|个)|照片|图(片|里)|人物|人像|脸|头像|模特|主角)/.test(text)
+      || /(人物|人像|脸|头像|主角|模特|主持人).{0,10}(换成|替换|替换为|替换成|改成|替代)/.test(text)
+      || /(合成|融合|叠加|贴到|贴进|放进|放到|加到|加进|嵌入|套进|套用)/.test(text)
+      || /把.{0,16}(人物|人像|脸|头像|模特|主角).{0,10}(放|加|换|贴|融|合|嵌)/.test(text);
+  }
+
   // 改图/生图意图识别
   function _looksLikeImageGen(text) {
     if (!text) return false;
-    return /(改图|改一下|修改|改成|换成|换个|调整|p一下|p图|抠图|去掉|加个|加上|做一?张|画一?张|设计一?张|出一?张|来一?张|(生成|做|画|设计|出|来|输出).{0,8}(图|图片|banner|海报|视觉|背景|封面|素材|壁纸|头图|插画|logo))/i.test(text);
+    return /(改图|改一下|修改|改成|换成|换个|调整|p一下|p图|抠图|去掉|加个|加上|做一?张|画一?张|设计一?张|出一?张|来一?张|帮我做|帮我画|帮我设计|帮我生成|我需要一?张|我要一?张|(生成|做|画|设计|出|来|输出).{0,8}(图|图片|banner|海报|视觉|背景|封面|素材|壁纸|头图|插画|logo))/i.test(text);
   }
 
   // 「生成一张全新图」意图识别（区别于"改现有图"）：含生成动词+图类名词/量词，且不含改图/指代现有图的词。
@@ -519,8 +536,12 @@
   function _normalizeIntent(aiAct, text, imgCount, opts = {}) {
     let a = (aiAct && aiAct.action) || 'chat';
     if (a === 'chat') {
-      // 模型没给出明确意图 → 关键词兜底（优先级：分析 > 搜索 > 改图）
+      // 模型没给出明确意图 → 关键词兜底
+      // 优先级：分析 > 明确生图动词(edit) > 搜索 > 模糊生图词(edit) > 改图迭代
+      // 「帮我做/需要一张/画一张」等明确生图动词高于搜索，避免「需要一张海报」走搜索
+      const hasGenVerb = /(帮我做|帮我画|帮我设计|帮我生成|做一?张|画一?张|设计一?张|出一?张|我需要一?张|我要一?张)/i.test(text);
       if (_looksLikeAnalyze(text) && !_looksLikeImageGen(text)) a = 'analyze';
+      else if (hasGenVerb && _looksLikeImageGen(text)) a = 'edit';  // 明确生图动词优先于搜索
       else if (materialService.looksLikeSearch(text) || _looksLikeBikeImage(text)) a = 'search';
       else if (_looksLikeImageGen(text)) a = 'edit';
       // 有进行中改图任务时：画面描述型指令默认当作改图迭代（避免详细修改需求被当闲聊敷衍）
@@ -570,6 +591,15 @@
     return m ? m[1].trim() : '';
   }
 
+  // 是否「内宣/内部活动海报」意图（走大区面对面规范生图，1242×2333）
+  // 命中「内宣/内部海报/大区面对面/直播海报」等关键词 + 生成动词即触发；优先于通用 banner 分支。
+  function _looksLikeInternalPoster(text) {
+    if (!text) return false;
+    const poster = /(内宣|内部海报|内部宣传|直播海报|员工海报|活动海报|大区面对面|线上直播宣传|内部活动|公司海报|面对面海报)/i.test(text);
+    const gen = /(生成|输出|做一?张|画一?张|设计一?张|出一?张|来一?张|做一?个|制作|需要|帮我)/.test(text);
+    return poster || (gen && /(内宣|内部|大区|直播海报)/i.test(text));
+  }
+
   // 是否「按品牌规范生成一张 banner/头部视觉」意图（走模板改图，而非纯文生图）
   function _looksLikeSpecBanner(text) {
     if (!text) return false;
@@ -586,6 +616,15 @@
     const popup = /(弹窗|弹框|popup|pop-?up)/i.test(text);
     const gen = /(生成|输出|做一?张|画一?张|设计一?张|出一?张|来一?张|做一?个|做个|制作)/.test(text);
     return popup && gen;
+  }
+
+  // 是否「只要一张/一版」意图（区别于默认的双版并行生成）。
+  // 命中时规范生成类流程只走「版式A：DesignHub 模板参考图生图」，跳过无参考图的独立版B。
+  function _wantsSingleVersion(text) {
+    if (!text) return false;
+    return /(只要|只需|只用|只生成|只出|仅要|仅需|仅出|就要|只想要|不用两版|不用2版|不需要两版|不需要2版)[^。\n]{0,6}(一张|一版|1张|1版)/.test(text)
+      || /(一张|一版|1张|1版)[^。\n]{0,4}(就行|就好|就够|即可|就可以)/.test(text)
+      || /(不用|不需要|无需)[^。\n]{0,6}(两版|2版|两张|2张|双版)/.test(text);
   }
 
   // 是否「宽幅横向 banner（702×180）」意图（头图延展的宽横幅规范：左文右图）。
@@ -845,38 +884,50 @@
         + '禁止新增色块底板、矩形框、红色描边；禁止复制参考图旧文字；无错别字。';
     }
 
-    // 版 A（参考图图生图）和版 B（无参考图文生图）并行执行，总耗时取较慢的一版
+    // 用户明确只要一张/一版时，只走版 A（DesignHub 模板参考图生图），跳过无参考图的独立版 B
+    const singleVersion = _wantsSingleVersion(text);
+
+    // 版 A（参考图图生图）和版 B（无参考图文生图）并行执行，总耗时取较慢的一版；
+    // 只要一版时仅发版 A 请求，省去多余的版 B 调用和等待。
     if (modelReady) {
       try {
         const imgCfg = window.aiService.imageConfig || {};
         const activeModel = imgCfg.modelName || (window.aiService.config && window.aiService.config.modelName) || '';
-        // 版 B 专用提示词：去掉"以这张...为母版/骨架"的引导，追加独立场景指令
-        const promptB = prompt
-          .replace(/以这张[^。\n]*版式母版[^。\n]*。?\n?/, '')
-          .replace(/以这张[^。\n]*骨架参考[^。\n]*。?\n?/, '')
-          + '\n\n【独立创作，无参考图约束】请完全按上述规范独立创作，主动选择与常见林间/公园场景截然不同的骑行环境（如城市街头、海边公路、乡村田野、清晨街道、建筑广场等任意一种），让两版在场景、光线、氛围上形成明显差异。';
-        console.warn(tag + ' 并行生成：版A=参考图图生图 版B=无参考图文生图 model=' + (activeModel || 'unknown'));
-        // 并行发出两版请求
-        const [resA, resB] = await Promise.allSettled([
-          window.aiService.generateImage({ prompt, imageUrl: ref, size }),       // 版 A：CDN URL 直传
-          window.aiService.generateImage({ prompt: promptB, size }),              // 版 B：无参考图
-        ]);
-        const outs = [];
-        if (resA.status === 'fulfilled') {
-          const uA = resA.value && (resA.value.url || (resA.value.b64 ? `data:image/png;base64,${resA.value.b64}` : ''));
-          if (uA) { outs.push(uA); console.warn(tag + ' 版A 成功'); }
-        } else { console.warn(tag + ' 版A 失败:', resA.reason && resA.reason.message); }
-        if (resB.status === 'fulfilled') {
-          const uB = resB.value && (resB.value.url || (resB.value.b64 ? `data:image/png;base64,${resB.value.b64}` : ''));
-          if (uB) { outs.push(uB); console.warn(tag + ' 版B 成功'); }
-        } else { console.warn(tag + ' 版B 失败:', resB.reason && resB.reason.message); }
-        if (outs.length) return _done(outs, pick.name, ref);
-        console.warn(tag + ' 两版均无结果，回退 DesignHub 改图');
+        if (singleVersion) {
+          console.warn(tag + ' 用户只要一版：仅走版A=DesignHub模板参考图生图 model=' + (activeModel || 'unknown'));
+          const resA = await window.aiService.generateImage({ prompt, imageUrl: ref, size });
+          const uA = resA && (resA.url || (resA.b64 ? `data:image/png;base64,${resA.b64}` : ''));
+          if (uA) return _done([uA], pick.name, ref);
+          console.warn(tag + ' 版A 无结果，回退 DesignHub 改图');
+        } else {
+          // 版 B 专用提示词：去掉"以这张...为母版/骨架"的引导，追加独立场景指令
+          const promptB = prompt
+            .replace(/以这张[^。\n]*版式母版[^。\n]*。?\n?/, '')
+            .replace(/以这张[^。\n]*骨架参考[^。\n]*。?\n?/, '')
+            + '\n\n【独立创作，无参考图约束】请完全按上述规范独立创作，主动选择与常见林间/公园场景截然不同的骑行环境（如城市街头、海边公路、乡村田野、清晨街道、建筑广场等任意一种），让两版在场景、光线、氛围上形成明显差异。';
+          console.warn(tag + ' 并行生成：版A=参考图图生图 版B=无参考图文生图 model=' + (activeModel || 'unknown'));
+          // 并行发出两版请求
+          const [resA, resB] = await Promise.allSettled([
+            window.aiService.generateImage({ prompt, imageUrl: ref, size }),       // 版 A：CDN URL 直传
+            window.aiService.generateImage({ prompt: promptB, size }),              // 版 B：无参考图
+          ]);
+          const outs = [];
+          if (resA.status === 'fulfilled') {
+            const uA = resA.value && (resA.value.url || (resA.value.b64 ? `data:image/png;base64,${resA.value.b64}` : ''));
+            if (uA) { outs.push(uA); console.warn(tag + ' 版A 成功'); }
+          } else { console.warn(tag + ' 版A 失败:', resA.reason && resA.reason.message); }
+          if (resB.status === 'fulfilled') {
+            const uB = resB.value && (resB.value.url || (resB.value.b64 ? `data:image/png;base64,${resB.value.b64}` : ''));
+            if (uB) { outs.push(uB); console.warn(tag + ' 版B 成功'); }
+          } else { console.warn(tag + ' 版B 失败:', resB.reason && resB.reason.message); }
+          if (outs.length) return _done(outs, pick.name, ref);
+          console.warn(tag + ' 两版均无结果，回退 DesignHub 改图');
+        }
       } catch (e) { console.warn(tag + ' 生图异常，回退 DesignHub 改图:', e && e.message); }
     }
 
-    // 截图版本兜底：同一参考模板生成两版。
-    const gen = await materialService.generateVariant({ referenceImageUrl: ref, prompt, size, count: 2 });
+    // 截图版本兜底：同一参考模板生成对应版数（用户要一版则只出一版）。
+    const gen = await materialService.generateVariant({ referenceImageUrl: ref, prompt, size, count: singleVersion ? 1 : 2 });
     if (gen && gen.ok && gen.images && gen.images.length) return _done(gen.images, pick.name, ref);
     if (gen && gen.needAuth) return { markdown: false, text: '素材库登录过期了，麻烦到「API 接入 → 素材库」重登后再试～' };
     return null; // 都失败 → 交由调用方回退文生图
@@ -891,7 +942,6 @@
       searchKeywords: ['蓝莓骑行 顶部氛围', '顶部氛围', '首页顶部氛围', '头部视觉 1170'],
       tplFilter: /1170|顶部氛围|头部|头图|首页顶部|氛围图/i,
       size: '780x586',
-      forceSize: true,
       taskName: '规范banner',
       ruleKeywords: ['蓝莓头图', '头图banner', '头图 banner', 'banner规范', '头部视觉规范'],
       compose: { region: 'right', coverage: 0.56, pad: 0 },
@@ -1107,6 +1157,74 @@
     return { markdown: false, text: tip, images: okImages };
   }
 
+  /**
+   * 多图融合/换人物：把多张图在同一次请求里喂给 GPT-Image 合成为一张。
+   * 典型场景：第 1 张海报为底图（保留版式/文字/背景），第 2 张照片提供人物 → 替换海报里的人物。
+   * 依赖 GPT-Image（哈啰网关 imageList 支持多图 URL）；Seedream 仅取第一张，无法真正融合。
+   * @param {string} convId
+   * @param {string[]} codes  钉钉图片下载码（按发送顺序：第 1 张=底图，第 2 张=人物来源）
+   * @param {string} prompt   用户的融合指令
+   */
+  async function _runImageFusion(convId, codes, prompt) {
+    const tc = window.taskContext;
+    // 解析所有图为可访问 URL（顺序即发送顺序）
+    const urls = [];
+    for (const code of codes.slice(0, 4)) {
+      const u = await _resolveDingImage(convId, code);
+      if (u) urls.push(u);
+    }
+    if (urls.length < 2) {
+      // 不足两张，退回单图/逐张改
+      console.warn('[imageFusion] 有效图不足 2 张，退回逐张改 urls=' + urls.length);
+      return await _runMultiImageEdit(convId, codes, prompt);
+    }
+    const modelReady = !!(window.aiService && window.aiService.config && !window.aiService.useMock);
+    if (!modelReady) {
+      return { markdown: false, text: '还没配置生图模型，多图融合/换人物用不了，去「API 接入 → 生图模型」配一下再发～' };
+    }
+    const imgCfg = store.get('imageModel') || {};
+    const curModel = imgCfg.modelName || (window.aiService.config && window.aiService.config.modelName) || '';
+    // 多图融合依赖 GPT-Image（Seedream 只吃第一张图无法换人物）。
+    // 当前模型不是 GPT-Image 时，自动从已配置的生图模型标签里挑一个 GPT-Image 临时用于本次融合，
+    // 常规生图仍保持用户选中的模型（如 Seedream），做到「换人物自动切、其它不受影响」。
+    let fusionModel = curModel;
+    if (!/gpt-?image/i.test(String(curModel))) {
+      const opts = Array.isArray(imgCfg.options) ? imgCfg.options : [];
+      const gpt = opts.find(m => /gpt-?image/i.test(String(m)));
+      if (gpt) {
+        fusionModel = gpt;
+        console.warn('[imageFusion] 当前模型=' + curModel + ' 非GPT-Image，自动临时切换为=' + fusionModel);
+      } else {
+        // 标签里也没有 GPT-Image → 引导用户新增
+        return { markdown: false, text: '换人物/多图融合需要 GPT-Image 模型（当前是「' + (curModel || '未知') + '」，它只会用到第一张图）。到「API 接入 → 生图模型」新增一个 gpt-image 模型标签后再发一次就能融合啦～' };
+      }
+    }
+    console.warn('[imageFusion] 图数=' + urls.length + ' 使用模型=' + fusionModel);
+    // 构造融合提示词：明确各图角色（第 1 张=底图海报，第 2 张=人物来源），让模型只换人物、保留版式
+    const fusionPrompt = [
+      '这是一个多图融合任务，请把提供的多张图合成为「一张」图。',
+      '第 1 张图是底图海报：请完整保留它的整体版式、文字内容、背景、配色、装饰元素、Logo 和布局，全部不要改动。',
+      '第 2 张图提供人物：把底图海报中原有的人物，替换成第 2 张照片里的这个人物（保留其真实样貌、发型、五官、着装特征），并让人物自然融入海报原有的位置、光线、色调与姿态。',
+      prompt ? ('用户补充要求：' + prompt) : '',
+      '核心要求：只替换人物，海报的文字、排版、背景等其它内容一律保持不变；人物要与第 2 张照片高度一致；无错别字、无多余人物。',
+    ].filter(Boolean).join('\n');
+    try {
+      // 尺寸沿用底图（不显式指定，交给模型按底图比例出）；imageUrls 传全部图，第一张为底图；
+      // model 显式指定为 GPT-Image（覆盖当前 Seedream），走哈啰网关 imageList 多图融合路径
+      const r = await window.aiService.generateImage({ prompt: fusionPrompt, imageUrls: urls, model: fusionModel });
+      const u = r && (r.url || (r.b64 ? `data:image/png;base64,${r.b64}` : ''));
+      if (u) {
+        tc.createTask(convId, { task_type: 'image_edit', status: 'editing', task_name: '多图融合', original_request: prompt, current_material: { name: '融合底图', url: urls[0], cdnUrl: urls[0] } });
+        tc.addVersion(convId, { file_url: u, edit: prompt || '多图融合换人物' });
+        return { markdown: false, text: '已把第 2 张照片里的人物融合进海报✅ 看看效果，需要微调（换姿态/调光线/改文字）继续说～', images: [{ url: u, name: '融合结果' }] };
+      }
+      return { markdown: false, text: '这次融合没成功😖，可能是被内容审核拦了或超时。换一张更清晰、正脸的人物照片，或稍后再试～' };
+    } catch (e) {
+      console.warn('[imageFusion] 失败:', e && e.message);
+      return { markdown: false, text: '这次融合没成功😖（' + ((e && e.message) || '未知原因') + '），换张更清晰的人物照片再试试～' };
+    }
+  }
+
   // 把钉钉图片下载码换成可下载 URL（失败返回空串）
   async function _resolveDingImage(convId, code) {
     try {
@@ -1269,6 +1387,104 @@
       tc.clearActive(convId);
       return { markdown: false, text: '好的，已清空当前任务，我们重新开始～需要找素材还是改图？😊' };
     }
+    // 「内宣/内部活动海报」→ 走大区面对面规范生图（1242×2333，科技蓝风格）。
+    // 最先判定，避免被 banner 或搜索分支抢走。
+    if (_looksLikeInternalPoster(text) && hasText) {
+      console.warn('[buildReply] 内宣海报 → 调用大区面对面规范生图');
+      tc.clearActive(convId);
+      try {
+        // 找到运行时内宣海报 Skill 正文
+        const posterSkill = window.skillService && window.skillService.getAll
+          ? window.skillService.getAll().find(s => s && (s.name || '').includes('大区面对面'))
+          : null;
+        const posterRuleText = posterSkill && posterSkill.systemPrompt ? posterSkill.systemPrompt.slice(0, 1600) : '';
+        const genSize = _extractReqSize(text) || '1242x2333';
+
+        // 版 A：DesignHub 模板参考图生图（搜已有海报模板，参考版式 + 替换内容）
+        // 版 B：Skill 规范文生图（不传参考图，按规范独立创作不同版式）
+        // 用户上传的人物照片（如有）注入提示词，两版都用
+        let userPhotoUrl = '';
+        if (curCodes.length) {
+          try { userPhotoUrl = await _resolveDingImage(convId, curCodes[0]); } catch (e) {}
+        }
+        const personClause = userPhotoUrl
+          ? '\n【人物照片】用户已提供主持人照片，请将该人物（外貌、着装、姿态）完整融入海报主视觉中作为主角，不要替换成其他人物。'
+          : '';
+
+        const basePrompt = [
+          '请按以下「大区面对面」内宣海报规范，严格按规范的尺寸（1242×2333）、色彩系统（深色科技蓝或浅色品牌蓝）、固定元素（Logo/主标题/人物卡片/直播信息栏/底部口号）和装饰元素（斜线光效/几何网格/斜切色块）生成：',
+          posterRuleText,
+          `\n用户需求：${text}`,
+          personClause,
+        ].filter(Boolean).join('\n');
+
+        const promptB = basePrompt
+          + '\n\n【独立版式创作】本版不参考任何模板，在规范允许范围内自由选择版式（A/B/C/D 中任选一种与常见版式不同的），主动让排版结构、色调（深色或浅色）与版 A 明显不同。';
+
+      console.warn('[buildReply] 内宣海报 并行生成 版A=模板参考图生图 版B=规范独立文生图 userPhoto=' + !!userPhotoUrl);
+      // 内宣海报生图较慢，主动告知用户预计等待时间
+      dtService.sendAck(conv.id, '正在按大区面对面规范生成 2 版海报，通常需要 2~4 分钟，请耐心等候 ☕').catch(() => {});
+
+        // 先搜 DesignHub 拿模板图（版 A 参考用）
+        // 只取命中海报关键词的素材；搜不到或文件太大时退回纯文生图（不传 imageUrl），避免出错
+        let templateUrl = '';
+        if (materialService.connected) {
+          try {
+            const sr = await materialService.search('大区面对面 海报', { pageSize: 20 });
+            const items = sr && sr.ok && sr.items ? sr.items : [];
+            // 只取名称明确包含海报/大区/面对面的素材，排除非海报类型（如骑行素材/Banner）
+            const tpl = items.find(it => /(大区面对面|内宣海报|直播海报|面对面海报)/i.test(it.name || ''));
+            templateUrl = tpl && (tpl.cdnUrl || tpl.url || tpl.thumb) || '';
+            if (templateUrl) console.warn('[buildReply] 内宣海报模板=' + (tpl && tpl.name));
+            else console.warn('[buildReply] 未找到内宣海报模板，版A 退回纯文生图');
+          } catch (e) { console.warn('[buildReply] 搜内宣模板失败，退回纯文生图:', e && e.message); }
+        }
+
+        // 并行生成两版
+        // 版 A：模板 URL + 用户人物照片都传入（让模型参考模板版式同时融入用户照片）
+        // 版 B：仅用户人物照片（无版式约束，独立创作）
+        const imagesA = [templateUrl, userPhotoUrl].filter(Boolean);
+        const imagesB = userPhotoUrl ? [userPhotoUrl] : [];
+        const [resA, resB] = await Promise.allSettled([
+          window.aiService.generateImage({
+            prompt: basePrompt,
+            imageUrl: imagesA[0] || undefined,
+            imageUrls: imagesA.length > 1 ? imagesA : undefined,
+            size: genSize,
+          }),
+          window.aiService.generateImage({
+            prompt: promptB,
+            imageUrl: imagesB[0] || undefined,
+            size: genSize,
+          }),
+        ]);
+
+        const images = [];
+        if (resA.status === 'fulfilled') {
+          const u = resA.value && (resA.value.url || (resA.value.b64 ? `data:image/png;base64,${resA.value.b64}` : ''));
+          if (u) { images.push({ url: u, name: '内宣海报-版A' }); console.warn('[buildReply] 版A 成功'); }
+        } else { console.warn('[buildReply] 版A 失败:', resA.reason && resA.reason.message); }
+        if (resB.status === 'fulfilled') {
+          const u = resB.value && (resB.value.url || (resB.value.b64 ? `data:image/png;base64,${resB.value.b64}` : ''));
+          if (u) { images.push({ url: u, name: '内宣海报-版B' }); console.warn('[buildReply] 版B 成功'); }
+        } else { console.warn('[buildReply] 版B 失败:', resB.reason && resB.reason.message); }
+
+        if (images.length) {
+          tc.createTask(convId, { task_type: 'image_edit', status: 'editing', task_name: '内宣海报' });
+          tc.addVersion(convId, { file_url: images[0].url, edit: text.slice(0, 30) });
+          const tips = images.length > 1
+            ? '按大区面对面规范生成了 2 版✅ 版A 参考已有模板版式，版B 独立版式创作，挑一版继续调整～'
+            : '按大区面对面规范生成了 1 版✅ 需要调整或换一版直接说～';
+          return { markdown: false, text: tips, images };
+        }
+        // 两版都失败：明确告知，不能落穿到蓝莓头图等其他分支
+        return { markdown: false, text: '这次内宣海报没生成成功，可能是网络超时，稍后再试试～😊' };
+      } catch (e) {
+        console.warn('[buildReply] 内宣海报生图失败，回退:', e && e.message);
+        return { markdown: false, text: '这次内宣海报生成出错（' + (e && e.message || '未知原因') + '），稍后重试～' };
+      }
+    }
+
     // 「按品牌规范生成弹窗」→ 弹窗模板改图（竖版 594×790）。
     // 放在 banner 之前判定：弹窗更具体，避免「生成蓝莓弹窗视觉」被 banner 分支抢走。
     // 带图时：把用户图作为主视觉，先按规范版式合成脚手架再图生图（提升外部图版式命中率）。
@@ -1307,8 +1523,12 @@
     if (_looksLikeSpecBanner(text) && hasText && materialService.connected) {
       const explicitReference = curCodes.length > 0 || /(改这张|改图|基于(?:这张|上图|刚才)|引用(?:这张|上图)|(?:这张|上图|刚才那张).{0,12}(?:改|生成|做|调整)|继续调整|延展)/.test(text);
       const specRef = explicitReference ? await _resolveSpecUserRef(convId, msgs, curCodes) : '';
-      console.warn('[buildReply] 规范banner → 模板改图' + (specRef ? '（明确指定用户主视觉合成）' : '（重新检索模板）'));
+      const _single = _wantsSingleVersion(text);
+      console.warn('[buildReply] 规范banner → 模板改图' + (specRef ? '（明确指定用户主视觉合成）' : '（重新检索模板）') + (_single ? '（只出1版）' : ''));
       tc.clearActive(convId);   // 规范新图，清掉旧任务，避免复用无关旧图
+      dtService.sendAck(convId, _single
+        ? '正在按蓝莓骑行规范生成头图，通常需要 1~2 分钟 🎨'
+        : '正在按蓝莓骑行规范生成 2 版头图，通常需要 2~3 分钟 🎨').catch(() => {});
       try {
         const r = await _specBannerFromTemplate(convId, text, specRef);
         if (r) return r;
@@ -1517,6 +1737,11 @@
         // 避免误把旧搜索结果（如之前搜的"骑行卡"）当成要改的图。
         if (intent === 'batch_edit' || tc.looksBatch(text) || curCodes.length > 1) {
           const batchCodes = curCodes.length > 1 ? curCodes : _collectRecentImageCodes(msgs, 8);
+          // 融合/换人物（把多张图合成为一张）优先于「逐张各自改」
+          if (batchCodes.length > 1 && _looksLikeImageFusion(text)) {
+            console.warn('[buildReply] A2 多图融合/换人物 count=' + batchCodes.length);
+            return await _runImageFusion(convId, batchCodes, editPrompt);
+          }
           if (batchCodes.length >= 1) {
             console.warn('[buildReply] A2 多图批量改（用户新发图）count=' + batchCodes.length);
             return await _runMultiImageEdit(convId, batchCodes, editPrompt);
@@ -1545,11 +1770,17 @@
       }
     }
 
-    // ===== B0. 多图改图：本条/最近几条带了多张图 + 改图/批量指令 → 逐张改，一起发回 =====
+    // ===== B0. 多图改图：本条/最近几条带了多张图 + 改图/批量指令 =====
     if (hasText && (intent === 'edit' || intent === 'batch_edit')) {
       // 本条多图优先；否则收集"用户刚连发的多张图"（分开发的独立图片消息）
       const multiCodes = curCodes.length > 1 ? curCodes : _collectRecentImageCodes(msgs, 8);
       if (multiCodes.length > 1) {
+        // 融合/换人物（把多张图合成为一张）优先于「逐张各自改」——
+        // 如「把海报里的人物换成这张照片里的人」应一次性喂给模型融合，而非分别改两张
+        if (_looksLikeImageFusion(text)) {
+          console.warn('[buildReply] 多图融合/换人物 count=' + multiCodes.length);
+          return await _runImageFusion(convId, multiCodes, editPrompt);
+        }
         console.warn('[buildReply] 多图批量改 count=' + multiCodes.length);
         return await _runMultiImageEdit(convId, multiCodes, editPrompt);
       }
@@ -1845,16 +2076,55 @@
 
   async function autoReplyTo(conv) {
     try {
-      // 先让 AI 判断意图；仅当确实是「改图/批量改图」这类耗时操作时，才发"改图中"回执
+      // 延迟 10s 发「收到」回执：若处理在 10s 内完成，此提示会被取消；
+      // 处理超过 10s 时发出，让用户知道机器人还在运行
+      const _ackLines = [
+        '收到～稍等一下，我来处理 🐾',
+        '收到啦，马上看看 👀',
+        '好的，处理中，稍等片刻 ⚙️',
+        '嗯嗯收到，给我一点时间 🕐',
+        '在的在的，正在想办法 🤔',
+        '收到！处理中，别着急 😊',
+        '已收到，稍等我一下 🔍',
+        '好嘞，马上安排 ✨',
+      ];
+      // 图片生成/修改类消息：对应处理分支（改图 / 规范 banner / 弹窗 / 宽幅 / 内宣海报）
+      // 都会自己发针对性的「正在生成/改图…」进度提示，所以这里不再叠加通用「收到」自动回复，
+      // 避免出现「正在按…生成」后又冒一句「好嘞马上安排」的重复回执。
+      const _lastMsg = (conv.messages || [])[(conv.messages || []).length - 1] || {};
+      const _lastText = _lastMsg.content || '';
+      const _hasImg = Array.isArray(_lastMsg.imageDownloadCodes) && _lastMsg.imageDownloadCodes.length > 0;
+      const _isImageTask = _hasImg
+        || _looksLikeImageGen(_lastText)
+        || _looksLikeSpecBanner(_lastText)
+        || _looksLikeSpecPopup(_lastText)
+        || _looksLikeWideBanner(_lastText)
+        || _looksLikeInternalPoster(_lastText);
+
+      // 仅非图片任务（普通文字对话）才启动 10s 通用回执计时器
+      let ackTimer = null;
+      if (!_isImageTask) {
+        ackTimer = setTimeout(() => {
+          ackTimer = null;
+          const line = _ackLines[Math.floor(Math.random() * _ackLines.length)];
+          dtService.sendAck(conv.id, line).catch(() => {});
+        }, 10000);
+      }
+
+      // 让 AI 判断意图；改图/批量改图时追加一条更具体的提示，
+      // 并取消上面的通用「收到」计时器 —— 已经发过针对性提示，不需要再叠加一条泛泛的
       const aiAct = await _computeIntent(conv);
       if (aiAct.action === 'edit' || aiAct.action === 'batch_edit') {
+        if (ackTimer) { clearTimeout(ackTimer); ackTimer = null; }
         const ack = aiAct.action === 'batch_edit'
-          ? '收到～整组素材批量改图中，需要一点时间，请稍候 ⏳'
-          : '收到～正在按你的要求改图，稍等一下哦 🎨（改图通常要 1~2 分钟）';
+          ? '正在批量改图，需要一点时间，请稍候 ⏳'
+          : '正在按你的要求改图，通常需要 1~2 分钟 🎨';
         dtService.sendAck(conv.id, ack).catch(() => {});
       }
       // 复用同一份意图，避免重复调用 AI
       const r = await buildTakeoverReply(conv, aiAct);
+      // 处理完成，取消还未发出的「收到」提示（< 10s 完成时）
+      if (ackTimer) { clearTimeout(ackTimer); ackTimer = null; }
       console.warn('[autoReply] 诊断 materialConnected=' + materialService.connected + ' imagesLen=' + ((r.images && r.images.length) || 0));
       await sendReplyToConv(conv, r);
       statsService.increment('messageHandled');

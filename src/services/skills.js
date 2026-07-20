@@ -9,6 +9,7 @@
   const os = require('os');
   const DIR = path.join(os.homedir(), '.hellobike-pet');
   const FILE = path.join(DIR, 'skills.json');
+  const NAMES_FILE = path.join(DIR, 'skill-names.json'); // 内置 skill 的备注名映射（id -> 自定义显示名）
 
   // skill1：当前机器人的默认回复与操作规则（SKILL.md 样式）
   const RULES_MD = `---
@@ -96,6 +97,7 @@ icon: 📋
       if (!fs.existsSync(DIR)) fs.mkdirSync(DIR, { recursive: true });
       this.customSkills = this._load();
       this.rules = this._loadRules();   // skill1 的可编辑规则（覆盖默认）
+      this.customNames = this._loadNames(); // 内置 skill 的备注名映射
       this.listeners = new Set();
       // 暴露为全局，供 AI 对话层读取当前规则
       window.skillService = this;
@@ -161,6 +163,13 @@ icon: 📋
         if (!name) continue;
         const core = name.replace(/(规范|技能|规则|指南|手册|模板)$/g, '').trim();
         if (t.includes(name) || (core.length >= 2 && t.includes(core))) return s;
+      }
+      // ① bis：front matter triggers 字段精确触发（逗号分隔的关键词列表）
+      for (const s of skills) {
+        const triggers = String(s.triggers || '').toLowerCase();
+        if (!triggers) continue;
+        const words = triggers.split(/[,，\s]+/).filter(w => w.length >= 2);
+        if (words.some(w => t.includes(w))) return s;
       }
       // ② 名称分词重合度打分
       let best = null, bestScore = 0;
@@ -264,10 +273,13 @@ icon: 📋
 
     onChange(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
 
-    /** 给内置 skill1 注入当前生效的规则文本 */
+    /** 给内置 skill1 注入当前生效的规则文本；同时应用备注名（若用户改过显示名） */
     _withRules(s) {
-      if (s && s.id === 'skill1') return { ...s, systemPrompt: this.getRules() };
-      return s;
+      if (!s) return s;
+      let out = s;
+      if (s.id === 'skill1') out = { ...out, systemPrompt: this.getRules() };
+      if (this.customNames && this.customNames[s.id]) out = { ...out, name: this.customNames[s.id] };
+      return out;
     }
 
     /** 获取所有技能（内置 + 用户自定义） */
@@ -356,6 +368,7 @@ icon: 📋
         if (front.name) result.name = String(front.name);
         if (front.description) result.desc = String(front.description);
         if (front.icon) result.icon = String(front.icon);
+        if (front.triggers) result.triggers = String(front.triggers);  // 扩展触发词，逗号分隔
       }
 
       // 兜底命名：文件名（去掉扩展名）
@@ -421,6 +434,40 @@ icon: 📋
       const fm = `---\nname: ${esc(s.name)}\ndescription: ${esc(s.desc)}\nicon: ${s.icon || '📜'}\n---\n\n`;
       const safeName = String(s.name || 'skill').replace(/[\/\\:*?"<>|]/g, '_');
       return { filename: `SKILL-${safeName}.md`, content: fm + (body || '').trim() + '\n' };
+    }
+
+    /** 重命名 skill（备注名）：内置 skill 也允许改名（仅影响显示，不影响触发逻辑用的原始名） */
+    rename(id, newName) {
+      const name = String(newName || '').trim().slice(0, 30);
+      if (!name) return false;
+      const idx = this.customSkills.findIndex(s => s.id === id);
+      if (idx >= 0) {
+        this.customSkills[idx].name = name;
+        this._persist();
+        return true;
+      }
+      // 内置 skill：备注名存入 customNames 映射，不改动内置定义本身
+      if (SKILLS.find(s => s.id === id)) {
+        this.customNames = this.customNames || {};
+        this.customNames[id] = name;
+        this._persistNames();
+        return true;
+      }
+      return false;
+    }
+
+    _persistNames() {
+      try {
+        fs.writeFileSync(NAMES_FILE, JSON.stringify(this.customNames || {}, null, 2), 'utf-8');
+        this.listeners.forEach(fn => { try { fn(); } catch (e) { console.warn(e); } });
+      } catch (e) { console.warn('[SkillService] save names failed:', e); }
+    }
+
+    _loadNames() {
+      try {
+        if (fs.existsSync(NAMES_FILE)) return JSON.parse(fs.readFileSync(NAMES_FILE, 'utf-8'));
+      } catch (e) { console.warn('[SkillService] load names failed:', e); }
+      return {};
     }
 
     /** 删除自定义 skill（内置不可删） */

@@ -18,7 +18,7 @@
   const STORE_DIR = path.join(os.homedir(), '.hellobike-pet');
   const STORE_FILE = path.join(STORE_DIR, 'dingtalk-history.json');
   // 单会话消息上限，超过则裁剪最旧的，避免文件无限增长
-  const MAX_MESSAGES_PER_CONV = 500;
+  const MAX_MESSAGES_PER_CONV = 200;  // 存储上限，超过则裁剪最旧的
 
   // Mock 演示数据（未配置真实凭据时使用）
   const MOCK_CONVS = [

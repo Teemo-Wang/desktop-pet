@@ -52,9 +52,6 @@
           <div class="skill-grid">
             ${skills.map(s => `
               <div class="skill-card${s.custom ? ' skill-card-custom' : ''}" data-id="${s.id}">
-                <button class="skill-card-export" data-export="${s.id}" title="导出分享">⬇</button>
-                ${s.custom ? `<button class="skill-card-del" data-del="${s.id}" title="删除">🗑</button>` : ''}
-                <div class="skill-icon">${s.icon}</div>
                 <div class="skill-name">${s.name}</div>
                 <div class="skill-desc">${s.desc}</div>
               </div>
@@ -67,26 +64,75 @@
         this.view = 'upload';
         this._renderUpload();
       });
+      // 点击进入详情；长按弹出操作菜单（改名 / 导出 / 删除）
       this.panel.querySelectorAll('.skill-card').forEach(c => {
-        c.addEventListener('click', e => {
-          if (e.target.closest('[data-del]') || e.target.closest('[data-export]')) return; // 让操作按钮独立处理
+        let pressTimer = null;
+        let longPressed = false;
+        const start = () => {
+          longPressed = false;
+          pressTimer = setTimeout(() => {
+            pressTimer = null;
+            longPressed = true;
+            this._showSkillActions(c.dataset.id);
+          }, 550);
+        };
+        const cancel = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } };
+        c.addEventListener('mousedown', start);
+        c.addEventListener('touchstart', start, { passive: true });
+        c.addEventListener('mouseup', cancel);
+        c.addEventListener('mouseleave', cancel);
+        c.addEventListener('touchend', cancel);
+        c.addEventListener('touchcancel', cancel);
+        c.addEventListener('click', () => {
+          if (longPressed) { longPressed = false; return; }
           this.currentSkill = this.service.get(c.dataset.id);
           this.view = 'detail';
           this._renderDetail();
         });
       });
-      this.panel.querySelectorAll('[data-del]').forEach(btn => {
-        btn.addEventListener('click', e => {
-          e.stopPropagation();
-          this.service.remove(btn.dataset.del);
-        });
+    }
+
+    /** 长按卡片弹出的操作菜单：改备注名 / 导出分享 / 删除 */
+    _showSkillActions(id) {
+      const s = this.service.get(id);
+      if (!s) return;
+      const isBuiltinCore = id === 'skill1'; // 核心回复规则不可删除，仅可改名
+      const overlay = document.createElement('div');
+      overlay.className = 'skill-action-overlay';
+      overlay.innerHTML = `
+        <div class="skill-action-sheet">
+          <div class="skill-action-title">${s.name}</div>
+          <button class="skill-action-btn" data-act="rename">✏️ 修改备注名</button>
+          <button class="skill-action-btn" data-act="export">⬇ 导出分享</button>
+          ${!isBuiltinCore ? `<button class="skill-action-btn skill-action-danger" data-act="delete">🗑 删除</button>` : ''}
+          <button class="skill-action-btn skill-action-cancel" data-act="cancel">取消</button>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      const close = () => overlay.remove();
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+      overlay.querySelector('[data-act="cancel"]').addEventListener('click', close);
+      overlay.querySelector('[data-act="rename"]').addEventListener('click', () => {
+        close();
+        const next = prompt('修改备注名', s.name);
+        if (next && next.trim() && next.trim() !== s.name) {
+          this.service.rename(id, next.trim());
+          this._renderList();
+        }
       });
-      this.panel.querySelectorAll('[data-export]').forEach(btn => {
-        btn.addEventListener('click', e => {
-          e.stopPropagation();
-          this._exportSkill(btn.dataset.export);
-        });
+      overlay.querySelector('[data-act="export"]').addEventListener('click', () => {
+        close();
+        this._exportSkill(id);
       });
+      const delBtn = overlay.querySelector('[data-act="delete"]');
+      if (delBtn) {
+        delBtn.addEventListener('click', () => {
+          close();
+          if (!confirm(`确定删除「${s.name}」？此操作不可恢复。`)) return;
+          this.service.remove(id);
+          this._renderList();
+        });
+      }
     }
 
     /** 导出技能为 SKILL.md 文件，供分享给团队成员（对方用"上传新技能"导入） */
@@ -282,7 +328,7 @@
       this.panel.innerHTML = `
         <div class="panel-head">
           <button class="btn-icon btn-back" id="skBack">‹</button>
-          <span class="panel-head-title">${s.icon} ${s.name}</span>
+          <span class="panel-head-title">${s.name}</span>
           <button class="btn-icon" onclick="document.dispatchEvent(new CustomEvent('panel-close-all'))">✕</button>
         </div>
         <div class="panel-body" style="padding:12px 14px;">
@@ -332,7 +378,7 @@
       this.panel.innerHTML = `
         <div class="panel-head">
           <button class="btn-icon btn-back" id="cRulesBack">‹</button>
-          <span class="panel-head-title">${s.icon} 编辑内容</span>
+          <span class="panel-head-title">编辑内容</span>
           <button class="btn-icon" onclick="document.dispatchEvent(new CustomEvent('panel-close-all'))">✕</button>
         </div>
         <div class="panel-body" style="padding:12px 14px;display:flex;flex-direction:column;gap:10px;height:100%;box-sizing:border-box;">

@@ -10,7 +10,8 @@
 
   const DEFAULTS = {
     general: { alwaysOnTop:true, opacity:100, scale:100 },
-    appearance: { idleAnimation:'float', messageReaction:'bounce' },
+    // skin: 'default'=内置小哈 | 'custom'=用户自定义；customSkin=自定义形象图片(data URL)
+    appearance: { idleAnimation:'float', messageReaction:'bounce', skin:'default', customSkin:'' },
     work: { dingtalkNotify:true, aiAssistant:true, yuqueAccess:true, dndEnabled:false, dndStart:'22:00', dndEnd:'08:00', showMsgContent:true, allowChitchat:true, editMethod:'designhub' },
     model: { provider:'deepseek', apiKey:'', modelName:'deepseek-chat', baseUrl:'https://api.deepseek.com/v1', systemPrompt:`你是哈啰出行两轮事业部的设计工作 AI 助手，名叫"小哈"。你的直属用户是一位视觉设计师。
 

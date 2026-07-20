@@ -432,9 +432,12 @@
           try {
             // 从输入文字里提取目标尺寸（如 702*180 / 702x180），传给生图接口
             const _szm = (t || '').match(/(\d{2,5})\s*[*x×]\s*(\d{2,5})/i);
+            // 支持多图：把全部上传图片的 dataUrl 传入，由 generateImage 根据模型 family 路由
+            const _imageUrls = imageDataList.map(d => d.dataUrl).filter(Boolean);
             const result = await window.aiService.generateImage({
               prompt: t || '基于参考图生成',
-              imageUrl: imageDataList[0]?.dataUrl || null,
+              imageUrl: _imageUrls[0] || null,
+              imageUrls: _imageUrls.length > 1 ? _imageUrls : undefined,
               size: _szm ? `${_szm[1]}x${_szm[2]}` : undefined,
             });
 

@@ -113,6 +113,39 @@
   cursor: pointer;
 }
 
+/* 换肤 IP 形象 */
+.pref-skin-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pref-skin-preview {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  object-fit: contain;
+  background: rgba(0, 118, 255, 0.06);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.pref-skin-btn {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  font-family: var(--font);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+.pref-skin-btn:hover { background: rgba(0, 118, 255, 0.08); border-color: var(--brand); color: var(--brand); }
+.pref-skin-reset { color: var(--text-tertiary); }
+.pref-skin-reset.disabled { opacity: 0.4; pointer-events: none; }
+
 /* Time */
 .pref-time-range {
   display: flex;

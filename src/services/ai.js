@@ -123,7 +123,7 @@
           res = await fetch(this.config.baseUrl + '/chat/completions', {
             method: 'POST',
             headers: this._buildHeaders(),
-            body: JSON.stringify({ model: this.config.modelName, messages, max_tokens: 2048, temperature: 0.7 }),
+            body: JSON.stringify({ model: this.config.modelName, messages, ...this._tokenLimitParam(2048), ...this._temperatureParam() }),
             signal: AbortSignal.timeout(timeoutMs),
           });
           break;
@@ -178,7 +178,7 @@
           method: 'POST',
           // 流式请求必须带 Accept: text/event-stream，否则部分网关（如幻视大模型）按非流式处理，导致"憋完整段才返回"
           headers: { ...this._buildHeaders(), 'Accept': 'text/event-stream' },
-          body: JSON.stringify({ model: this.config.modelName, messages, max_tokens: 2048, temperature: 0.7, stream: true }),
+          body: JSON.stringify({ model: this.config.modelName, messages, ...this._tokenLimitParam(2048), ...this._temperatureParam(), stream: true }),
           signal: signal || AbortSignal.timeout(60000),
         });
       } catch (e) {
@@ -271,7 +271,7 @@
       const res = await fetch(this.config.baseUrl + '/chat/completions', {
         method: 'POST',
         headers: this._buildHeaders(),
-        body: JSON.stringify({ model: this.config.modelName, messages, max_tokens: 2048, temperature: 0.7 }),
+        body: JSON.stringify({ model: this.config.modelName, messages, ...this._tokenLimitParam(2048), ...this._temperatureParam() }),
         signal: signal || AbortSignal.timeout(60000),
       });
       if (!res.ok) throw new Error(await this._formatHttpError(res));
@@ -414,7 +414,7 @@
           body: JSON.stringify({
             model: this.config.modelName,
             messages: [{ role: 'user', content: 'hi' }],
-            max_tokens: 1,
+            ...this._tokenLimitParam(1),
           }),
           signal: AbortSignal.timeout(15000),
         });
@@ -436,6 +436,33 @@
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + this.config.apiKey,
       };
+    }
+
+    /** 是否为新一代推理模型（o1/o3/o4/gpt-5 等系列，含哈啰网关的 GPT-5.x-sol） */
+    _isReasoningModel() {
+      const name = String((this.config && this.config.modelName) || '').trim();
+      return /^(o[13-9]|gpt-?5)/i.test(name);
+    }
+
+    /**
+     * 新一代推理模型已不再接受 max_tokens 参数，必须用 max_completion_tokens，否则网关直接 400：
+     * "Unsupported parameter: 'max_tokens' is not supported with this model."
+     * 这里按模型名判断，返回正确的 token 限制字段，供各处请求体统一复用。
+     * @param {number} n - 期望的最大 token 数
+     * @returns {{max_tokens:number}|{max_completion_tokens:number}}
+     */
+    _tokenLimitParam(n) {
+      return this._isReasoningModel() ? { max_completion_tokens: n } : { max_tokens: n };
+    }
+
+    /**
+     * 新一代推理模型的 temperature 只支持默认值 1，传其他值（如 0.7）同样会 400：
+     * "Unsupported value: 'temperature' does not support 0.7 with this model."
+     * 因此推理模型直接不传该字段（走模型默认），其余模型保持原有的 0.7。
+     * @returns {{temperature?:number}}
+     */
+    _temperatureParam() {
+      return this._isReasoningModel() ? {} : { temperature: 0.7 };
     }
 
     /**
@@ -522,7 +549,7 @@
           try { const e = await res.json(); detail = e?.error?.message || e?.message || JSON.stringify(e); }
           catch (_) { detail = await res.text().catch(() => ''); }
           console.error('[generateImage] images/edits 失败:', res.status, detail);
-          throw new Error(`改图失败 (${res.status})：${detail}`);
+          throw new Error(this._formatImageError(res.status, detail));
         }
         const data = await res.json();
         console.warn('[generateImage] images/edits 返回 status=' + res.status + ' items=' + (data.data?.length || 0));
@@ -536,6 +563,9 @@
         if (isGptImage) {
           const GPT_SIZES = ['1024x1024', '1024x1536', '1536x1024', 'auto'];
           body.size = (!isAdaptive && GPT_SIZES.includes(cfgSize)) ? cfgSize : 'auto';
+          // 把审核档位调到最宽松（仅 gpt-image-1 系列支持），降低内容安全审核对含人物画面的误拦。
+          // 若网关不认识该参数会 400，下方有自动去参数重试兜底，不会把生图搞挂。
+          body.moderation = 'low';
           // 哈啰网关改图：使用 imageList 字段（数组，仅支持 http(s) URL，不支持 base64）
           if (useGenerationsWithImages) {
             const httpImages = inputImages.filter(u => /^https?:\/\//i.test(u));
@@ -563,19 +593,36 @@
         console.warn('[generateImage] → images/generations model=' + model
           + ' size=' + (body.size || 'auto')
           + ' imageList=' + (body.imageList ? body.imageList.length : (body.image ? 1 : 0))
+          + ' moderation=' + (body.moderation || '-')
           + ' timeout=' + (genTimeout / 1000) + 's');
-        const res = await fetch(endpoint, {
+        const _postGen = (b) => fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + imgApiKey },
-          body: JSON.stringify(body),
+          body: JSON.stringify(b),
           signal: AbortSignal.timeout(genTimeout),
         });
+        let res = await _postGen(body);
         if (!res.ok) {
           let detail = '';
           try { const e = await res.json(); detail = e?.error?.message || e?.message || JSON.stringify(e); }
           catch (_) { detail = await res.text().catch(() => ''); }
-          console.error('[generateImage] images/generations 失败:', res.status, detail, '请求体:', JSON.stringify(body).slice(0, 400));
-          throw new Error(`生图失败 (${res.status})：${detail}`);
+          // 网关不认识 moderation 参数（类似此前 max_tokens 的严格拒绝）→ 去掉该参数重试一次，
+          // 保证即使不支持降审核也不影响正常生图。
+          if (res.status === 400 && 'moderation' in body && /moderation|unsupported|unknown|not\s+supported|unexpected/i.test(detail)) {
+            console.warn('[generateImage] 网关不支持 moderation 参数，去掉后重试:', detail.slice(0, 160));
+            delete body.moderation;
+            res = await _postGen(body);
+            if (!res.ok) {
+              let d2 = '';
+              try { const e = await res.json(); d2 = e?.error?.message || e?.message || JSON.stringify(e); }
+              catch (_) { d2 = await res.text().catch(() => ''); }
+              console.error('[generateImage] images/generations 去参数重试仍失败:', res.status, d2);
+              throw new Error(this._formatImageError(res.status, d2));
+            }
+          } else {
+            console.error('[generateImage] images/generations 失败:', res.status, detail, '请求体:', JSON.stringify(body).slice(0, 400));
+            throw new Error(this._formatImageError(res.status, detail));
+          }
         }
         const data = await res.json();
         console.warn('[generateImage] images/generations 返回 status=' + res.status + ' items=' + (data.data?.length || 0));
@@ -590,6 +637,27 @@
         catch (e) { console.warn('[generateImage] 精确缩放失败，返回原图:', e && e.message); }
       }
       return { url, b64 };
+    }
+
+    /**
+     * 把生图/改图接口的错误明细转成对设计师友好的中文提示。
+     * 重点识别内容安全审核拦截（moderation_blocked）——这类不是系统故障，
+     * 而是提示词或参考图触发了图像模型的安全策略，应引导换图/换词重试，而非甩英文 JSON。
+     * @param {number} status HTTP 状态码
+     * @param {string} detail 网关返回的错误明细（可能是英文 JSON 串）
+     * @returns {string}
+     */
+    _formatImageError(status, detail) {
+      const raw = String(detail || '');
+      if (/moderation_blocked|safety system|content[_ ]?policy|rejected by the safety/i.test(raw)) {
+        return '这次生成被图片模型的内容安全审核拦截了🚫。多数是「参考图里有真实人脸/人物」或提示词触发了敏感词。'
+          + '建议：① 换一张不含真实人脸的参考图；② 把文案/描述换个说法；③ 稍后重试。（并非系统故障，换个说法或换张图通常就能过）';
+      }
+      if (/file_above_max_size|too large|max.?size/i.test(raw)) {
+        return '参考图太大了（超过 50MB 限制），换一张更小的图或先压缩一下再试～';
+      }
+      // 其余错误：保留状态码 + 明细，便于排查
+      return `生图失败 (${status})：${raw.slice(0, 300)}`;
     }
 
     /**

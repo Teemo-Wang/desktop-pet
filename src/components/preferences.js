@@ -61,6 +61,8 @@
 
           <div class="pref-group">
             <div class="pref-group-title">桌宠</div>
+            ${this._skinRow(a)}
+            <div class="pref-hint">上传一张图片即可替换小哈的主形象（建议用透明背景 PNG，方形或竖版效果更佳）。</div>
             ${this._select('appearance','idleAnimation','待机动画',a.idleAnimation,[['float','悬浮'],['breathe','呼吸'],['bounce','弹跳']])}
             ${this._select('appearance','messageReaction','消息反馈',a.messageReaction,[['bounce','弹跳'],['shake','摇晃'],['glow','发光']])}
           </div>
@@ -96,6 +98,65 @@
           ${opts.map(o => `<option value="${o[0]}" ${o[0]===val?'selected':''}>${o[1]}</option>`).join('')}
         </select>
       </div>`;
+    }
+
+    /** IP 形象换肤：当前形象缩略图预览 + 上传 / 恢复默认 */
+    _skinRow(a) {
+      const isCustom = a.skin === 'custom' && a.customSkin;
+      const preview = isCustom ? a.customSkin : 'pet.png';
+      return `<div class="pref-row pref-skin-row">
+        <span class="pref-label">IP 形象</span>
+        <div class="pref-skin-ctrl">
+          <img class="pref-skin-preview" id="prefSkinPreview" src="${preview}" alt="当前形象">
+          <button class="pref-skin-btn" id="prefSkinUpload">上传图片</button>
+          <button class="pref-skin-btn pref-skin-reset ${isCustom?'':'disabled'}" id="prefSkinReset" ${isCustom?'':'disabled'}>恢复默认</button>
+          <input type="file" id="prefSkinFile" accept="image/png,image/jpeg,image/webp" style="display:none">
+        </div>
+      </div>`;
+    }
+
+    /**
+     * 把用户上传的图片等比缩放到最长边 512px，输出 PNG data URL。
+     * 目的：避免把原始大图直接塞进 settings.json 导致文件膨胀；桌宠展示尺寸小，512px 足够清晰。
+     * @param {File} file
+     * @returns {Promise<string|null>}
+     */
+    _resizeSkin(file) {
+      return new Promise((resolve) => {
+        try {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+              try {
+                const MAX = 512;
+                const scale = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+                const w = Math.round(img.naturalWidth * scale);
+                const h = Math.round(img.naturalHeight * scale);
+                const c = document.createElement('canvas');
+                c.width = w; c.height = h;
+                c.getContext('2d').drawImage(img, 0, 0, w, h);
+                resolve(c.toDataURL('image/png'));
+              } catch (e) { resolve(null); }
+            };
+            img.onerror = () => resolve(null);
+            img.src = reader.result;
+          };
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(file);
+        } catch (e) { resolve(null); }
+      });
+    }
+
+    /** 应用 IP 形象到桌宠主图（换肤/恢复默认共用） */
+    _applySkin(src) {
+      const img = document.querySelector('.pet-image');
+      if (img) {
+        img.src = src;
+        // 换肤成功给一个轻微反馈动画
+        img.classList.add('react-bounce');
+        setTimeout(() => img.classList.remove('react-bounce'), 600);
+      }
     }
 
     _renderDockItems() {
@@ -179,6 +240,35 @@
           }
         });
       });
+
+      // 换肤：上传自定义 IP 形象
+      const skinUpload = this.panel.querySelector('#prefSkinUpload');
+      const skinFile = this.panel.querySelector('#prefSkinFile');
+      if (skinUpload && skinFile) {
+        skinUpload.addEventListener('click', () => skinFile.click());
+        skinFile.addEventListener('change', async () => {
+          const file = skinFile.files && skinFile.files[0];
+          if (!file) return;
+          const dataUrl = await this._resizeSkin(file);
+          if (!dataUrl) { alert('这张图片没读取成功，换一张再试～'); return; }
+          this.store.set('appearance', 'customSkin', dataUrl);
+          this.store.set('appearance', 'skin', 'custom');
+          this._applySkin(dataUrl);
+          this._render();   // 刷新预览与「恢复默认」按钮状态
+        });
+      }
+
+      // 换肤：恢复默认小哈形象
+      const skinReset = this.panel.querySelector('#prefSkinReset');
+      if (skinReset) {
+        skinReset.addEventListener('click', () => {
+          if (skinReset.disabled) return;
+          this.store.set('appearance', 'skin', 'default');
+          this.store.set('appearance', 'customSkin', '');
+          this._applySkin('pet.png');
+          this._render();
+        });
+      }
     }
 
     _applyToggle(group, key, value) {
