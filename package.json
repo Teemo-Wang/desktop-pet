@@ -1,6 +1,6 @@
 {
-  "name": "hellobike-desktop-pet",
-  "version": "1.1.6",
+  "name": "teemo-assistant",
+  "version": "1.1.7",
   "description": "哈啰桌面AI机器人 - 设计助手",
   "main": "main.js",
   "author": "Teemo Wang",
@@ -12,8 +12,8 @@
     "release": "electron-builder --publish always"
   },
   "build": {
-    "appId": "cn.hellobike.desktop-pet",
-    "productName": "哈啰设计助手",
+    "appId": "cn.teemo.assistant",
+    "productName": "Teemo助理",
     "artifactName": "Teemo-${version}-${arch}.${ext}",
     "files": [
       "main.js",
@@ -53,7 +53,7 @@
       "title": "${productName} ${version}"
     },
     "win": {
-      "icon": "icon/LOGO.png",
+      "icon": "icon/Teemo-app.png",
       "target": [
         { "target": "nsis", "arch": ["x64"] }
       ]

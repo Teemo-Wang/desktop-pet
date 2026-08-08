@@ -4,6 +4,7 @@
 
 ## P0 阶段收尾（2026-08-09）
 
+- 产品命名已统一为 `Teemo助理`；当前源码版本为 `v1.1.7`，后续安装包、快捷方式和版本显示不得再使用“哈啰设计助手”。
 - P0-1：唯一正式开发源码为 `D:\Teemo助手\Teemo机器人项目\Teemo-source`，Git 基线分支和可构建标签已建立。
 - P0-2：AI、存储、本地文件能力已整理为 AIService、TeemoStorageService、TeemoFileService 统一入口。
 - P0-3：根目录 `AGENTS.md` 已建立，作为 Codex、Kiro、Grok 等 AI Coding Agent 的最高优先级协作规则。

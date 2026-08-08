@@ -148,7 +148,7 @@ ipcMain.handle('teemo:archive-chat-image', async (_event, options = {}) => {
 
 // Windows 通知、任务栏分组和安装包快捷方式使用同一个稳定 ID。
 if (isWindows) {
-  app.setAppUserModelId('cn.hellobike.desktop-pet');
+  app.setAppUserModelId('cn.teemo.assistant');
 }
 
 // ===== 全局错误兜底 =====
