@@ -6,11 +6,11 @@
 (function() {
   const fs = require('fs');
   const path = require('path');
-  const os = require('os');
-  const DIR = path.join(os.homedir(), '.hellobike-pet');
-  const FILE = path.join(DIR, 'skills.json');
-  const NAMES_FILE = path.join(DIR, 'skill-names.json'); // 内置 skill 的备注名映射（id -> 自定义显示名）
-  const GROUPS_FILE = path.join(DIR, 'skill-groups.json'); // 分组与 Skill 归属独立保存，不改写 Skill 正文
+  const storage = new window.TeemoStorageService();
+  const DIR = storage.getDir();
+  const FILE = storage.getPath('skills.json');
+  const NAMES_FILE = storage.getPath('skill-names.json'); // 内置 Skill 名称映射
+  const GROUPS_FILE = storage.getPath('skill-groups.json'); // Skill 分组归属
 
   // skill1：当前机器人的默认回复与操作规则（SKILL.md 样式）
   const FALLBACK_RULES_MD = `---
@@ -103,11 +103,11 @@ icon: 📋
     },
   ];
 
-  const RULES_FILE = path.join(DIR, 'skill1-rules.md');
+  const RULES_FILE = storage.getPath('skill1-rules.md');
 
   class SkillService {
     constructor() {
-      if (!fs.existsSync(DIR)) fs.mkdirSync(DIR, { recursive: true });
+      storage.ensureDir();
       this.customSkills = this._load();
       this.rules = this._loadRules();   // skill1 的可编辑规则（覆盖默认）
       this.customNames = this._loadNames(); // 内置 skill 的备注名映射
@@ -120,8 +120,8 @@ icon: 📋
     /** 读取已保存的规则；没有则用内置默认 */
     _loadRules() {
       try {
-        if (fs.existsSync(RULES_FILE)) {
-          const t = fs.readFileSync(RULES_FILE, 'utf-8');
+        if (storage.exists('skill1-rules.md')) {
+          const t = storage.readText('skill1-rules.md', '');
           if (t && t.trim()) return t;
         }
       } catch (e) { console.warn('[SkillService] load rules failed:', e); }
@@ -134,7 +134,7 @@ icon: 📋
     /** 保存/更新规则，持久化并通知刷新 */
     saveRules(text) {
       this.rules = (text && text.trim()) ? text : RULES_MD;
-      try { fs.writeFileSync(RULES_FILE, this.rules, 'utf-8'); }
+      try { storage.writeText('skill1-rules.md', this.rules); }
       catch (e) { console.warn('[SkillService] save rules failed:', e); }
       this.listeners.forEach(fn => { try { fn(); } catch (e) {} });
       return this.rules;
@@ -322,8 +322,8 @@ icon: 📋
 
     _load() {
       try {
-        if (!fs.existsSync(FILE)) return [];
-        const arr = JSON.parse(fs.readFileSync(FILE, 'utf-8'));
+        if (!storage.exists('skills.json')) return [];
+        const arr = storage.readJson('skills.json', []);
         return Array.isArray(arr) ? arr : [];
       } catch (e) {
         console.warn('[SkillService] load failed:', e);
@@ -333,7 +333,7 @@ icon: 📋
 
     _persist() {
       try {
-        fs.writeFileSync(FILE, JSON.stringify(this.customSkills, null, 2), 'utf-8');
+        storage.writeJson('skills.json', this.customSkills);
         this.listeners.forEach(fn => { try { fn(); } catch (e) { console.warn(e); } });
       } catch (e) {
         console.warn('[SkillService] save failed:', e);
@@ -353,8 +353,8 @@ icon: 📋
 
     _loadGroups() {
       try {
-        if (!fs.existsSync(GROUPS_FILE)) return { groups: [], assignments: {} };
-        const raw = JSON.parse(fs.readFileSync(GROUPS_FILE, 'utf-8')) || {};
+        if (!storage.exists('skill-groups.json')) return { groups: [], assignments: {} };
+        const raw = storage.readJson('skill-groups.json', {}) || {};
         const groups = Array.isArray(raw.groups)
           ? raw.groups.filter(item => item && item.id && item.name).map(item => ({
             id: String(item.id),
@@ -379,7 +379,7 @@ icon: 📋
 
     _persistGroups() {
       try {
-        fs.writeFileSync(GROUPS_FILE, JSON.stringify(this.groupState || { groups: [], assignments: {} }, null, 2), 'utf-8');
+        storage.writeJson('skill-groups.json', this.groupState || { groups: [], assignments: {} });
         this.listeners.forEach(fn => { try { fn(); } catch (e) { console.warn(e); } });
       } catch (e) {
         console.warn('[SkillService] save groups failed:', e);
@@ -696,14 +696,14 @@ icon: 📋
 
     _persistNames() {
       try {
-        fs.writeFileSync(NAMES_FILE, JSON.stringify(this.customNames || {}, null, 2), 'utf-8');
+        storage.writeJson('skill-names.json', this.customNames || {});
         this.listeners.forEach(fn => { try { fn(); } catch (e) { console.warn(e); } });
       } catch (e) { console.warn('[SkillService] save names failed:', e); }
     }
 
     _loadNames() {
       try {
-        if (fs.existsSync(NAMES_FILE)) return JSON.parse(fs.readFileSync(NAMES_FILE, 'utf-8'));
+        if (storage.exists('skill-names.json')) return storage.readJson('skill-names.json', {});
       } catch (e) { console.warn('[SkillService] load names failed:', e); }
       return {};
     }

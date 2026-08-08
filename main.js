@@ -2,8 +2,7 @@ const { app, BrowserWindow, screen, ipcMain, session, net, dialog, shell, native
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
-const mammoth = require('mammoth');
-const pdfParse = require('pdf-parse');
+const TeemoFileService = require('./src/services/TeemoFileService');
 const dingtalkBridge = require('./dingtalk-bridge');
 const materialBridge = require('./material-bridge');
 
@@ -12,68 +11,34 @@ const appIcon = path.join(__dirname, 'icon', isWindows ? 'Teemo-app.png' : 'app.
 const TEEMO_ARCHIVE_DIR = 'D:\\Teemo助手';
 const TEEMO_COMFY_OUTPUT_DIR = 'I:\\ComfyUI\\ComfyUI\\output';
 const LOCAL_ACCESS_FILE = 'local-file-access.json';
-const LOCAL_DOC_MAX_BYTES = 15 * 1024 * 1024;
-const LOCAL_DOC_MAX_TEXT = 60000;
-const LOCAL_TEXT_EXTENSIONS = new Set([
-  '.txt', '.md', '.json', '.csv', '.log', '.html', '.css', '.js', '.ts', '.jsx', '.tsx',
-  '.py', '.java', '.c', '.cpp', '.h', '.yaml', '.yml', '.xml', '.sql', '.sh', '.ps1',
-]);
+const fileService = new TeemoFileService();
 
 function localAccessFilePath() {
   return path.join(app.getPath('userData'), LOCAL_ACCESS_FILE);
 }
 
 function loadLocalAccessRoots() {
-  try {
-    const raw = JSON.parse(fs.readFileSync(localAccessFilePath(), 'utf8'));
-    return Array.isArray(raw) ? raw.filter(item => typeof item === 'string' && item.trim()) : [];
-  } catch (_) {
-    return [];
-  }
+  return fileService.loadAuthorizedRoots(localAccessFilePath());
 }
 
 function saveLocalAccessRoots(roots) {
-  const filePath = localAccessFilePath();
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify([...new Set(roots)], null, 2), 'utf8');
+  fileService.saveAuthorizedRoots(localAccessFilePath(), roots);
 }
 
 function canonicalLocalPath(filePath) {
-  return fs.realpathSync.native(String(filePath || ''));
+  return fileService.canonicalPath(filePath);
 }
 
 function isPathWithinRoot(rootPath, targetPath) {
-  const relative = path.relative(rootPath, targetPath);
-  return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+  return fileService.isPathWithinRoot(rootPath, targetPath);
 }
 
 function resolveAuthorizedLocalPath(filePath) {
-  const target = canonicalLocalPath(filePath);
-  const roots = loadLocalAccessRoots().map(root => {
-    try { return canonicalLocalPath(root); } catch (_) { return null; }
-  }).filter(Boolean);
-  const root = roots.find(item => isPathWithinRoot(item, target));
-  if (!root) throw new Error('文件不在已授权目录内');
-  return { target, root };
+  return fileService.resolveAuthorizedPath(filePath, loadLocalAccessRoots());
 }
 
 async function localDocumentContent(filePath) {
-  const ext = path.extname(filePath).toLowerCase();
-  const stat = fs.statSync(filePath);
-  if (!stat.isFile()) throw new Error('目标不是文件');
-  if (stat.size > LOCAL_DOC_MAX_BYTES) throw new Error('文件超过 15 MB');
-  if (!LOCAL_TEXT_EXTENSIONS.has(ext) && ext !== '.pdf' && ext !== '.docx') {
-    throw new Error('暂不支持此文件格式，请选择 TXT、Markdown、代码、PDF 或 DOCX');
-  }
-  const buffer = fs.readFileSync(filePath);
-  let content = '';
-  if (ext === '.pdf') content = (await pdfParse(buffer)).text || '';
-  else if (ext === '.docx') content = (await mammoth.extractRawText({ buffer })).value || '';
-  else content = buffer.toString('utf8');
-  content = content.replace(/\u0000/g, '').trim();
-  if (!content) throw new Error('文件中没有可读取的文本');
-  if (content.length > LOCAL_DOC_MAX_TEXT) content = `${content.slice(0, LOCAL_DOC_MAX_TEXT)}\n\n[文件内容过长，已截取前 60000 字]`;
-  return { content, size: stat.size, ext };
+  return fileService.readDocument(filePath);
 }
 
 function readImageBuffer(imageUrl) {

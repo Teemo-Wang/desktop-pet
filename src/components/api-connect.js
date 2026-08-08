@@ -565,7 +565,7 @@
           const r = document.getElementById('aiTestResult');
           saveAI();
           r.textContent = '测试中...'; r.className = 'api-test-result';
-          const result = await window.aiService.test();
+          const result = await window.aiService.testConnection();
           r.textContent = result.ok ? '✓ ' + result.msg : '✗ ' + result.msg;
           r.className = 'api-test-result ' + (result.ok ? 'ok' : 'err');
         });

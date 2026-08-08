@@ -1,6 +1,20 @@
 # 哈啰桌面 AI 助手（Desktop Pet）— 项目进度与规划
 
-> 文档版本：v1.2 ｜ 更新日期：2026-07-10 ｜ 当前应用版本：**v1.1.0（功能试行阶段）**
+> 文档版本：v1.2 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.1.6（P0 基线已封板）**
+
+## P0 阶段收尾（2026-08-09）
+
+- P0-1：唯一正式开发源码为 `D:\Teemo助手\Teemo机器人项目\Teemo-source`，Git 基线分支和可构建标签已建立。
+- P0-2：AI、存储、本地文件能力已整理为 AIService、TeemoStorageService、TeemoFileService 统一入口。
+- P0-3：根目录 `AGENTS.md` 已建立，作为 Codex、Kiro、Grok 等 AI Coding Agent 的最高优先级协作规则。
+- GPT 审阅结论：总体方向符合预期；已补齐 Storage 安全写入、多 AI 防覆盖、正式构建验收和 P1 Permission Layer 边界说明。
+- 正式 Windows 构建：`dist\Teemo-1.1.6-x64.exe` 已从 `Teemo-source` 生成并完成隔离 profile 启动烟测。
+- 下一阶段：P1-Agent Core。Agent Core、Tool Calling、Memory、Permission Layer、FileTool 写入/执行能力不属于 P0。
+
+### P0 已知风险
+
+- `npm ci` 报告现有依赖树存在 11 项 audit vulnerabilities（10 high、1 critical）。本阶段未升级依赖，避免改变稳定基线；后续单独建立依赖升级任务和回归窗口。
+- `js/` 旧兼容模块和外围模块的独立存储逻辑暂保留，作为技术债记录。
 
 ---
 

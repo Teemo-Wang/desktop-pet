@@ -22,12 +22,9 @@
  * }
  */
 (function() {
-  const fs = require('fs');
-  const path = require('path');
-  const os = require('os');
-
-  const DIR = path.join(os.homedir(), '.hellobike-pet');
-  const FILE = path.join(DIR, 'projects.json');
+  const storage = new window.TeemoStorageService();
+  const DIR = storage.getDir();
+  const FILE = storage.getPath('projects.json');
 
   // Seed 数据（首次启动填充）
   const SEED_PROJECTS = [
@@ -79,19 +76,18 @@
 
   class ProjectService {
     constructor() {
-      if (!fs.existsSync(DIR)) fs.mkdirSync(DIR, { recursive: true });
+      storage.ensureDir();
       this.items = this._load();
       this.listeners = new Set();
     }
 
     _load() {
       try {
-        if (!fs.existsSync(FILE)) {
+        if (!storage.exists('projects.json')) {
           this._writeFile(SEED_PROJECTS);
           return JSON.parse(JSON.stringify(SEED_PROJECTS));
         }
-        const raw = fs.readFileSync(FILE, 'utf-8');
-        const arr = JSON.parse(raw);
+        const arr = storage.readJson('projects.json', []);
         return Array.isArray(arr) ? arr : [];
       } catch (e) {
         console.warn('[ProjectService] load failed, fallback to seed:', e);
@@ -101,7 +97,7 @@
 
     _writeFile(data) {
       try {
-        fs.writeFileSync(FILE, JSON.stringify(data, null, 2), 'utf-8');
+        storage.writeJson('projects.json', data);
       } catch (e) {
         console.warn('[ProjectService] save failed:', e);
       }

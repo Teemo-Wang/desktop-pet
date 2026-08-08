@@ -3,8 +3,6 @@
   const fs = require('fs');
   const os = require('os');
   const path = require('path');
-  const mammoth = require('mammoth');
-  const pdfParse = require('pdf-parse');
   const UPLOAD_DIR = path.join(os.homedir(), '.hellobike-pet', 'uploads');
 
   const MAX_FILE_SIZE = 15 * 1024 * 1024;
@@ -24,6 +22,7 @@
   const comfyui = new window.TeemoComfyUIService(store);
   window.comfyUIService = comfyui;
   const audioAnalysis = new window.TeemoAudioAnalysisService(store);
+  const fileService = new window.TeemoFileService();
 
   const els = {
     history: document.getElementById('historyList'),
@@ -245,22 +244,8 @@
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    let content = '';
-    if (ext === '.pdf') {
-      const parsed = await pdfParse(buffer);
-      content = parsed.text || '';
-    } else if (ext === '.docx') {
-      const parsed = await mammoth.extractRawText({ buffer });
-      content = parsed.value || '';
-    } else if (TEXT_EXTENSIONS.has(ext)) {
-      content = buffer.toString('utf8');
-    } else {
-      throw new Error('暂不支持这种文件格式');
-    }
-    content = content.replace(/\u0000/g, '').trim();
-    if (!content) throw new Error('没有读取到可用文字');
-    if (content.length > MAX_FILE_TEXT) content = content.slice(0, MAX_FILE_TEXT) + '\n\n[文件内容过长，已截取前 60000 字]';
-    return { kind: 'document', content, dataUrl: '' };
+    const parsedByService = await fileService.readBuffer(buffer, file.name, file.size);
+    return { kind: 'document', content: parsedByService.content, dataUrl: '' };
   }
 
   async function addFiles(files) {
@@ -1506,7 +1491,7 @@
     const probe = new window.AIService();
     probe.configure({ ...draft, systemPrompt: '' });
     try {
-      const result = await probe.test();
+      const result = await probe.testConnection();
       if (result.ok) {
         els.apiSaveStatus.style.color = '#7fd6a8';
         els.apiSaveStatus.textContent = `✓ 连接成功（Key 尾号 ${draft.apiKey.slice(-4)}）· 请点击「保存 API 配置」`;

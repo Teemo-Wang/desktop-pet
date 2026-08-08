@@ -2,11 +2,9 @@
  * 设置持久化 Store
  */
 (function() {
-  const fs = require('fs');
-  const path = require('path');
-  const os = require('os');
-  const DIR = path.join(os.homedir(), '.hellobike-pet');
-  const FILE = path.join(DIR, 'settings.json');
+  const storage = new window.TeemoStorageService();
+  const DIR = storage.getDir();
+  const FILE = storage.getPath('settings.json');
 
   const DEFAULTS = {
     general: { alwaysOnTop:true, opacity:100, scale:100 },
@@ -97,14 +95,14 @@
 
   class SettingsStore {
     constructor() {
-      if (!fs.existsSync(DIR)) fs.mkdirSync(DIR, {recursive:true});
+      storage.ensureDir();
       this.reload();
       this._save();
     }
     /** 从磁盘重新读取，供桌宠与独立聊天窗口同步最新配置。 */
     reload() {
       try {
-        this.data = fs.existsSync(FILE) ? merge(DEFAULTS, JSON.parse(fs.readFileSync(FILE,'utf-8'))) : JSON.parse(JSON.stringify(DEFAULTS));
+        this.data = storage.exists('settings.json') ? merge(DEFAULTS, storage.readJson('settings.json', {})) : JSON.parse(JSON.stringify(DEFAULTS));
       } catch(e) { this.data = JSON.parse(JSON.stringify(DEFAULTS)); }
       return this.data;
     }
@@ -112,7 +110,7 @@
     set(g, k, v) { if(this.data[g]) { this.data[g][k]=v; this._save(); } }
     /** 整组替换（用于自定义供应商等需要增删键的场景） */
     setGroup(g, obj) { this.data[g] = obj || {}; this._save(); }
-    _save() { try { fs.writeFileSync(FILE, JSON.stringify(this.data,null,2),'utf-8'); } catch(e){} }
+    _save() { try { storage.writeJson('settings.json', this.data); } catch(e){} }
   }
   window.SettingsStore = SettingsStore;
 })();

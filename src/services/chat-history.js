@@ -12,12 +12,9 @@
  * }
  */
 (function() {
-  const fs = require('fs');
-  const path = require('path');
-  const os = require('os');
-
-  const DIR = path.join(os.homedir(), '.hellobike-pet');
-  const FILE = path.join(DIR, 'chat-history.json');
+  const storage = new window.TeemoStorageService();
+  const DIR = storage.getDir();
+  const FILE = storage.getPath('chat-history.json');
 
   // 单条消息上限：避免 system+history 累计过长
   const MAX_MESSAGES_PER_SESSION = 200;
@@ -80,19 +77,20 @@
 
   class ChatHistoryService {
     constructor() {
-      if (!fs.existsSync(DIR)) fs.mkdirSync(DIR, { recursive: true });
+      storage.ensureDir();
       this.data = this._load();
       this.listeners = new Set();
     }
 
     _load() {
       try {
-        if (!fs.existsSync(FILE)) {
+        if (!storage.exists('chat-history.json')) {
           const init = { sessions: [], folders: [], activeId: null };
           this._writeFile(init);
           return init;
         }
-        const raw = JSON.parse(fs.readFileSync(FILE, 'utf-8'));
+        const raw = storage.readJson('chat-history.json', null);
+        if (!raw || typeof raw !== 'object') throw new Error('invalid chat history');
         if (!raw.sessions) raw.sessions = [];
         if (!Array.isArray(raw.folders)) raw.folders = [];
         const folderIds = new Set(raw.folders.map(folder => folder && folder.id).filter(Boolean));
@@ -120,7 +118,7 @@
 
     _writeFile(data) {
       try {
-        fs.writeFileSync(FILE, JSON.stringify(data, null, 2), 'utf-8');
+        storage.writeJson('chat-history.json', data);
       } catch (e) {
         console.warn('[ChatHistory] save failed:', e);
       }

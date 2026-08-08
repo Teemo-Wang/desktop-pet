@@ -417,6 +417,11 @@
     }
 
     /** 测试连接：优先 /models 端点；不支持时降级用一次极简 chat 探活 */
+    async testConnection(config) {
+      if (config) this.configure(config);
+      return this.test();
+    }
+
     async test() {
       // 哈啰 AI 应用平台：用一次极简 execute 探活
       if (this._isAIBrain()) {

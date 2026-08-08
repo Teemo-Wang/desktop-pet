@@ -18,12 +18,9 @@
  * }
  */
 (function() {
-  const fs = require('fs');
-  const path = require('path');
-  const os = require('os');
-
-  const DIR = path.join(os.homedir(), '.hellobike-pet');
-  const FILE = path.join(DIR, 'todos.json');
+  const storage = new window.TeemoStorageService();
+  const DIR = storage.getDir();
+  const FILE = storage.getPath('todos.json');
 
   // 提醒轮询频率：30 秒
   const POLL_INTERVAL = 30 * 1000;
@@ -96,7 +93,7 @@
 
   class TodoService {
     constructor() {
-      if (!fs.existsSync(DIR)) fs.mkdirSync(DIR, { recursive: true });
+      storage.ensureDir();
       this.items = this._load();
       this.listeners = new Set();      // 数据变更监听（用于 UI 重渲）
       this.remindListeners = new Set(); // 到期提醒监听（用于通知气泡）
@@ -106,12 +103,11 @@
     /** 加载数据；首次启动写入 seed；向后兼容无 projectId 的旧数据 */
     _load() {
       try {
-        if (!fs.existsSync(FILE)) {
+        if (!storage.exists('todos.json')) {
           this._writeFile(SEED_TODOS);
           return JSON.parse(JSON.stringify(SEED_TODOS));
         }
-        const raw = fs.readFileSync(FILE, 'utf-8');
-        const arr = JSON.parse(raw);
+        const arr = storage.readJson('todos.json', []);
         if (!Array.isArray(arr)) return [];
         // 向后兼容：旧数据缺失 projectId 字段时自动补 null
         for (const item of arr) {
@@ -126,7 +122,7 @@
 
     _writeFile(data) {
       try {
-        fs.writeFileSync(FILE, JSON.stringify(data, null, 2), 'utf-8');
+        storage.writeJson('todos.json', data);
       } catch (e) {
         console.warn('[TodoService] save failed:', e);
       }
