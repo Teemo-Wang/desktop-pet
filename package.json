@@ -14,7 +14,7 @@
   "build": {
     "appId": "cn.hellobike.desktop-pet",
     "productName": "哈啰设计助手",
-    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "artifactName": "Teemo-${version}-${arch}.${ext}",
     "files": [
       "main.js",
       "dingtalk-bridge.js",
