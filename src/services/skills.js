@@ -10,15 +10,16 @@
   const DIR = path.join(os.homedir(), '.hellobike-pet');
   const FILE = path.join(DIR, 'skills.json');
   const NAMES_FILE = path.join(DIR, 'skill-names.json'); // 内置 skill 的备注名映射（id -> 自定义显示名）
+  const GROUPS_FILE = path.join(DIR, 'skill-groups.json'); // 分组与 Skill 归属独立保存，不改写 Skill 正文
 
   // skill1：当前机器人的默认回复与操作规则（SKILL.md 样式）
-  const RULES_MD = `---
+  const FALLBACK_RULES_MD = `---
 name: 机器人回复规则
-description: 哈啰设计助手机器人的默认回复与操作规则
+description: Teemo助理机器人的默认回复与操作规则
 icon: 📋
 ---
 
-# 哈啰设计助手 · 机器人回复规则
+# Teemo助理 · 机器人回复规则
 
 ## 一、身份与语气
 - 你是哈啰两轮设计中心的「实名 AI 助理」，替设计师回复同事的钉钉消息。
@@ -75,6 +76,18 @@ icon: 📋
 - 禁止在失败时返回虚假的成功结果。
 `;
 
+  // 默认规则独立保存为 Markdown，便于直接用 Teemo 的规则文档更新。
+  const BUNDLED_RULES_FILE = path.join(__dirname, 'skills', 'Teemo-private-assistant-rules.md');
+  let RULES_MD = FALLBACK_RULES_MD;
+  try {
+    if (fs.existsSync(BUNDLED_RULES_FILE)) {
+      const bundledRules = fs.readFileSync(BUNDLED_RULES_FILE, 'utf-8');
+      if (bundledRules && bundledRules.trim()) RULES_MD = bundledRules;
+    }
+  } catch (e) {
+    console.warn('[SkillService] load bundled rules failed:', e);
+  }
+
   const SKILLS = [
     {
       id: 'skill1',
@@ -98,6 +111,7 @@ icon: 📋
       this.customSkills = this._load();
       this.rules = this._loadRules();   // skill1 的可编辑规则（覆盖默认）
       this.customNames = this._loadNames(); // 内置 skill 的备注名映射
+      this.groupState = this._loadGroups(); // { groups: [], assignments: { skillId: groupId } }
       this.listeners = new Set();
       // 暴露为全局，供 AI 对话层读取当前规则
       window.skillService = this;
@@ -153,16 +167,71 @@ icon: 📋
      * @param {string} text 用户消息
      * @returns {object|null} 命中的技能（含 name / systemPrompt），无则 null
      */
+    /** 从 Skill 名称提炼可触发的关键词（支持「按瑶光/anima 的规则」这类口语） */
+    _skillNameKeys(name) {
+      const raw = String(name || '').toLowerCase().trim();
+      if (!raw) return [];
+      const keys = new Set([raw]);
+
+      // 括号里的别名很重要：NSFW提示词版（Anima）→ anima
+      const parenRe = /[（(【\[]([^）)\]】]+)[）)\]】]/g;
+      let pm;
+      while ((pm = parenRe.exec(raw))) {
+        const inner = String(pm[1] || '').trim();
+        if (inner.length >= 2) keys.add(inner);
+        String(inner).split(/[\s\/、,，·|_\-]+/).forEach(part => {
+          const w = String(part || '').trim();
+          if (w.length >= 2) keys.add(w);
+        });
+      }
+
+      // 英文/数字词：Anima、K2、GPT 等
+      (raw.match(/[a-z][a-z0-9]{1,}|[a-z]*\d+[a-z0-9]*/gi) || []).forEach(w => {
+        const word = String(w || '').toLowerCase();
+        if (word.length >= 2) keys.add(word);
+      });
+
+      // 去掉括号后再剥后缀：瑶光提示词模板 → 瑶光
+      let core = raw.replace(/[（(【\[].*?[）)\]】]/g, ' ').replace(/\s+/g, ' ').trim();
+      const suffixRe = /(规范|技能|规则|指南|手册|模板|提示词模板|提示词引擎|提示词|引擎|nsfw版|sfw版|版)$/i;
+      for (let i = 0; i < 4; i++) {
+        if (core.length >= 2) keys.add(core);
+        const next = core.replace(suffixRe, '').trim();
+        if (!next || next === core) break;
+        core = next;
+      }
+
+      // 仅对中文核心词取前 2～4 字，避免把 nsfw 拆成 ns/nsf 误触发
+      if (/[\u4e00-\u9fff]/.test(core)) {
+        if (core.length >= 2) keys.add(core.slice(0, 2));
+        if (core.length >= 3) keys.add(core.slice(0, 3));
+        if (core.length >= 4) keys.add(core.slice(0, 4));
+      }
+
+      String(raw).split(/[\s\/、,，·|_\-]+/).forEach(part => {
+        const w = String(part || '').trim().replace(/[（(【\[）)\]】]/g, '');
+        if (w.length >= 2) keys.add(w);
+      });
+
+      // 过滤过短且无意义的英文碎片
+      return [...keys].filter(k => {
+        if (!k || k.length < 2) return false;
+        if (/^[a-z]+$/.test(k) && k.length < 3 && !/\d/.test(k)) {
+          // 允许少量常见短词；其余 2 字母英文太容易误伤
+          return ['k2', 'ai'].includes(k);
+        }
+        return true;
+      });
+    }
+
     findRelevantSkill(text) {
       const t = String(text || '').toLowerCase();
       if (!t.trim()) return null;
       const skills = this.getAll().filter(s => s && s.id !== 'skill1' && s.systemPrompt && String(s.systemPrompt).trim());
-      // ① 名称 / 核心词直接命中（用户明确点名，最可靠）
+      // ① 名称 / 简称 / 核心词直接命中（用户明确点名，最可靠）
       for (const s of skills) {
-        const name = String(s.name || '').toLowerCase().trim();
-        if (!name) continue;
-        const core = name.replace(/(规范|技能|规则|指南|手册|模板)$/g, '').trim();
-        if (t.includes(name) || (core.length >= 2 && t.includes(core))) return s;
+        const keys = this._skillNameKeys(s.name);
+        if (keys.some(k => t.includes(k))) return s;
       }
       // ① bis：front matter triggers 字段精确触发（逗号分隔的关键词列表）
       for (const s of skills) {
@@ -174,7 +243,7 @@ icon: 📋
       // ② 名称分词重合度打分
       let best = null, bestScore = 0;
       for (const s of skills) {
-        const tokens = String(s.name || '').toLowerCase().split(/[\s\/、,，·|]+/).filter(w => w.length >= 2);
+        const tokens = this._skillNameKeys(s.name);
         let score = 0;
         for (const w of tokens) if (t.includes(w)) score++;
         if (score > bestScore) { bestScore = score; best = s; }
@@ -273,6 +342,140 @@ icon: 📋
 
     onChange(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
 
+    /** 从共享文件重新读取，供桌宠与独立聊天窗口同步最新 Skill。 */
+    reload() {
+      this.customSkills = this._load();
+      this.rules = this._loadRules();
+      this.customNames = this._loadNames();
+      this.groupState = this._loadGroups();
+      return this.getAll();
+    }
+
+    _loadGroups() {
+      try {
+        if (!fs.existsSync(GROUPS_FILE)) return { groups: [], assignments: {} };
+        const raw = JSON.parse(fs.readFileSync(GROUPS_FILE, 'utf-8')) || {};
+        const groups = Array.isArray(raw.groups)
+          ? raw.groups.filter(item => item && item.id && item.name).map(item => ({
+            id: String(item.id),
+            name: String(item.name).trim().slice(0, 30),
+            createdAt: Number(item.createdAt) || Date.now(),
+          }))
+          : [];
+        const validIds = new Set(groups.map(item => item.id));
+        const assignments = {};
+        if (raw.assignments && typeof raw.assignments === 'object') {
+          Object.keys(raw.assignments).forEach(skillId => {
+            const groupId = String(raw.assignments[skillId] || '');
+            if (validIds.has(groupId)) assignments[String(skillId)] = groupId;
+          });
+        }
+        return { groups, assignments };
+      } catch (e) {
+        console.warn('[SkillService] load groups failed:', e);
+        return { groups: [], assignments: {} };
+      }
+    }
+
+    _persistGroups() {
+      try {
+        fs.writeFileSync(GROUPS_FILE, JSON.stringify(this.groupState || { groups: [], assignments: {} }, null, 2), 'utf-8');
+        this.listeners.forEach(fn => { try { fn(); } catch (e) { console.warn(e); } });
+      } catch (e) {
+        console.warn('[SkillService] save groups failed:', e);
+      }
+    }
+
+    /** 获取用户创建的 Skill 分组。 */
+    getGroups() {
+      return (this.groupState && this.groupState.groups || []).map(item => ({ ...item }));
+    }
+
+    /** 按传入 ID 顺序重排分组；缺失或未知 ID 不会导致已有分组丢失。 */
+    reorderGroups(orderedIds) {
+      const groups = this.groupState && Array.isArray(this.groupState.groups)
+        ? this.groupState.groups
+        : [];
+      const byId = new Map(groups.map(group => [group.id, group]));
+      const seen = new Set();
+      const reordered = [];
+      (Array.isArray(orderedIds) ? orderedIds : []).forEach(value => {
+        const id = String(value || '');
+        if (!id || seen.has(id) || !byId.has(id)) return;
+        reordered.push(byId.get(id));
+        seen.add(id);
+      });
+      groups.forEach(group => {
+        if (seen.has(group.id)) return;
+        reordered.push(group);
+        seen.add(group.id);
+      });
+      if (reordered.every((group, index) => group.id === groups[index]?.id)) return true;
+      this.groupState.groups = reordered;
+      this._persistGroups();
+      return true;
+    }
+
+    /** 获取 Skill 所属分组；未分组返回 null。 */
+    getSkillGroup(skillId) {
+      const groupId = this.groupState && this.groupState.assignments
+        ? this.groupState.assignments[String(skillId)]
+        : '';
+      return this.getGroups().some(item => item.id === groupId) ? groupId : null;
+    }
+
+    createGroup(name) {
+      const value = String(name || '').trim().slice(0, 30);
+      if (!value) throw new Error('分组名称不能为空');
+      const groups = this.groupState.groups || [];
+      if (groups.some(item => item.name.toLowerCase() === value.toLowerCase())) throw new Error('已存在同名分组');
+      const item = {
+        id: 'skill_group_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        name: value,
+        createdAt: Date.now(),
+      };
+      groups.push(item);
+      this.groupState.groups = groups;
+      this._persistGroups();
+      return { ...item };
+    }
+
+    renameGroup(id, name) {
+      const value = String(name || '').trim().slice(0, 30);
+      if (!value) throw new Error('分组名称不能为空');
+      const groups = this.groupState.groups || [];
+      const item = groups.find(group => group.id === id);
+      if (!item) return false;
+      if (groups.some(group => group.id !== id && group.name.toLowerCase() === value.toLowerCase())) throw new Error('已存在同名分组');
+      item.name = value;
+      this._persistGroups();
+      return true;
+    }
+
+    /** 删除分组后，组内 Skill 自动回到未分组。 */
+    removeGroup(id) {
+      const before = (this.groupState.groups || []).length;
+      this.groupState.groups = (this.groupState.groups || []).filter(group => group.id !== id);
+      if (this.groupState.groups.length === before) return false;
+      Object.keys(this.groupState.assignments || {}).forEach(skillId => {
+        if (this.groupState.assignments[skillId] === id) delete this.groupState.assignments[skillId];
+      });
+      this._persistGroups();
+      return true;
+    }
+
+    /** groupId 为空时移回未分组。 */
+    setSkillGroup(skillId, groupId) {
+      if (!this.get(skillId)) return false;
+      const targetId = String(groupId || '');
+      if (targetId && !(this.groupState.groups || []).some(group => group.id === targetId)) return false;
+      this.groupState.assignments = this.groupState.assignments || {};
+      if (targetId) this.groupState.assignments[String(skillId)] = targetId;
+      else delete this.groupState.assignments[String(skillId)];
+      this._persistGroups();
+      return true;
+    }
+
     /** 给内置 skill1 注入当前生效的规则文本；同时应用备注名（若用户改过显示名） */
     _withRules(s) {
       if (!s) return s;
@@ -334,6 +537,36 @@ icon: 📋
     }
 
     /**
+     * 更新已保存的 Skill。内置回复规则允许改名和修改正文，自定义 Skill 可编辑全部展示字段。
+     * @param {string} id
+     * @param {object} patch
+     * @returns {object|null}
+     */
+    update(id, patch) {
+      const values = patch || {};
+      if (id === 'skill1') {
+        if (values.name) this.rename(id, values.name);
+        if (Object.prototype.hasOwnProperty.call(values, 'systemPrompt')) this.saveRules(values.systemPrompt);
+        return this.get(id);
+      }
+      const idx = this.customSkills.findIndex(s => s.id === id);
+      if (idx < 0) return null;
+      const current = this.customSkills[idx];
+      const next = {
+        ...current,
+        name: Object.prototype.hasOwnProperty.call(values, 'name') ? String(values.name || '').trim().slice(0, 30) : current.name,
+        icon: Object.prototype.hasOwnProperty.call(values, 'icon') ? (String(values.icon || '').trim() || '⭐') : current.icon,
+        desc: Object.prototype.hasOwnProperty.call(values, 'desc') ? String(values.desc || '').trim().slice(0, 80) : current.desc,
+        systemPrompt: Object.prototype.hasOwnProperty.call(values, 'systemPrompt') ? String(values.systemPrompt || '') : current.systemPrompt,
+        updatedAt: Date.now(),
+      };
+      if (!next.name) throw new Error('Skill 名称不能为空');
+      this.customSkills[idx] = next;
+      this._persist();
+      return { ...next, custom: true };
+    }
+
+    /**
      * 从 SKILL.md 文本解析并上传
      * @param {string} mdText
      * @param {string} [filename] - 文件名（用于兜底命名）
@@ -361,14 +594,22 @@ icon: 📋
 
       // 提取 front matter
       let body = mdText;
+      let hasExplicitDescription = false;
       const fm = mdText.match(/^---\s*\n([\s\S]*?)\n---\s*\n?/);
       if (fm) {
         body = mdText.slice(fm[0].length);
         const front = this._parseFrontMatter(fm[1]);
         if (front.name) result.name = String(front.name);
-        if (front.description) result.desc = String(front.description);
+        hasExplicitDescription = Object.prototype.hasOwnProperty.call(front, 'description');
+        if (hasExplicitDescription) result.desc = String(front.description);
         if (front.icon) result.icon = String(front.icon);
         if (front.triggers) result.triggers = String(front.triggers);  // 扩展触发词，逗号分隔
+      }
+
+      // 从「# Skill: 名称」标题提取名字
+      if (!result.name) {
+        const skillTitle = body.match(/^#\s*Skill[:：]\s*(.+)$/im);
+        if (skillTitle) result.name = String(skillTitle[1] || '').trim().slice(0, 30);
       }
 
       // 兜底命名：文件名（去掉扩展名）
@@ -378,9 +619,9 @@ icon: 📋
       if (!result.name) result.name = '未命名 Skill';
 
       // desc 兜底：取正文第一段非标题文本（去 # 等）
-      if (!result.desc) {
-        const firstLine = body.split('\n').find(l => l.trim() && !l.startsWith('#'));
-        result.desc = (firstLine || '').slice(0, 80);
+      if (!result.desc && !hasExplicitDescription) {
+        const firstLine = body.split('\n').find(l => l.trim() && !l.startsWith('#') && !/^Skill[:：]/i.test(l.trim()));
+        result.desc = (firstLine || '对话中自动新增的 Skill').slice(0, 80);
       }
 
       // 整段正文作为 system prompt（保留 markdown 结构供 AI 理解）
@@ -425,11 +666,8 @@ icon: 📋
         if (typeof s.prompt === 'string') body = s.prompt;
         else if (s.promptTpl) body = s.promptTpl;
       }
-      // 若正文本身已含 front matter，直接原样导出，避免重复包裹
-      if (/^---\s*\n[\s\S]*?\n---/.test(body.trim())) {
-        const safeName0 = String(s.name || 'skill').replace(/[\/\\:*?"<>|]/g, '_');
-        return { filename: `SKILL-${safeName0}.md`, content: body.trim() + '\n' };
-      }
+      // 正文可能来自一个旧 SKILL.md；移除旧元数据，再写入当前界面中的名称和简介。
+      body = body.trim().replace(/^---\s*\n[\s\S]*?\n---\s*\n?/, '');
       const esc = (v) => String(v == null ? '' : v).replace(/\n/g, ' ');
       const fm = `---\nname: ${esc(s.name)}\ndescription: ${esc(s.desc)}\nicon: ${s.icon || '📜'}\n---\n\n`;
       const safeName = String(s.name || 'skill').replace(/[\/\\:*?"<>|]/g, '_');
@@ -474,7 +712,13 @@ icon: 📋
     remove(id) {
       const before = this.customSkills.length;
       this.customSkills = this.customSkills.filter(s => s.id !== id);
-      if (this.customSkills.length !== before) this._persist();
+      if (this.customSkills.length !== before) {
+        this._persist();
+        if (this.groupState && this.groupState.assignments && this.groupState.assignments[id]) {
+          delete this.groupState.assignments[id];
+          this._persistGroups();
+        }
+      }
     }
 
     /** 用 input 渲染 prompt 模板（支持 {{key}} 占位） */

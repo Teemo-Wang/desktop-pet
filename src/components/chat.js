@@ -7,6 +7,7 @@
  *  - 单条消息复制
  */
 (function() {
+  const { shell } = require('electron');
   const QUICK_CMDS = [
     { id:'summary', icon:'📝', label:'总结消息', sources:['dingtalk'] },
     { id:'analyze', icon:'🔍', label:'需求分析', sources:['dingtalk'] },
@@ -33,7 +34,8 @@
       this.systemPrompt = '';
       this.drawerOpen = false;
       this.streamAbortCtrl = null;
-      this._pendingFiles = [];  // 待发送的图片文件列表
+      this._pendingFiles = [];  // 待发送的图片/视频文件列表
+      this._dragUploadActive = false;
       this._initHeader();
       this._initQuickCmds();
       this._initDrawer();
@@ -148,6 +150,23 @@
         const r = this.panel.getBoundingClientRect();
         return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
       };
+      let dragLeaveTimer = null;
+      const keepDragHighlight = () => {
+        if (dragLeaveTimer) {
+          clearTimeout(dragLeaveTimer);
+          dragLeaveTimer = null;
+        }
+        this._dragUploadActive = true;
+        this.panel.classList.add('drag-over');
+      };
+      const clearDragHighlight = (delay = 0) => {
+        if (dragLeaveTimer) clearTimeout(dragLeaveTimer);
+        dragLeaveTimer = setTimeout(() => {
+          this._dragUploadActive = false;
+          this.panel.classList.remove('drag-over');
+          dragLeaveTimer = null;
+        }, delay);
+      };
 
       // dragover：捕获阶段 preventDefault，既允许放置，又抑制原生拖放光标与窗口导航
       const onDragOver = (e) => {
@@ -155,30 +174,35 @@
         e.preventDefault();
         if (inPanel(e)) {
           if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
-          this.panel.classList.add('drag-over');
+          keepDragHighlight();
         } else {
-          this.panel.classList.remove('drag-over');
+          clearDragHighlight(80);
         }
       };
       const onDrop = (e) => {
         if (!draggingFiles(e)) return;
         e.preventDefault();          // 阻止窗口把文件当页面打开
-        this.panel.classList.remove('drag-over');
+        clearDragHighlight();
         if (!inPanel(e)) return;     // 只处理落在面板内的
         const dt = e.dataTransfer;
         let files = Array.from((dt && dt.files) || []);
         if (!files.length && dt && dt.items) {
           for (const it of dt.items) { if (it.kind === 'file') { const f = it.getAsFile(); if (f) files.push(f); } }
         }
-        const imageFiles = files.filter(f => _isImageFile(f));
-        console.warn('[chat.drop] files=' + files.length + ' images=' + imageFiles.length + ' types=' + files.map(f => f.type || f.name).join(','));
-        if (imageFiles.length > 0) this._addPendingFiles(imageFiles);
+        const mediaFiles = files.filter(f => _isSupportedMediaFile(f));
+        console.warn('[chat.drop] files=' + files.length + ' media=' + mediaFiles.length + ' types=' + files.map(f => f.type || f.name).join(','));
+        if (mediaFiles.length > 0) this._addPendingFiles(mediaFiles);
+        else this.addMsg('bot', '目前聊天窗口支持拖入图片、MP4 和 MOV 视频。');
       };
-      const onDragEnd = () => this.panel.classList.remove('drag-over');
+      const onDragEnd = () => {
+        clearDragHighlight();
+      };
       // 捕获阶段绑定，确保早于 <input> 等元素的原生处理
       document.addEventListener('dragover', onDragOver, true);
       document.addEventListener('drop', onDrop, true);
-      document.addEventListener('dragleave', (e) => { if (!inPanel(e)) this.panel.classList.remove('drag-over'); }, true);
+      document.addEventListener('dragleave', (e) => {
+        if (!inPanel(e)) clearDragHighlight(80);
+      }, true);
       window.addEventListener('dragend', onDragEnd);
 
       // 粘贴上传：在输入框里 Ctrl/Cmd+V 直接贴图（截图/复制的图片）
@@ -201,12 +225,18 @@
     /** 添加待发送文件到预览区 */
     _addPendingFiles(files) {
       let added = 0;
+      let oversizedVideo = false;
       for (const file of files) {
-        if (!_isImageFile(file)) continue;
+        if (!_isSupportedMediaFile(file)) continue;
+        if (_isVideoFile(file) && file.size > 100 * 1024 * 1024) {
+          oversizedVideo = true;
+          continue;
+        }
         this._pendingFiles.push(file);
         added++;
       }
-      console.warn('[chat.addPending] 收到 ' + files.length + ' 个，加入 ' + added + ' 张，待发送共 ' + this._pendingFiles.length);
+      if (oversizedVideo) this.addMsg('bot', '单个视频不能超过 100 MB，请压缩后重新上传。');
+      console.warn('[chat.addPending] 收到 ' + files.length + ' 个，加入 ' + added + ' 个媒体，待发送共 ' + this._pendingFiles.length);
       this._renderPendingPreview();
       this.input.focus();
     }
@@ -225,8 +255,11 @@
       preview.style.display = 'flex';
       preview.innerHTML = this._pendingFiles.map((file, idx) => {
         const url = URL.createObjectURL(file);
+        const media = _isVideoFile(file)
+          ? `<video src="${url}" muted preload="metadata"></video><span class="pending-video-badge">视频</span>`
+          : `<img src="${url}" alt="${_escape(file.name)}" />`;
         return `<div class="pending-img-item" data-idx="${idx}">
-          <img src="${url}" alt="${_escape(file.name)}" />
+          ${media}
           <button class="pending-img-remove" data-idx="${idx}">✕</button>
           <span class="pending-img-name">${_escape(file.name.length > 12 ? file.name.slice(0, 10) + '…' : file.name)}</span>
         </div>`;
@@ -280,6 +313,7 @@
                     <span class="chat-drawer-item-time">${window.ChatHistoryUtils.relativeTime(s.updatedAt)}</span>
                   </div>
                 </div>
+                <button class="btn-icon chat-drawer-item-pin ${s.pinned ? 'pinned' : ''}" title="${s.pinned ? '取消置顶' : '置顶'}" data-pin="${s.id}">📌</button>
                 <button class="btn-icon chat-drawer-item-del" title="删除" data-del="${s.id}">🗑</button>
               </div>
             `;
@@ -290,10 +324,17 @@
       list.querySelectorAll('.chat-drawer-item').forEach(row => {
         const id = row.dataset.id;
         row.addEventListener('click', e => {
-          if (e.target.closest('[data-del]')) return;
+          if (e.target.closest('[data-del], [data-pin]')) return;
           this.history.setActive(id);
           this._renderActiveMessages();
           this._toggleDrawer(false);
+        });
+      });
+      list.querySelectorAll('[data-pin]').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          this.history.togglePin(btn.dataset.pin);
+          this._renderDrawer();
         });
       });
       list.querySelectorAll('[data-del]').forEach(btn => {
@@ -342,6 +383,32 @@
       this.msgs.scrollTop = this.msgs.scrollHeight;
     }
 
+    _extractOriginalImagePath(content) {
+      const match = String(content || '').match(/📁\s*原图：\s*([A-Za-z]:\\[^\r\n`]+)/);
+      return match ? match[1].trim() : '';
+    }
+
+    _bindThumbnailOpen(container, content) {
+      if (!container) return;
+      const originalPath = this._extractOriginalImagePath(content);
+      container.querySelectorAll('img.md-img, img').forEach(image => {
+        image.title = originalPath ? '单击查看原图' : '单击查看图片';
+        image.addEventListener('click', async () => {
+          if (originalPath) {
+            await shell.openPath(originalPath);
+            return;
+          }
+          const src = String(image.src || '');
+          if (/^file:/i.test(src)) {
+            const filePath = decodeURIComponent(new URL(src).pathname).replace(/^\/([A-Za-z]:)/, '$1').replace(/\//g, '\\');
+            await shell.openPath(filePath);
+          } else if (/^https?:/i.test(src)) {
+            shell.openExternal(src);
+          }
+        });
+      });
+    }
+
     /** 创建单条消息 DOM；返回 DOM 引用（流式时由调用方持续更新内容） */
     _renderMessageDOM(role, content, animate = true) {
       const wrap = document.createElement('div');
@@ -349,14 +416,23 @@
       const body = document.createElement('div');
       body.className = 'msg-body';
       if (role === 'user') {
-        // 检测富内容对象（带图片附件的消息）
-        if (content && typeof content === 'object' && content._images && content._images.length > 0) {
-          for (const img of content._images) {
-            const imgEl = document.createElement('img');
-            imgEl.className = 'msg-inline-img';
-            imgEl.src = img.dataUrl;
-            imgEl.alt = img.name || '图片';
-            body.appendChild(imgEl);
+        // 检测富内容对象（带图片/视频附件的消息）
+        if (content && typeof content === 'object' && content._media && content._media.length > 0) {
+          for (const media of content._media) {
+            if (_isVideoData(media)) {
+              const videoEl = document.createElement('video');
+              videoEl.className = 'msg-inline-video';
+              videoEl.src = media.dataUrl;
+              videoEl.controls = true;
+              videoEl.preload = 'metadata';
+              body.appendChild(videoEl);
+            } else {
+              const imgEl = document.createElement('img');
+              imgEl.className = 'msg-inline-img';
+              imgEl.src = media.dataUrl;
+              imgEl.alt = media.name || '图片';
+              body.appendChild(imgEl);
+            }
           }
           if (content._text) {
             const p = document.createElement('p');
@@ -368,27 +444,16 @@
         }
       } else {
         body.innerHTML = window.Markdown.render(typeof content === 'string' ? content : '');
+        this._bindThumbnailOpen(body, content);
       }
       wrap.appendChild(body);
 
-      // bot 消息加复制按钮
+      // 普通对话不加复制；只有 Skill 系统文案代码块才由 bindCopyButtons 加「复制」
       if (role === 'bot' || role === 'assistant') {
         wrap.classList.add('msg-bot');
-        const tools = document.createElement('div');
-        tools.className = 'msg-tools';
-        const copyBtn = document.createElement('button');
-        copyBtn.className = 'msg-copy-btn';
-        copyBtn.title = '复制';
-        copyBtn.innerHTML = '<svg viewBox="0 0 24 24" width="11" height="11"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
-        copyBtn.addEventListener('click', () => {
-          navigator.clipboard.writeText(body.textContent).then(() => {
-            copyBtn.classList.add('copied');
-            copyBtn.title = '已复制';
-            setTimeout(() => { copyBtn.classList.remove('copied'); copyBtn.title = '复制'; }, 1500);
-          });
-        });
-        tools.appendChild(copyBtn);
-        wrap.appendChild(tools);
+        if (window.Markdown && window.Markdown.bindCopyButtons) {
+          window.Markdown.bindCopyButtons(body, { messageCopy: false });
+        }
       }
 
       this.msgs.appendChild(wrap);
@@ -404,24 +469,29 @@
       this.input.value = '';
 
       if (hasFiles) {
-        // 将图片转为 base64
-        const imageDataList = await this._filesToBase64(this._pendingFiles);
-        const fileNames = this._pendingFiles.map(f => f.name);
+        const selectedFiles = this._pendingFiles.slice();
+        // 将图片/视频转为 base64 data URL
+        const mediaDataList = await this._filesToBase64(selectedFiles);
+        const fileNames = selectedFiles.map(f => f.name);
         this._clearPendingFiles();
 
         // 先标记发送中，防止 history.onChange 触发重渲覆盖富内容
         this.sending = true;
 
-        // 写入历史（文本形式记录图片信息）
-        const historyText = `[图片：${fileNames.join(', ')}]${t ? '\n' + t : ''}`;
+        // 写入历史（文本形式记录媒体信息，不持久化大体积 base64）
+        const hasVideo = mediaDataList.some(item => _isVideoData(item));
+        const historyText = `[${hasVideo ? '媒体' : '图片'}：${fileNames.join(', ')}]${t ? '\n' + t : ''}`;
         this.history.addMessage('user', historyText);
 
         // 渲染用户消息（带缩略图）
-        const richContent = { _images: imageDataList, _text: t || '' };
+        const richContent = { _media: mediaDataList, _text: t || '' };
         this._renderMessageDOM('user', richContent);
 
         // 判断是否是生图/改图请求（调用 images API）
-        const isImageGenRequest = this._isImageEditRequest(t);
+        const imageDataList = mediaDataList.filter(item => !_isVideoData(item));
+        const videoDataList = mediaDataList.filter(item => _isVideoData(item));
+        const videoFiles = selectedFiles.filter(file => _isVideoFile(file));
+        const isImageGenRequest = imageDataList.length > 0 && videoDataList.length === 0 && this._isImageEditRequest(t);
 
         if (isImageGenRequest && window.aiService.config && !window.aiService.useMock) {
           // 使用 images/generations 端点
@@ -470,6 +540,21 @@
           }
         } else {
           // 使用 chat/completions（多模态理解）
+          const audioSections = [];
+          if (videoFiles.length && window.teemoAudioAnalysis) {
+            for (const videoFile of videoFiles) {
+              try {
+                const audioResult = await window.teemoAudioAnalysis.analyzeVideo(videoFile, { signal: this.streamAbortCtrl && this.streamAbortCtrl.signal });
+                if (audioResult && audioResult.ok && audioResult.text) {
+                  audioSections.push(`【${videoFile.name} · 音频分析（${audioResult.model}）】\n${audioResult.text}`);
+                } else if (audioResult && audioResult.error) {
+                  audioSections.push(`【${videoFile.name} · 音频分析未完成】\n${audioResult.error}`);
+                }
+              } catch (audioError) {
+                audioSections.push(`【${videoFile.name} · 音频分析未完成】\n${audioError.message || '未知错误'}`);
+              }
+            }
+          }
           const active = this.history.getActive();
           const apiMessages = active.messages
             .filter(m => m.role === 'system' || m.role === 'user' || m.role === 'assistant')
@@ -480,7 +565,13 @@
           for (const img of imageDataList) {
             visionContent.push({ type: 'image_url', image_url: { url: img.dataUrl } });
           }
-          visionContent.push({ type: 'text', text: t || '请分析这张图片的内容、设计风格和元素。' });
+          for (const video of videoDataList) {
+            visionContent.push({ type: 'video_url', video_url: { url: video.dataUrl } });
+          }
+          const audioContext = audioSections.length
+            ? `\n\n--- 视频音轨分析结果 ---\n${audioSections.join('\n\n')}\n--- 音轨分析结束 ---\n请把声音分析与视频画面结合起来回答。`
+            : '';
+          visionContent.push({ type: 'text', text: (t || (videoDataList.length ? '请分析这段视频的内容、画面、节奏和关键元素。' : '请分析这张图片的内容、设计风格和元素。')) + audioContext });
           if (apiMessages.length > 0) {
             apiMessages[apiMessages.length - 1] = { role: 'user', content: visionContent };
           }
@@ -527,11 +618,23 @@
           const handled = await this._handleRuleManualSave(t);
           if (handled) return;
         }
-        // 纯文字生成新图：命中造图意图且已配置生图模型 → 直接调真实生图接口，
-        // 避免走聊天模型时被"编造 ![生成结果](假链接)"导致图裂开
-        if (this._looksLikeTextToImage(t) && window.aiService.config && !window.aiService.useMock) {
-          await this._runTextToImage(t);
-          return;
+        // 纯文字生图：由 AI 判断意图（或关键词模式），避免误触 ComfyUI / 云端生图
+        const localImageReady = window.comfyUIService && window.comfyUIService.isEnabled();
+        const imgCfg = (window.settingsStore && window.settingsStore.get('imageModel')) || (window.aiService && window.aiService.imageConfig) || {};
+        const chatCfg = (window.settingsStore && window.settingsStore.get('model')) || (window.aiService && window.aiService.config) || {};
+        const cloudImageReady = !!(imgCfg.modelName && (imgCfg.apiKey || chatCfg.apiKey) && (imgCfg.baseUrl || chatCfg.baseUrl));
+        // 本地 ComfyUI 和云端生图 API 都不可用时，跳过意图识别以加快普通聊天。
+        if ((localImageReady || cloudImageReady) && window.teemoImageIntent) {
+          let intent = { wantImage: false, prompt: '' };
+          try {
+            intent = await window.teemoImageIntent.detect(window.aiService, t);
+          } catch (e) {
+            console.warn('[chat.imageIntent]', e);
+          }
+          if (intent.wantImage) {
+            await this._runTextToImage(intent.prompt || t);
+            return;
+          }
         }
         // 规范自动沉淀：后台异步检测"明确要求遵循某规范"，命中则追加到「我的规范」(私聊来源)；
         // 不 await，避免阻塞正常回复；结果由 app.js 监听 onCapture 反馈到 UI
@@ -593,7 +696,7 @@
      */
     _looksLikeTextToImage(text) {
       if (!text) return false;
-      const action = /(生成|画一?张|画个|做一?张|做个|出一?张|来一?张|设计一?张|生图|文生图)/;
+      const action = /(生成|画图|画一?张|画个|做一?张|做个|出一?张|出个|来一?张|来个|设计一?张|生(?:一|个|张|幅)?(?:张)?图|文生图)/;
       const noun = /(图|图片|banner|海报|视觉|背景|插画|logo|封面|素材|壁纸|头图)/i;
       return action.test(text) && noun.test(text);
     }
@@ -615,6 +718,7 @@
     }
 
     async _buildImagePrompt(userBrief) {
+      if (window.aiService && window.aiService.useMock) return userBrief;
       try {
         const svc = window.skillService;
         // 汇总所有可用的规范上下文：参考规范(rule技能) + 机器人规则 + 对话模型的设计系统提示
@@ -628,7 +732,7 @@
         // 规范可能很长，裁剪到 2000 字以内，减少输入 token、加快扩写、降低超时概率
         const rules = parts.join('\n\n---\n\n').slice(0, 2000);
         console.warn('[chat._buildImagePrompt] 注入规范长度=' + rules.length);
-        const sys = '你是资深视觉设计师。把用户的作图需求扩写成一段用于「文生图模型」的详细中文提示词：明确画面主体与场景、构图与主体位置、氛围与光线、色彩（涉及品牌色务必给出具体色值并严格采用）、主标题/副标题的文字内容与排版位置、logo 的样式与位置、留白与安全区。若提供了【品牌/设计规范】，必须严格遵循其中的色值、logo、版式、字体、字数与文案约束，规范优先级高于其它默认审美。只输出提示词正文（150字以内），不要任何解释或前后缀。';
+        const sys = '你是资深视觉设计师。把用户的作图需求扩写并翻译成一段用于 SDXL 文生图模型的高质量英文提示词：明确画面主体与场景、构图与主体位置、氛围与光线、色彩（涉及品牌色务必给出具体色值并严格采用）、留白与安全区。若画面必须包含中文标题，请仅把需要渲染的中文原文放在英文双引号中，其余全部使用英文。若提供了【品牌/设计规范】，必须严格遵循其中的色值、logo、版式、字体、字数与文案约束。只输出提示词正文（不超过 180 个英文词），不要解释或前后缀。';
         const user = (rules ? `【品牌/设计规范】\n${rules}\n\n` : '') + `【作图需求】${userBrief}`;
         // 慢网关下扩写可能超过默认 40s，放宽到 90s；失败则回退「原文 + 规范直拼」（不再丢掉规范）
         const out = await window.aiService.send([
@@ -670,6 +774,18 @@
         const result = await window.aiService.generateImage({
           prompt: genPrompt,
           size: genSize,
+          onProgress: progress => {
+            if (!progress) return;
+            if (progress.stage === 'sampling') {
+              placeholder.body.textContent = `🎨 ComfyUI 正在生图 ${progress.value || 0}/${progress.max || 0}（${progress.percent || 0}%）...`;
+            } else if (progress.stage === 'connecting') {
+              placeholder.body.textContent = '🔌 正在连接本机 ComfyUI...';
+            } else if (progress.stage === 'queued') {
+              placeholder.body.textContent = '🧾 生图任务已进入 ComfyUI 队列...';
+            } else if (progress.stage === 'downloading') {
+              placeholder.body.textContent = '📥 正在读取 ComfyUI 生成结果...';
+            }
+          },
         });
         placeholder.wrap.classList.remove('msg-typing');
         let imgUrl = result.url || (result.b64 ? `data:image/png;base64,${result.b64}` : null);
@@ -678,9 +794,28 @@
           const dataUrl = await window.materialService.fetchImageAsDataUrl(result.url);
           if (dataUrl) imgUrl = dataUrl;
         }
-        const responseText = imgUrl ? `✅ 图片已生成：\n\n![生成结果](${imgUrl})` : '⚠️ 生图完成但未返回图片数据';
-        placeholder.body.innerHTML = window.Markdown.render(responseText);
-        assistantMsg.content = responseText;
+        let finalText = imgUrl ? `✅ 图片已生成：\n\n![生成结果](${imgUrl})` : '⚠️ 生图完成但未返回图片数据';
+        let storedText = finalText;
+        if (imgUrl && window.teemoImageArchive) {
+          const archived = await window.teemoImageArchive.saveFromChat(null, {
+            imageUrl: imgUrl,
+            userPrompt: t,
+            source: window.comfyUIService && window.comfyUIService.isEnabled() ? 'comfyui' : 'cloud-api',
+            directUrl: result.url || '',
+          });
+          if (window.TeemoMessageSanitize && window.TeemoMessageSanitize.buildStoredImageReply) {
+            storedText = window.TeemoMessageSanitize.buildStoredImageReply('✅ 图片已生成：', archived);
+            finalText = storedText;
+          } else if (archived && archived.ok) {
+            finalText += `\n\n📁 已保存到：\`${archived.path}\``;
+            storedText = finalText;
+          }
+        } else if (window.TeemoMessageSanitize) {
+          storedText = window.TeemoMessageSanitize.stripForApi(finalText);
+        }
+        placeholder.body.innerHTML = window.Markdown.render(finalText);
+        assistantMsg.content = storedText;
+        this._bindThumbnailOpen(placeholder.body, storedText);
         this.history.updateLastMessage(assistantMsg.content);
         this.history.flush();
       } catch (e) {
@@ -702,7 +837,7 @@
       for (const file of files) {
         const dataUrl = await new Promise((resolve) => {
           const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
+          reader.onload = () => resolve(_normalizeMediaDataUrl(file, reader.result));
           reader.readAsDataURL(file);
         });
         results.push({ name: file.name, dataUrl, size: file.size, type: file.type });
@@ -727,40 +862,72 @@
       const placeholder = this._renderMessageDOM('assistant', '…');
       placeholder.wrap.classList.add('msg-typing');
 
-      // 构造请求消息（按 OpenAI 协议）
-      const active = this.history.getActive();
-      const apiMessages = active.messages
-        .filter(m => m.role === 'system' || m.role === 'user' || m.role === 'assistant')
-        .map(m => ({ role: m.role, content: _stripDataUrls(m.content) }));
-      // 如果是从快捷指令传 prompt（不同于 displayText），把最后一条 user 替换为 prompt
-      if (prompt !== displayText && apiMessages.length > 0) {
-        const lastUserIdx = (() => {
-          for (let i = apiMessages.length - 1; i >= 0; i--) if (apiMessages[i].role === 'user') return i;
-          return -1;
-        })();
-        if (lastUserIdx >= 0) apiMessages[lastUserIdx] = { role: 'user', content: prompt };
-      }
-
-      // 技能自动加载：命中用户点到的技能 → 注入其内容，让本次回答严格应用该技能
-      let _loadedSkill = null;
-      try {
-        _loadedSkill = window.skillService && window.skillService.findRelevantSkill && window.skillService.findRelevantSkill(prompt);
-        if (_loadedSkill && _loadedSkill.systemPrompt) {
-          apiMessages.unshift({
-            role: 'system',
-            content: `【已加载技能：${_loadedSkill.name}】本次回答请严格应用以下技能的规范、方法与约束（优先级高于其它默认设定）：\n\n${_loadedSkill.systemPrompt}`,
-          });
-          console.warn('[chat.sendToAI] 已加载技能: ' + _loadedSkill.name);
-          // 给用户即时反馈：本次已按该技能处理
-          try { placeholder.body.innerHTML = window.Markdown.render(`🎯 已应用技能「${_loadedSkill.name}」，生成中…`); } catch (e) {}
-        }
-      } catch (e) { /* 匹配失败不影响正常对话 */ }
-
       // 入库占位（开始为空，由流式更新）
       const assistantMsg = this.history.addMessage('assistant', '');
 
       this.streamAbortCtrl = new AbortController();
       try {
+        let finalPrompt = prompt;
+        if (window.teemoWebBrowse && window.teemoWebBrowse.extractUrls(finalPrompt).length) {
+          try {
+            placeholder.body.innerHTML = window.Markdown.render('🌐 正在联网读取网页…');
+          } catch (e) {}
+          const browseStore = window.settingsStore || (window.SettingsStore ? new window.SettingsStore() : null);
+          const browsed = await window.teemoWebBrowse.enrichPrompt(finalPrompt, {
+            store: browseStore,
+            signal: this.streamAbortCtrl.signal,
+            onStatus: message => {
+              try { placeholder.body.innerHTML = window.Markdown.render(`🌐 ${message}`); } catch (e) {}
+            },
+          });
+          finalPrompt = browsed.prompt || finalPrompt;
+        }
+
+        // 构造请求消息（按 OpenAI 协议）
+        const active = this.history.getActive();
+        const filtered = active.messages.filter(m => m.role === 'system' || m.role === 'user' || m.role === 'assistant');
+        const apiMessages = window.TeemoMessageSanitize
+          ? window.TeemoMessageSanitize.buildApiMessages(filtered, { maxMessages: 24 })
+          : filtered.map(m => ({ role: m.role, content: window.TeemoMessageSanitize.stripForApi(m.content) }));
+        // 把最后一条 user 替换为实际发给模型的内容（含联网读取结果）
+        if (apiMessages.length > 0) {
+          const lastUserIdx = (() => {
+            for (let i = apiMessages.length - 1; i >= 0; i--) if (apiMessages[i].role === 'user') return i;
+            return -1;
+          })();
+          if (lastUserIdx >= 0) apiMessages[lastUserIdx] = { role: 'user', content: finalPrompt };
+        }
+
+        // 技能自动加载：命中用户点到的技能 → 注入其内容，让本次回答严格应用该技能
+        let _loadedSkill = null;
+        try {
+          _loadedSkill = window.skillService && window.skillService.findRelevantSkill && window.skillService.findRelevantSkill(finalPrompt);
+          if (_loadedSkill && _loadedSkill.systemPrompt) {
+            apiMessages.unshift({
+              role: 'system',
+              content: `【已加载技能：${_loadedSkill.name}】本次回答请严格应用以下技能的规范、方法与约束（优先级高于其它默认设定）：\n\n${_loadedSkill.systemPrompt}`,
+            });
+            console.warn('[chat.sendToAI] 已加载技能: ' + _loadedSkill.name);
+            try { placeholder.body.innerHTML = window.Markdown.render(`🎯 已应用技能「${_loadedSkill.name}」，生成中…`); } catch (e) {}
+          }
+        } catch (e) { /* 匹配失败不影响正常对话 */ }
+
+        const captureSvc = window.ruleCaptureService;
+        if (captureSvc && (
+          captureSvc._wantsNewSkill(displayText)
+          || captureSvc.looksLikeManualSave(displayText)
+          || captureSvc.looksLikeRuleRequest(displayText)
+        )) {
+          apiMessages.unshift({
+            role: 'system',
+            content: [
+              '用户正在要求新增 Skill 或长期记住规则。',
+              '若是独立 Skill：请用完整 Markdown 输出，必须以「# Skill: 名称」开头，包含触发条件与执行步骤；不要只说“已添加”而不给正文。',
+              '若是普通回复规则：请整理成清晰条目，系统会自动追加到「Teemo 新增回复规则」。',
+            ].join('\n'),
+          });
+        }
+
         let acc = '';
         await window.aiService.stream(apiMessages, (chunk, full) => {
           // 第一片 chunk 到来时移除"思考中"
@@ -769,14 +936,40 @@
           }
           acc = full;
           placeholder.body.innerHTML = window.Markdown.render(full);
+          if (window.Markdown && window.Markdown.bindCopyButtons) {
+            window.Markdown.bindCopyButtons(placeholder.body, { messageCopy: false });
+          }
           this.msgs.scrollTop = this.msgs.scrollHeight;
         }, this.streamAbortCtrl.signal);
+
+        // 流式结束：必要时自动落库 Skill / 规则
+        if (acc && captureSvc && (
+          captureSvc._wantsNewSkill(displayText)
+          || captureSvc.looksLikeManualSave(displayText)
+          || captureSvc.looksLikeRuleRequest(displayText)
+        )) {
+          try {
+            const saved = await captureSvc.captureFromConversation(displayText, acc, { source: 'self' });
+            if (saved && saved.created) {
+              const label = (saved.skill && saved.skill.name) || 'Teemo 新增回复规则';
+              const tip = saved.mode === 'new'
+                ? `\n\n✅ 已自动新增 Skill：${label}`
+                : `\n\n✅ 已自动写入「${label}」`;
+              acc += tip;
+            }
+          } catch (e) {
+            console.warn('[chat.autoCapture]', e);
+          }
+        }
 
         // 流式结束写库
         assistantMsg.content = acc || '⚠️ 模型无响应';
         this.history.updateLastMessage(assistantMsg.content);
         this.history.flush();
-        if (!acc) placeholder.body.innerHTML = window.Markdown.render(assistantMsg.content);
+        placeholder.body.innerHTML = window.Markdown.render(assistantMsg.content);
+        if (window.Markdown && window.Markdown.bindCopyButtons) {
+          window.Markdown.bindCopyButtons(placeholder.body, { messageCopy: false });
+        }
       } catch (e) {
         const errText = e.message || '⚠️ 请求失败';
         placeholder.wrap.classList.remove('msg-typing');
@@ -962,6 +1155,29 @@
     if (!file) return false;
     if (/^image\//i.test(file.type || '')) return true;
     return /\.(png|jpe?g|gif|webp|bmp|svg|heic|heif|avif|tiff?)$/i.test(file.name || '');
+  }
+
+  /** MP4/MOV 在 Windows 拖拽时 MIME 可能为空，因此同时检查扩展名。 */
+  function _isVideoFile(file) {
+    if (!file) return false;
+    if (/^video\/(mp4|quicktime)$/i.test(file.type || '')) return true;
+    return /\.(mp4|mov)$/i.test(file.name || '');
+  }
+
+  function _isVideoData(item) {
+    return !!item && (/^video\//i.test(item.type || '') || /^data:video\//i.test(item.dataUrl || '') || /\.(mp4|mov)$/i.test(item.name || ''));
+  }
+
+  function _isSupportedMediaFile(file) {
+    return _isImageFile(file) || _isVideoFile(file);
+  }
+
+  /** 某些 Windows 环境不给 MOV/MP4 提供 MIME，补成模型和播放器可识别的类型。 */
+  function _normalizeMediaDataUrl(file, value) {
+    const dataUrl = String(value || '');
+    if (!_isVideoFile(file) || /^data:video\//i.test(dataUrl)) return dataUrl;
+    const mime = /\.mov$/i.test(file.name || '') ? 'video/quicktime' : 'video/mp4';
+    return dataUrl.replace(/^data:[^;,]*/i, `data:${mime}`);
   }
 
   /** 去除字符串开头的 emoji 图标及其后的空白（历史会话列表标题/摘要不展示前缀图标） */

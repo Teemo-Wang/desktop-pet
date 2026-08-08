@@ -23,7 +23,7 @@ window.MockData = {
   ],
 
   about: {
-    name: '哈啰桌面助手',
+    name: 'Teemo助理',
     version: '1.0.0-demo',
     description: '哈啰两轮事业部设计团队桌面工作助手',
     author: '哈啰设计中心',

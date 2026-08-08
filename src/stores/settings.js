@@ -11,8 +11,8 @@
   const DEFAULTS = {
     general: { alwaysOnTop:true, opacity:100, scale:100 },
     // skin: 'default'=内置小哈 | 'custom'=用户自定义；customSkin=自定义形象图片(data URL)
-    appearance: { idleAnimation:'float', messageReaction:'bounce', skin:'default', customSkin:'' },
-    work: { dingtalkNotify:true, aiAssistant:true, yuqueAccess:true, dndEnabled:false, dndStart:'22:00', dndEnd:'08:00', showMsgContent:true, allowChitchat:true, editMethod:'designhub' },
+    appearance: { idleAnimation:'float', messageReaction:'bounce', skin:'default', customSkin:'', chatFontSize:16 },
+    work: { dingtalkNotify:true, aiAssistant:true, yuqueAccess:true, dndEnabled:false, dndStart:'22:00', dndEnd:'08:00', showMsgContent:true, allowChitchat:true, editMethod:'designhub', dailyBriefAuto:false },
     model: { provider:'deepseek', apiKey:'', modelName:'deepseek-chat', baseUrl:'https://api.deepseek.com/v1', systemPrompt:`你是哈啰出行两轮事业部的设计工作 AI 助手，名叫"小哈"。你的直属用户是一位视觉设计师。
 
 ## 你的核心能力
@@ -45,7 +45,34 @@
     // 素材库（DesignHub 团队素材管理工具）：登录邮箱 + 本地缓存的 session token
     material: { dhEmail:'', dhToken:'', dhUserName:'' },
     // 生图模型：modelName=当前生效的模型；options=可切换的模型名列表；apiKey/baseUrl 留空则复用对话配置
-    imageModel: { modelName:'doubao-seedream-4-5-251128', size:'2048x2048', apiKey:'', baseUrl:'', options:[] },
+    imageModel: { label:'生图 API', modelName:'doubao-seedream-4-5-251128', size:'2048x2048', apiKey:'', baseUrl:'', options:[] },
+    // 视频音轨分析：Key/地址留空时自动复用已保存且名称包含 GPT/OpenAI 的接口
+    audioModel: { enabled:true, modelName:'gpt-audio-1.5', transcriptionModel:'gpt-4o-mini-transcribe', providerId:'', apiKey:'', baseUrl:'' },
+    // 生图触发：keyword=只有明确说生图/画一张等才出图（默认更稳）；ai=由对话 API 判断
+    imageIntent: { mode:'keyword' },
+    // 联网读取：消息里含 http(s) 链接时，先抓取网页正文再交给模型
+    webBrowse: { enabled:true, maxPages:3, maxChars:12000, timeoutMs:20000 },
+    // 聊天生图自动存档到本机文件夹
+    imageArchive: {
+      enabled: true,
+      dir: 'D:\\Teemo助手',
+      comfyOutputDir: 'I:\\ComfyUI\\ComfyUI\\output',
+    },
+    // 本机 ComfyUI：针对 RTX 4070 Ti 12GB 默认使用 SDXL 1024px 稳定工作流
+    comfyui: {
+      enabled:true,
+      baseUrl:'http://127.0.0.1:8188',
+      checkpoint:'SDXL\\Realistic\\speciosa25D_v12.safetensors',
+      width:1024,
+      height:1024,
+      steps:26,
+      cfg:5.5,
+      sampler:'dpmpp_2m',
+      scheduler:'karras',
+      negativePrompt:'worst quality, low quality, lowres, blurry, deformed, bad anatomy, extra fingers, extra limbs, watermark, signature, jpeg artifacts',
+      activeWorkflowId:'builtin',
+      workflows:[],
+    },
     // 各供应商独立配置（apiKey/modelName/baseUrl 互不干扰）
     providerConfigs: {},
     // 用户自建的 API 供应商：{ [id]: { label, baseUrl, modelName, hint } }，可自定义命名
@@ -71,10 +98,15 @@
   class SettingsStore {
     constructor() {
       if (!fs.existsSync(DIR)) fs.mkdirSync(DIR, {recursive:true});
+      this.reload();
+      this._save();
+    }
+    /** 从磁盘重新读取，供桌宠与独立聊天窗口同步最新配置。 */
+    reload() {
       try {
         this.data = fs.existsSync(FILE) ? merge(DEFAULTS, JSON.parse(fs.readFileSync(FILE,'utf-8'))) : JSON.parse(JSON.stringify(DEFAULTS));
       } catch(e) { this.data = JSON.parse(JSON.stringify(DEFAULTS)); }
-      this._save();
+      return this.data;
     }
     get(g) { return g ? this.data[g] : this.data; }
     set(g, k, v) { if(this.data[g]) { this.data[g][k]=v; this._save(); } }

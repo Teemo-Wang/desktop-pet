@@ -82,6 +82,51 @@
     return `${ww}x${hh}`;
   }
 
+  /**
+   * API 最终安全门：历史图片只保留“[图片]”占位，绝不发送 base64 或本地缩略图路径。
+   * 仅保留最后一条用户消息中主动上传的多模态图片，确保“上传图片让 AI 分析”仍可用。
+   */
+  function _sanitizeChatMessages(messages) {
+    const list = Array.isArray(messages) ? messages : [];
+    let lastUserIndex = -1;
+    list.forEach((message, index) => {
+      if (message && message.role === 'user') lastUserIndex = index;
+    });
+
+    const systemIndexes = list
+      .map((message, index) => (message && message.role === 'system' ? index : -1))
+      .filter(index => index >= 0);
+    const dialogIndexes = list
+      .map((message, index) => (message && message.role !== 'system' ? index : -1))
+      .filter(index => index >= 0)
+      .slice(-24);
+    const keep = new Set([...systemIndexes, ...dialogIndexes]);
+
+    return list
+      .map((message, index) => ({ message, index }))
+      .filter(item => keep.has(item.index) && item.message)
+      .map(({ message, index }) => {
+        let content = message.content;
+        if (typeof content === 'string') {
+          content = content
+            .replace(/!\[[^\]]*\]\([^)]+\)/g, '[图片]')
+            .replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=\s]+/gi, '[图片]')
+            .replace(/^📁\s*原图：.*$/gm, '')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+        } else if (Array.isArray(content)) {
+          content = content.map(part => {
+            const isMedia = part && (part.type === 'image_url' || part.type === 'video_url');
+            if (isMedia && !(index === lastUserIndex && message.role === 'user')) {
+              return { type: 'text', text: part.type === 'video_url' ? '[视频]' : '[图片]' };
+            }
+            return part;
+          });
+        }
+        return { role: message.role, content };
+      });
+  }
+
   class AIService {
     constructor() { this.config = null; this.useMock = true; }
 
@@ -112,6 +157,7 @@
 
     /** 非流式发送（opts.timeout 可自定义超时毫秒，默认 40s；慢网关/长提示词场景可放宽） */
     async send(messages, opts = {}) {
+      messages = _sanitizeChatMessages(messages);
       if (this.useMock) return this._mock(messages);
       if (this._isAIBrain()) return this._aibrainExecute(messages, null);
       if (!this.config.apiKey) throw new Error('⚠️ 请先配置 API Key');
@@ -123,7 +169,7 @@
           res = await fetch(this.config.baseUrl + '/chat/completions', {
             method: 'POST',
             headers: this._buildHeaders(),
-            body: JSON.stringify({ model: this.config.modelName, messages, ...this._tokenLimitParam(2048), ...this._temperatureParam() }),
+            body: JSON.stringify({ model: this.config.modelName, messages, ...this._tokenLimitParam(8192), ...this._temperatureParam() }),
             signal: AbortSignal.timeout(timeoutMs),
           });
           break;
@@ -163,6 +209,7 @@
      * @returns {Promise<string>} 完整文本
      */
     async stream(messages, onChunk, signal) {
+      messages = _sanitizeChatMessages(messages);
       if (this.useMock) return this._mockStream(messages, onChunk, signal);
       // 哈啰 AI 应用平台：走自定义 execute 接口（非流式），结果一次性回调
       if (this._isAIBrain()) {
@@ -178,8 +225,9 @@
           method: 'POST',
           // 流式请求必须带 Accept: text/event-stream，否则部分网关（如幻视大模型）按非流式处理，导致"憋完整段才返回"
           headers: { ...this._buildHeaders(), 'Accept': 'text/event-stream' },
-          body: JSON.stringify({ model: this.config.modelName, messages, ...this._tokenLimitParam(2048), ...this._temperatureParam(), stream: true }),
-          signal: signal || AbortSignal.timeout(60000),
+          body: JSON.stringify({ model: this.config.modelName, messages, ...this._tokenLimitParam(8192), ...this._temperatureParam(), stream: true }),
+          // 长提示词/多段输出可能超过 1 分钟，默认放宽到 3 分钟
+          signal: signal || AbortSignal.timeout(180000),
         });
       } catch (e) {
         // 用户主动中止（点了停止）：不降级，直接向上抛
@@ -268,11 +316,12 @@
      * @returns {Promise<string>} 完整文本
      */
     async _streamFallback(messages, onChunk, signal) {
+      messages = _sanitizeChatMessages(messages);
       const res = await fetch(this.config.baseUrl + '/chat/completions', {
         method: 'POST',
         headers: this._buildHeaders(),
-        body: JSON.stringify({ model: this.config.modelName, messages, ...this._tokenLimitParam(2048), ...this._temperatureParam() }),
-        signal: signal || AbortSignal.timeout(60000),
+        body: JSON.stringify({ model: this.config.modelName, messages, ...this._tokenLimitParam(8192), ...this._temperatureParam() }),
+        signal: signal || AbortSignal.timeout(180000),
       });
       if (!res.ok) throw new Error(await this._formatHttpError(res));
       const data = await res.json();
@@ -303,6 +352,7 @@
      * @returns {Promise<string>} 应用输出文本
      */
     async _aibrainExecute(messages, signal) {
+      messages = _sanitizeChatMessages(messages);
       const { prompt, images } = this._extractPrompt(messages);
       const base = this.config.baseUrl.replace(/\/+$/, '');
       const url = base + '/AIBrainAIApplication/api/v1/run/execute';
@@ -455,14 +505,25 @@
       return this._isReasoningModel() ? { max_completion_tokens: n } : { max_tokens: n };
     }
 
+    /** Kimi / Moonshot 部分型号（如 kimi-128k）只允许 temperature=1 */
+    _isFixedTemperatureOne() {
+      const name = String((this.config && this.config.modelName) || '').trim().toLowerCase();
+      const provider = String((this.config && this.config.provider) || '').trim().toLowerCase();
+      if (/kimi|moonshot/.test(provider)) return true;
+      return /kimi|moonshot/.test(name);
+    }
+
     /**
-     * 新一代推理模型的 temperature 只支持默认值 1，传其他值（如 0.7）同样会 400：
-     * "Unsupported value: 'temperature' does not support 0.7 with this model."
-     * 因此推理模型直接不传该字段（走模型默认），其余模型保持原有的 0.7。
+     * 温度参数：
+     * - 推理模型：不传（只用默认）
+     * - Kimi/Moonshot：只允许 1，传 0.7 会 400
+     * - 其余模型：0.7
      * @returns {{temperature?:number}}
      */
     _temperatureParam() {
-      return this._isReasoningModel() ? {} : { temperature: 0.7 };
+      if (this._isReasoningModel()) return {};
+      if (this._isFixedTemperatureOne()) return { temperature: 1 };
+      return { temperature: 0.7 };
     }
 
     /**
@@ -488,16 +549,32 @@
      */
     async generateImage(options = {}) {
       const imgCfg = this.imageConfig || {};
-      const imgApiKey = imgCfg.apiKey || this.config?.apiKey;
-      const imgBaseUrl = imgCfg.baseUrl || this.config?.baseUrl;
-      if (!imgApiKey) throw new Error('⚠️ 请先配置 API Key');
-      if (!imgBaseUrl) throw new Error('⚠️ 请先配置生图地址');
-      const model = options.model || imgCfg.modelName || this.config.imageModel || this.config.modelName;
 
       // 汇总所有参考图（支持单图/多图两种入参形式）
       const inputImages = [];
       if (options.imageUrls && Array.isArray(options.imageUrls)) inputImages.push(...options.imageUrls.filter(Boolean));
       if (options.imageUrl && !inputImages.includes(options.imageUrl)) inputImages.push(options.imageUrl);
+
+      // 未上传参考图时优先走本机 ComfyUI。图片编辑仍保留现有云端接口，
+      // 避免把参考图误当成纯文生图处理。
+      if (!inputImages.length && window.comfyUIService && window.comfyUIService.isEnabled()) {
+        return window.comfyUIService.generate({
+          prompt: options.prompt,
+          size: options.size,
+          width: options.width,
+          height: options.height,
+          negativePrompt: options.negativePrompt,
+          seed: options.seed,
+          onProgress: options.onProgress,
+          signal: options.signal,
+        });
+      }
+
+      const imgApiKey = imgCfg.apiKey || this.config?.apiKey;
+      const imgBaseUrl = imgCfg.baseUrl || this.config?.baseUrl;
+      if (!imgApiKey) throw new Error('⚠️ 请先配置 API Key');
+      if (!imgBaseUrl) throw new Error('⚠️ 请先配置生图地址');
+      const model = options.model || imgCfg.modelName || this.config.imageModel || this.config.modelName;
 
       const isGptImage = /gpt-?image/i.test(String(model));
       const hasImages = inputImages.length > 0;

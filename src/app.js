@@ -9,6 +9,9 @@
   const dtService = new window.DingTalkService();
   const yqService = new window.YuqueService();
   const store = new window.SettingsStore();
+  window.settingsStore = store;
+  window.comfyUIService = new window.TeemoComfyUIService(store);
+  window.teemoAudioAnalysis = new window.TeemoAudioAnalysisService(store);
   const takeover = new window.AITakeoverService();
   const dtAI = new window.DingTalkAIService();
   const materialService = new window.MaterialService(store);
@@ -63,10 +66,21 @@
   // Init
   async function init() {
     const model = store.get('model');
-    window.aiService.configure(model);
+    const activeRules = skillService.getRules() || model.systemPrompt || '';
+    window.aiService.configure({ ...model, systemPrompt: activeRules });
     // 注入生图模型配置
     window.aiService.imageConfig = store.get('imageModel') || {};
-    chat.init(model.systemPrompt);
+    chat.init(activeRules);
+
+    // 技能中心保存/恢复规则后，桌面聊天与钉钉机器人同步使用同一份规则。
+    let appliedRules = activeRules;
+    skillService.onChange(() => {
+      const nextRules = skillService.getRules() || '';
+      if (nextRules === appliedRules) return;
+      appliedRules = nextRules;
+      window.aiService.configure({ ...store.get('model'), systemPrompt: nextRules });
+      chat.init(nextRules);
+    });
 
     // 语雀：如果之前保存过 Token，启动时自动尝试连接
     const yqCfg = store.get('yuque');
@@ -172,9 +186,11 @@
       if (_petImg) _petImg.src = _ap.customSkin;
     }
 
-    // 早安/晚报触发：今日首次唤醒 → 早安；下班时段（>=18:00）首次开 → 晚报
+    // 早安/晚报触发（可由设置 work.dailyBriefAuto 关闭自动弹出）
     statsService.recordAwake();
     setTimeout(async () => {
+      const work = store.get('work') || {};
+      if (work.dailyBriefAuto === false) return; // 默认不再自动弹每日播报
       const hour = new Date().getHours();
       const today = statsService.today();
       if (today.petAwakened === 1 && hour < 18) {
@@ -303,6 +319,12 @@
     highlightTab(lastActiveTab);
     openPanelByTab(lastActiveTab);
     pet.hideHoverBubble();
+  };
+
+  // 双击桌宠打开独立聊天窗口；与头顶快捷聊天面板互不冲突。
+  pet.onDoubleClick = () => {
+    closeAll();
+    ipcRenderer.send('open-standalone-chat');
   };
 
   function highlightTab(tabId) {
@@ -2551,16 +2573,20 @@ ${chatContextText}`;
   // 关于
   function showAbout() {
     closeAll(); chat.open();
-    chat.addMsg('bot', '🐾 哈啰桌面助手 v1.0.0\n\n定位：视觉设计师的桌面工作助手\n团队：哈啰两轮设计中心\n\n功能：AI 问答 · 钉钉消息 · 语雀文档 · 需求分析');
+    chat.addMsg('bot', '🐾 Teemo助理 v1.1.1\n\n定位：视觉设计师的桌面工作助手\n团队：哈啰两轮设计中心\n\n功能：AI 问答 · 钉钉消息 · 语雀文档 · 需求分析');
   }
 
-  // 点击空白区域关闭所有面板
-  document.addEventListener('mousedown', (e) => {
+  // 点击空白区域关闭所有面板：短按关闭；长按或拖动保持窗口，便于从外部拖入文件。
+  const OUTSIDE_LONG_PRESS_MS = 420;
+  const OUTSIDE_MOVE_PX = 8;
+  let outsidePress = null;
+
+  function isOutsideInteractiveContent(e) {
     // 图片放大预览打开时，点击只关闭预览，不关闭面板
     const lightbox = document.getElementById('imgLightbox');
-    if (lightbox && lightbox.classList.contains('open')) return;
+    if (lightbox && lightbox.classList.contains('open')) return false;
     // 点击在 lightbox 元素上时也跳过（防止冒泡误关）
-    if (e.target.closest('.img-lightbox')) return;
+    if (e.target.closest('.img-lightbox')) return false;
 
     const isInside = e.target.closest('.panel') ||
                      e.target.closest('.quick-dock') ||
@@ -2569,7 +2595,27 @@ ${chatContextText}`;
                      e.target.closest('.notify-bubble') ||
                      e.target.closest('.hover-bubble') ||
                      e.target.closest('.daily-brief');
-    if (!isInside) {
+    return !isInside;
+  }
+
+  document.addEventListener('mousedown', (e) => {
+    if (e.button !== 0 || !isOutsideInteractiveContent(e)) return;
+    outsidePress = { startedAt: Date.now(), x: e.clientX, y: e.clientY, moved: false };
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!outsidePress) return;
+    const dx = Math.abs(e.clientX - outsidePress.x);
+    const dy = Math.abs(e.clientY - outsidePress.y);
+    if (dx > OUTSIDE_MOVE_PX || dy > OUTSIDE_MOVE_PX) outsidePress.moved = true;
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!outsidePress) return;
+    const press = outsidePress;
+    outsidePress = null;
+    const isShortClick = !press.moved && Date.now() - press.startedAt < OUTSIDE_LONG_PRESS_MS;
+    if (isShortClick && !chat._dragUploadActive) {
       closeAll();
       if (menu.visible) menu.hide();
       if (briefCard.visible) briefCard.hide();
@@ -2582,6 +2628,11 @@ ${chatContextText}`;
     if (chat._fileDialogOpen || dt._dtFileDialogOpen) return;
     closeAll();
     if (menu.visible) menu.hide();
+  });
+
+  // 长按外部通常表示用户正在拖文件：保持聊天窗，下一次短按仍会正常关闭。
+  ipcRenderer.on('external-long-press', () => {
+    outsidePress = null;
   });
 
   // ===== 图片放大预览 + 下载 =====
@@ -2629,22 +2680,6 @@ ${chatContextText}`;
   // 面板关闭按钮统一处理
   document.addEventListener('panel-close-all', () => {
     closeAll();
-  });
-
-  // 窗口失去焦点时关闭所有（切换到其他应用）
-  window.addEventListener('blur', () => {
-    setTimeout(() => {
-      if (!document.hasFocus() && !chat._fileDialogOpen && !dt._dtFileDialogOpen) {
-        if (chat.isOpen) chat.close();
-        if (dt.isOpen) dt.close();
-        if (yq.isOpen) yq.close();
-        if (todos.isOpen) todos.close();
-        if (workspace.isOpen) workspace.close();
-        if (apiPanel.isOpen) apiPanel.close();
-        if (prefPanel.isOpen) prefPanel.close();
-        if (dock.isOpen) dock.close();
-      }
-    }, 600);
   });
 
   init();

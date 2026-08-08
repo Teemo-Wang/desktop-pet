@@ -116,6 +116,8 @@
       if (!this._docked) return;
       const side = this._docked;
       this._docked = null;
+      this._clickTimer = null;
+      this.onDoubleClick = null;
       this.el.classList.remove('docked', 'docked-left', 'docked-right');
       this._posX = side === 'left' ? UNDOCK_INSET : window.innerWidth - PET_W - UNDOCK_INSET;
       this._animate();
@@ -246,9 +248,24 @@
           if (this._docked) {
             this._undock();
           } else if (this.onClick) {
-            this.onClick();
+            clearTimeout(this._clickTimer);
+            this._clickTimer = setTimeout(() => {
+              this._clickTimer = null;
+              if (this.onClick) this.onClick();
+            }, 260);
           }
         }
+      });
+
+      this.el.addEventListener('dblclick', e => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        clearTimeout(this._clickTimer);
+        this._clickTimer = null;
+        this._downTime = 0;
+        this._dragging = false;
+        if (this._docked) this._undock();
+        if (this.onDoubleClick) this.onDoubleClick();
       });
 
       this.el.addEventListener('contextmenu', e => {

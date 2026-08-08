@@ -1,8 +1,190 @@
-const { app, BrowserWindow, screen, ipcMain, session, net, dialog } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, session, net, dialog, shell, nativeImage, Tray, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { spawn } = require('child_process');
+const mammoth = require('mammoth');
+const pdfParse = require('pdf-parse');
 const dingtalkBridge = require('./dingtalk-bridge');
 const materialBridge = require('./material-bridge');
+
+const isWindows = process.platform === 'win32';
+const appIcon = path.join(__dirname, 'icon', isWindows ? 'Teemo-app.png' : 'app.icns');
+const TEEMO_ARCHIVE_DIR = 'D:\\Teemo助手';
+const TEEMO_COMFY_OUTPUT_DIR = 'I:\\ComfyUI\\ComfyUI\\output';
+const LOCAL_ACCESS_FILE = 'local-file-access.json';
+const LOCAL_DOC_MAX_BYTES = 15 * 1024 * 1024;
+const LOCAL_DOC_MAX_TEXT = 60000;
+const LOCAL_TEXT_EXTENSIONS = new Set([
+  '.txt', '.md', '.json', '.csv', '.log', '.html', '.css', '.js', '.ts', '.jsx', '.tsx',
+  '.py', '.java', '.c', '.cpp', '.h', '.yaml', '.yml', '.xml', '.sql', '.sh', '.ps1',
+]);
+
+function localAccessFilePath() {
+  return path.join(app.getPath('userData'), LOCAL_ACCESS_FILE);
+}
+
+function loadLocalAccessRoots() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(localAccessFilePath(), 'utf8'));
+    return Array.isArray(raw) ? raw.filter(item => typeof item === 'string' && item.trim()) : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveLocalAccessRoots(roots) {
+  const filePath = localAccessFilePath();
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify([...new Set(roots)], null, 2), 'utf8');
+}
+
+function canonicalLocalPath(filePath) {
+  return fs.realpathSync.native(String(filePath || ''));
+}
+
+function isPathWithinRoot(rootPath, targetPath) {
+  const relative = path.relative(rootPath, targetPath);
+  return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+}
+
+function resolveAuthorizedLocalPath(filePath) {
+  const target = canonicalLocalPath(filePath);
+  const roots = loadLocalAccessRoots().map(root => {
+    try { return canonicalLocalPath(root); } catch (_) { return null; }
+  }).filter(Boolean);
+  const root = roots.find(item => isPathWithinRoot(item, target));
+  if (!root) throw new Error('文件不在已授权目录内');
+  return { target, root };
+}
+
+async function localDocumentContent(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  const stat = fs.statSync(filePath);
+  if (!stat.isFile()) throw new Error('目标不是文件');
+  if (stat.size > LOCAL_DOC_MAX_BYTES) throw new Error('文件超过 15 MB');
+  if (!LOCAL_TEXT_EXTENSIONS.has(ext) && ext !== '.pdf' && ext !== '.docx') {
+    throw new Error('暂不支持此文件格式，请选择 TXT、Markdown、代码、PDF 或 DOCX');
+  }
+  const buffer = fs.readFileSync(filePath);
+  let content = '';
+  if (ext === '.pdf') content = (await pdfParse(buffer)).text || '';
+  else if (ext === '.docx') content = (await mammoth.extractRawText({ buffer })).value || '';
+  else content = buffer.toString('utf8');
+  content = content.replace(/\u0000/g, '').trim();
+  if (!content) throw new Error('文件中没有可读取的文本');
+  if (content.length > LOCAL_DOC_MAX_TEXT) content = `${content.slice(0, LOCAL_DOC_MAX_TEXT)}\n\n[文件内容过长，已截取前 60000 字]`;
+  return { content, size: stat.size, ext };
+}
+
+function readImageBuffer(imageUrl) {
+  if (String(imageUrl || '').startsWith('data:')) {
+    const base64 = String(imageUrl).split(',')[1] || '';
+    return Buffer.from(base64, 'base64');
+  }
+  return new Promise((resolve, reject) => {
+    const request = net.request(String(imageUrl));
+    const chunks = [];
+    request.on('response', response => {
+      response.on('data', chunk => chunks.push(chunk));
+      response.on('end', () => resolve(Buffer.concat(chunks)));
+    });
+    request.on('error', reject);
+    request.end();
+  });
+}
+
+function sanitizeFilePart(value, fallback) {
+  return String(value || fallback).slice(0, 40).replace(/[\\/:*?"<>|\s]+/g, '_').replace(/_+/g, '_') || fallback;
+}
+
+ipcMain.handle('teemo:open-folder', async (_event, { folderPath } = {}) => {
+  try {
+    const target = String(folderPath || TEEMO_COMFY_OUTPUT_DIR);
+    if (!fs.existsSync(target)) fs.mkdirSync(target, { recursive: true });
+    const result = await shell.openPath(target);
+    if (result) return { ok: false, error: result };
+    return { ok: true, path: target };
+  } catch (error) {
+    return { ok: false, error: error.message || String(error) };
+  }
+});
+
+function toFileUrl(filePath) {
+  const normalized = String(filePath || '').replace(/\\/g, '/');
+  if (!normalized) return '';
+  return normalized.startsWith('file://') ? normalized : `file:///${normalized.replace(/^\/+/, '')}`;
+}
+
+function writeThumbnail(buffer, thumbPath, maxWidth = 320) {
+  try {
+    const image = nativeImage.createFromBuffer(buffer);
+    if (!image || image.isEmpty()) return false;
+    const size = image.getSize();
+    const width = Math.min(maxWidth, size.width || maxWidth);
+    const resized = size.width > width ? image.resize({ width }) : image;
+    fs.writeFileSync(thumbPath, resized.toJPEG(82));
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+ipcMain.handle('teemo:archive-chat-image', async (_event, options = {}) => {
+  try {
+    const baseDir = String(options.archiveDir || TEEMO_ARCHIVE_DIR);
+    const imagesDir = path.join(baseDir, 'images');
+    const thumbsDir = path.join(baseDir, 'thumbs');
+    const indexFile = path.join(baseDir, '生图记录.txt');
+    if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true });
+    if (!fs.existsSync(thumbsDir)) fs.mkdirSync(thumbsDir, { recursive: true });
+
+    const buffer = await readImageBuffer(options.imageUrl);
+    const stamp = new Date();
+    const fileStamp = [
+      stamp.getFullYear(),
+      String(stamp.getMonth() + 1).padStart(2, '0'),
+      String(stamp.getDate()).padStart(2, '0'),
+      '_',
+      String(stamp.getHours()).padStart(2, '0'),
+      String(stamp.getMinutes()).padStart(2, '0'),
+      String(stamp.getSeconds()).padStart(2, '0'),
+    ].join('');
+    const baseName = `${fileStamp}_${sanitizeFilePart(options.userPrompt, '生图')}`;
+    const fileName = `${baseName}.png`;
+    const thumbName = `${baseName}_thumb.jpg`;
+    const filePath = path.join(imagesDir, fileName);
+    const thumbPath = path.join(thumbsDir, thumbName);
+    fs.writeFileSync(filePath, buffer);
+    const hasThumb = writeThumbnail(buffer, thumbPath);
+
+    const timeText = stamp.toLocaleString('zh-CN', { hour12: false });
+    const lines = [
+      `[${timeText}] ${String(options.userPrompt || '生图').trim()}`,
+      `  图片文件: ${filePath}`,
+    ];
+    if (hasThumb) lines.push(`  缩略图: ${thumbPath}`);
+    if (options.directUrl) lines.push(`  原始链接: ${options.directUrl}`);
+    if (options.source) lines.push(`  来源: ${options.source}`);
+    lines.push('');
+    fs.appendFileSync(indexFile, lines.join('\n') + '\n', 'utf-8');
+
+    return {
+      ok: true,
+      path: filePath,
+      thumbPath: hasThumb ? thumbPath : filePath,
+      thumbUrl: toFileUrl(hasThumb ? thumbPath : filePath),
+      indexFile,
+    };
+  } catch (error) {
+    return { ok: false, error: error.message || String(error) };
+  }
+});
+
+
+// Windows 通知、任务栏分组和安装包快捷方式使用同一个稳定 ID。
+if (isWindows) {
+  app.setAppUserModelId('cn.hellobike.desktop-pet');
+}
 
 // ===== 全局错误兜底 =====
 // 退出 / 断网时，主进程里在途的网络请求（钉钉 Stream、语雀等）可能抛
@@ -54,7 +236,7 @@ function setupAutoUpdate() {
         defaultId: 0,
         cancelId: 1,
         title: '发现新版本',
-        message: `哈啰设计助手 ${info && info.version} 已下载完成`,
+        message: `Teemo助理 ${info && info.version} 已下载完成`,
         detail: '重启后即可使用最新版本（含最新的机器人规则与能力）。',
       });
       if (response === 0) autoUpdater.quitAndInstall();
@@ -75,6 +257,60 @@ app.commandLine.appendSwitch('disable-gpu-sandbox');
 app.commandLine.appendSwitch('disable-software-rasterizer');
 
 let mainWindow;
+let chatWindow = null;
+let tray = null;
+let mouseProbeProcess = null;
+let mouseProbeOutput = '';
+const mouseProbeCallbacks = [];
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+
+function startMouseProbe() {
+  if (!isWindows || (mouseProbeProcess && !mouseProbeProcess.killed)) return;
+  const probePath = app.isPackaged
+    ? path.join(process.resourcesPath, 'app.asar.unpacked', 'Teemo-mouse-press.ps1')
+    : path.join(__dirname, 'Teemo-mouse-press.ps1');
+  mouseProbeProcess = spawn('powershell.exe', [
+    '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+    '-File', probePath,
+  ], { windowsHide: true });
+  mouseProbeProcess.stdout.on('data', chunk => {
+    mouseProbeOutput += String(chunk);
+    const lines = mouseProbeOutput.split(/\r?\n/);
+    mouseProbeOutput = lines.pop() || '';
+    for (const line of lines) {
+      const callback = mouseProbeCallbacks.shift();
+      if (callback) callback(line.trim() === 'long' ? 'long' : 'short');
+    }
+  });
+  mouseProbeProcess.on('exit', () => {
+    mouseProbeProcess = null;
+    while (mouseProbeCallbacks.length) mouseProbeCallbacks.shift()('short');
+  });
+  mouseProbeProcess.on('error', () => {
+    while (mouseProbeCallbacks.length) mouseProbeCallbacks.shift()('short');
+  });
+}
+
+function probeExternalMousePress() {
+  if (!isWindows) return Promise.resolve('short');
+  startMouseProbe();
+  return new Promise(resolve => {
+    mouseProbeCallbacks.push(resolve);
+    try { mouseProbeProcess.stdin.write('probe\n'); }
+    catch (e) { mouseProbeCallbacks.pop(); resolve('short'); }
+  });
+}
+
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  });
+}
 
 function getConfig() {
   const configPath = path.join(__dirname, 'config.json');
@@ -124,20 +360,20 @@ async function setupProxy() {
 
 function createWindow() {
   const display = screen.getPrimaryDisplay();
-  const { width: screenWidth, height: screenHeight } = display.workAreaSize;
+  const { x: screenX, y: screenY, width: screenWidth, height: screenHeight } = display.workArea;
   console.log('[window] 主屏工作区尺寸:', screenWidth, 'x', screenHeight, ' 显示器数量:', screen.getAllDisplays().length);
 
   mainWindow = new BrowserWindow({
     // 覆盖整个屏幕工作区
-    x: 0,
-    y: 0,
+    x: screenX,
+    y: screenY,
     width: screenWidth,
     height: screenHeight,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
     skipTaskbar: true,
-    icon: path.join(__dirname, 'icon', 'app.icns'),
+    icon: appIcon,
     hasShadow: false,
     resizable: false,
     show: false,
@@ -164,8 +400,8 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    mainWindow.setAlwaysOnTop(true, 'floating');
-    mainWindow.setVisibleOnAllWorkspaces(true);
+    mainWindow.setAlwaysOnTop(true, isWindows ? 'normal' : 'floating');
+    if (!isWindows) mainWindow.setVisibleOnAllWorkspaces(true);
     setupBlurHandler();
   });
 }
@@ -195,7 +431,7 @@ ipcMain.on('enable-passthrough', () => {
 
 // 置顶切换
 ipcMain.on('toggle-always-on-top', (event, value) => {
-  mainWindow.setAlwaysOnTop(value, 'floating');
+  mainWindow.setAlwaysOnTop(value, isWindows ? 'normal' : 'floating');
 });
 
 // 透明度设置
@@ -205,10 +441,214 @@ ipcMain.on('set-opacity', (event, value) => {
 
 // 主进程监听窗口失焦
 function setupBlurHandler() {
-  mainWindow.on('blur', () => {
-    mainWindow.webContents.send('window-blurred');
+  mainWindow.on('blur', async () => {
+    if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.isVisible()) return;
+    if (!isWindows) {
+      mainWindow.webContents.send('window-blurred');
+      return;
+    }
+
+    // Windows 透明窗口会在用户从资源管理器拖文件时失焦。
+    // 等待本次鼠标操作结束，再区分短按与长按：短按关闭，长按保留面板供拖放。
+    const result = await probeExternalMousePress();
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.webContents.send(result === 'long' ? 'external-long-press' : 'window-blurred');
   });
 }
+
+function openStandaloneChatWindow() {
+  if (chatWindow && !chatWindow.isDestroyed()) {
+    if (chatWindow.isMinimized()) chatWindow.restore();
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
+    chatWindow.show();
+    chatWindow.focus();
+    return;
+  }
+
+  // 桌宠主窗口是透明全屏且始终置顶。独立聊天激活时将它隐藏，
+  // 避免鼠标移动触发穿透切换，与聊天窗口争抢层级造成闪烁。
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
+
+  chatWindow = new BrowserWindow({
+    width: 1320,
+    height: 820,
+    minWidth: 900,
+    minHeight: 620,
+    show: false,
+    frame: true,
+    titleBarStyle: 'hidden',
+    titleBarOverlay: isWindows ? { color: '#171717', symbolColor: '#d8d8d8', height: 44 } : undefined,
+    backgroundColor: '#171717',
+    icon: appIcon,
+    autoHideMenuBar: true,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+      spellcheck: false,
+    },
+  });
+  chatWindow.setMenuBarVisibility(false);
+  chatWindow.loadFile(path.join(__dirname, 'Teemo-chat-window', 'Teemo-chat-window.html'));
+  chatWindow.once('ready-to-show', () => {
+    if (!chatWindow || chatWindow.isDestroyed()) return;
+    chatWindow.maximize();
+    chatWindow.show();
+    chatWindow.focus();
+  });
+  chatWindow.on('focus', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
+  });
+  chatWindow.on('minimize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.showInactive();
+  });
+  chatWindow.on('restore', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
+  });
+  chatWindow.on('closed', () => {
+    chatWindow = null;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.showInactive();
+      mainWindow.setAlwaysOnTop(true, isWindows ? 'normal' : 'floating');
+    }
+  });
+}
+
+function createSystemTray() {
+  if (tray) return;
+  let trayIcon = nativeImage.createFromPath(appIcon);
+  if (!trayIcon.isEmpty() && isWindows) trayIcon = trayIcon.resize({ width: 16, height: 16 });
+  tray = new Tray(trayIcon);
+  tray.setToolTip('Teemo 私人助理');
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: '打开 Teemo 聊天', click: openStandaloneChatWindow },
+    {
+      label: '显示桌宠',
+      click: () => {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        if (chatWindow && !chatWindow.isDestroyed()) chatWindow.hide();
+        mainWindow.showInactive();
+        mainWindow.setAlwaysOnTop(true, isWindows ? 'normal' : 'floating');
+      },
+    },
+    {
+      label: '隐藏桌宠',
+      click: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
+      },
+    },
+    { type: 'separator' },
+    { label: '退出 Teemo', click: () => app.quit() },
+  ]));
+  tray.on('click', openStandaloneChatWindow);
+  tray.on('double-click', openStandaloneChatWindow);
+}
+
+ipcMain.on('open-standalone-chat', () => openStandaloneChatWindow());
+ipcMain.handle('get-app-version', () => app.getVersion());
+ipcMain.handle('check-for-updates', async () => {
+  if (!autoUpdater || !app.isPackaged) {
+    return { ok: false, currentVersion: app.getVersion(), error: '开发模式不检查安装包更新' };
+  }
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    const latestVersion = result && result.updateInfo && result.updateInfo.version;
+    return {
+      ok: true,
+      currentVersion: app.getVersion(),
+      latestVersion: latestVersion || app.getVersion(),
+      updateAvailable: !!latestVersion && latestVersion !== app.getVersion(),
+    };
+  } catch (error) {
+    return { ok: false, currentVersion: app.getVersion(), error: error && error.message ? error.message : '检查更新失败' };
+  }
+});
+
+ipcMain.handle('teemo:local-access-list', () => {
+  const roots = loadLocalAccessRoots().filter(root => fs.existsSync(root));
+  return { ok: true, roots };
+});
+
+ipcMain.handle('teemo:local-access-add', async event => {
+  try {
+    const owner = BrowserWindow.fromWebContents(event.sender) || chatWindow || mainWindow;
+    const result = await dialog.showOpenDialog(owner, {
+      title: '选择允许 Teemo 读取的文件夹',
+      properties: ['openDirectory'],
+    });
+    if (result.canceled || !result.filePaths.length) return { ok: false, canceled: true };
+    const selected = canonicalLocalPath(result.filePaths[0]);
+    const roots = loadLocalAccessRoots();
+    if (!roots.some(root => String(root).toLowerCase() === selected.toLowerCase())) roots.push(selected);
+    saveLocalAccessRoots(roots);
+    return { ok: true, roots, selected };
+  } catch (error) {
+    return { ok: false, error: error.message || String(error) };
+  }
+});
+
+ipcMain.handle('teemo:local-access-remove', (_event, { rootPath } = {}) => {
+  try {
+    const selected = String(rootPath || '');
+    const roots = loadLocalAccessRoots().filter(root => root.toLowerCase() !== selected.toLowerCase());
+    saveLocalAccessRoots(roots);
+    return { ok: true, roots };
+  } catch (error) {
+    return { ok: false, error: error.message || String(error) };
+  }
+});
+
+ipcMain.handle('teemo:local-list-directory', (_event, { rootPath, relativePath = '' } = {}) => {
+  try {
+    const base = resolveAuthorizedLocalPath(rootPath).target;
+    const requested = canonicalLocalPath(path.resolve(base, String(relativePath || '')));
+    if (!isPathWithinRoot(base, requested)) throw new Error('目录路径超出授权范围');
+    const entries = fs.readdirSync(requested, { withFileTypes: true })
+      .filter(entry => !entry.name.startsWith('.'))
+      .slice(0, 300)
+      .map(entry => ({
+        name: entry.name,
+        path: path.join(requested, entry.name),
+        relativePath: path.relative(base, path.join(requested, entry.name)),
+        isDirectory: entry.isDirectory(),
+      }))
+      .sort((a, b) => Number(b.isDirectory) - Number(a.isDirectory) || a.name.localeCompare(b.name, 'zh-CN'));
+    return { ok: true, root: base, path: requested, entries };
+  } catch (error) {
+    return { ok: false, error: error.message || String(error) };
+  }
+});
+
+ipcMain.handle('teemo:local-pick-document', async event => {
+  try {
+    const roots = loadLocalAccessRoots().filter(root => fs.existsSync(root));
+    if (!roots.length) return { ok: false, needsAuthorization: true, error: '请先在设置中授权一个文件夹' };
+    const owner = BrowserWindow.fromWebContents(event.sender) || chatWindow || mainWindow;
+    const result = await dialog.showOpenDialog(owner, {
+      title: '选择要让 Teemo 读取的本地文档',
+      defaultPath: roots[0],
+      properties: ['openFile'],
+      filters: [
+        { name: '文档', extensions: ['txt', 'md', 'json', 'csv', 'log', 'html', 'css', 'js', 'ts', 'jsx', 'tsx', 'py', 'java', 'c', 'cpp', 'h', 'yaml', 'yml', 'xml', 'sql', 'sh', 'ps1', 'pdf', 'docx'] },
+      ],
+    });
+    if (result.canceled || !result.filePaths.length) return { ok: false, canceled: true };
+    const { target, root } = resolveAuthorizedLocalPath(result.filePaths[0]);
+    const parsed = await localDocumentContent(target);
+    return { ok: true, path: target, root, name: path.basename(target), ...parsed };
+  } catch (error) {
+    return { ok: false, error: error.message || String(error) };
+  }
+});
+
+ipcMain.handle('teemo:local-read-document', async (_event, { filePath } = {}) => {
+  try {
+    const { target, root } = resolveAuthorizedLocalPath(filePath);
+    const parsed = await localDocumentContent(target);
+    return { ok: true, path: target, root, name: path.basename(target), ...parsed };
+  } catch (error) {
+    return { ok: false, error: error.message || String(error) };
+  }
+});
 
 // 面板拉伸 — 不再调整窗口，面板限制在窗口范围内
 ipcMain.on('resize-panels', (event, { width, height }) => {
@@ -567,18 +1007,25 @@ ipcMain.handle('material:image', async (event, { token, url }) => {
   return await materialBridge.dhImage(token, url);
 });
 
-app.whenReady().then(async () => {
+if (gotSingleInstanceLock) app.whenReady().then(async () => {
   // macOS Dock 图标（必须在窗口创建前设置）
   if (app.dock) {
     app.dock.setIcon(path.join(__dirname, 'icon', 'dock-icon.png'));
   }
   await setupProxy();
+  startMouseProbe();
   createWindow();
+  createSystemTray();
   setupAutoUpdate();
 });
 // 退出前：标记退出中 + 关闭钉钉长连接，避免在途请求被中断后抛 net::ERR_FAILED 弹窗
 app.on('before-quit', () => {
   _isQuitting = true;
+  if (tray) {
+    tray.destroy();
+    tray = null;
+  }
+  try { if (mouseProbeProcess) mouseProbeProcess.kill(); } catch (e) { /* ignore */ }
   try { if (dtStreamClient) { dtStreamClient.close(); dtStreamClient = null; } } catch (e) { /* ignore */ }
 });
 app.on('window-all-closed', () => app.quit());

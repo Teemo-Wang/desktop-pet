@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>哈啰桌面助手</title>
+  <title>Teemo助理</title>
   <link rel="stylesheet" href="src/styles/base.css">
   <link rel="stylesheet" href="src/styles/pet.css">
   <link rel="stylesheet" href="src/styles/panels.css">
@@ -37,10 +37,10 @@
       <div class="chat-pending-preview" style="display:none"></div>
       <div class="chat-input-row">
         <input class="chat-input" placeholder="问我任何设计相关的问题..." autocomplete="off">
-        <button class="chat-upload-btn" title="上传图片素材">
+        <button class="chat-upload-btn" title="上传图片或视频素材（MP4、MOV）">
           <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
         </button>
-        <input type="file" class="chat-file-input" accept="image/*" multiple style="display:none">
+        <input type="file" class="chat-file-input" accept="image/*,video/mp4,video/quicktime,.mp4,.mov" multiple style="display:none">
         <button class="chat-send-btn"><svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button>
       </div>
     </div>
@@ -96,6 +96,11 @@
 
   <!-- 模块加载 -->
   <script src="src/stores/settings.js"></script>
+  <script src="src/services/Teemo-comfyui.js"></script>
+  <script src="src/services/Teemo-audio-analysis.js"></script>
+  <script src="src/services/Teemo-image-intent.js"></script>
+  <script src="src/services/Teemo-image-archive.js"></script>
+  <script src="src/services/Teemo-web-browse.js"></script>
   <script src="src/services/ai.js"></script>
   <script src="src/services/ai-takeover.js"></script>
   <script src="src/services/skills.js"></script>
@@ -113,6 +118,7 @@
   <script src="src/services/yuque-cache.js"></script>
   <script src="src/services/yuque.js"></script>
   <script src="src/services/yuque-search.js"></script>
+  <script src="src/services/Teemo-message-sanitize.js"></script>
   <script src="src/services/chat-history.js"></script>
   <script src="src/services/daily-brief.js"></script>
   <script src="src/utils/context-builder.js"></script>

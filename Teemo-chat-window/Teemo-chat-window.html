@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Teemo 私人助理</title>
+  <link rel="stylesheet" href="Teemo-chat-window.css">
+</head>
+<body>
+  <div class="teemo-app-shell">
+    <header class="teemo-titlebar">
+      <div class="teemo-titlebar-brand">
+        <img src="../icon/Teemo-app.png" alt="Teemo">
+        <span>Teemo</span>
+        <small>私人助理</small>
+      </div>
+    </header>
+
+    <div class="teemo-workspace">
+      <aside class="teemo-sidebar">
+        <button class="teemo-new-chat" id="newChatButton">
+          <span>＋</span><strong>新建对话</strong>
+        </button>
+        <div class="teemo-history-label-row">
+          <div class="teemo-history-label">对话历史</div>
+          <button type="button" class="teemo-history-new-folder" id="newFolderButton" title="新建分组">＋分组</button>
+        </div>
+        <div class="teemo-history" id="historyList"></div>
+        <button class="teemo-sidebar-foot" id="settingsButton" title="打开设置">
+          <img src="../icon/Teemo-app.png" alt="">
+          <div><strong>Teemo</strong><span id="modelLabel">私人助理</span></div>
+          <span class="teemo-settings-chevron">›</span>
+        </button>
+      </aside>
+
+      <main class="teemo-main" id="chatView">
+        <div class="teemo-chat-head">
+          <div>
+            <div class="teemo-chat-title-row">
+              <h1 id="chatTitle" title="双击重命名">新对话</h1>
+              <button class="teemo-rename-button" id="renameChatButton" title="重命名对话">✎</button>
+            </div>
+            <span id="chatStatus">随时可以开始</span>
+          </div>
+          <button class="teemo-head-action" id="clearChatButton" title="清空当前对话">清空</button>
+        </div>
+
+        <div class="teemo-chat-body">
+          <section class="teemo-messages" id="messageList"></section>
+          <button type="button" class="teemo-scroll-bottom" id="scrollBottomButton" hidden title="回到底部">↓</button>
+        </div>
+
+        <div class="teemo-composer-wrap">
+          <div class="teemo-drop-zone" id="dropZone">
+            <div class="teemo-attachments" id="attachmentList"></div>
+            <textarea id="messageInput" rows="1" placeholder="随心输入，拖文件到这里，或 Ctrl+V 粘贴图片…"></textarea>
+            <div class="teemo-composer-tools">
+              <div class="teemo-composer-left">
+                <button id="uploadButton" class="teemo-tool-button" title="上传文件">＋</button>
+                <button id="localDocumentButton" class="teemo-tool-button teemo-local-document-button" type="button" title="从已授权文件夹读取本地文档">本地文件</button>
+                <input id="fileInput" type="file" multiple hidden
+                  accept="image/*,video/mp4,video/quicktime,.mp4,.mov,.txt,.md,.json,.csv,.log,.html,.css,.js,.ts,.jsx,.tsx,.py,.java,.c,.cpp,.h,.yaml,.yml,.xml,.pdf,.docx">
+                <span>支持图片、MP4/MOV、文本、代码、PDF、DOCX</span>
+              </div>
+              <div class="teemo-composer-right">
+                <button id="contextMeter" class="teemo-context-meter" type="button" title="上下文用量" aria-label="上下文用量">
+                  <svg viewBox="0 0 36 36" aria-hidden="true">
+                    <circle class="teemo-context-meter-track" cx="18" cy="18" r="14" fill="none"></circle>
+                    <circle class="teemo-context-meter-fill" cx="18" cy="18" r="14" fill="none"></circle>
+                  </svg>
+                </button>
+                <div id="quickModelSelect" class="teemo-quick-model">
+                  <button id="quickModelButton" class="teemo-quick-model-button" type="button" title="快速切换当前对话模型">
+                    <span id="quickModelLabel">选择模型</span><span class="teemo-quick-model-arrow">⌄</span>
+                  </button>
+                  <div id="quickModelMenu" class="teemo-quick-model-menu" hidden></div>
+                </div>
+                <button id="sendButton" class="teemo-send-button" title="发送">
+                  <svg viewBox="0 0 24 24"><path d="M12 4l-7 7 1.4 1.4 4.6-4.6V20h2V7.8l4.6 4.6L19 11z"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <main class="teemo-settings-page" id="settingsView" hidden>
+        <div class="teemo-settings-head">
+          <button id="settingsBackButton" class="teemo-back-button">← 返回聊天</button>
+          <div><h1>设置</h1><p>配置模型和管理 Teemo 的 Skill</p></div>
+        </div>
+        <div class="teemo-settings-content">
+          <section class="teemo-settings-card">
+            <div class="teemo-card-heading"><div><h2>API 与模型</h2><p>独立聊天和桌宠会共用这套配置</p></div><span id="apiSaveStatus"></span></div>
+            <div class="teemo-saved-block">
+              <div class="teemo-saved-block-title"><strong>已保存连接</strong><span>点击即可立即切换</span></div>
+              <div class="teemo-api-connections" id="apiConnectionList"></div>
+            </div>
+            <details class="teemo-settings-collapse" id="apiFormCollapse">
+              <summary><strong>编辑接口详情</strong><span>点击展开备注、地址、Key 和生图触发方式</span></summary>
+              <div class="teemo-collapse-body teemo-form-grid">
+                <label class="teemo-form-wide"><span>接口备注名称</span><input id="apiRemarkName" placeholder="例如：Grok 主力接口、GPT 备用接口"></label>
+                <label><span>服务商</span><select id="apiProvider">
+                  <option value="deepseek">DeepSeek</option><option value="openai">OpenAI</option>
+                  <option value="qwen">通义千问</option><option value="zhipu">智谱</option>
+                  <option value="kimi">Kimi</option><option value="custom">自定义兼容接口</option>
+                </select></label>
+                <label><span>模型名称</span><input id="apiModelName" placeholder="deepseek-chat"></label>
+                <label class="teemo-form-wide"><span>Base URL</span><input id="apiBaseUrl" placeholder="https://api.deepseek.com/v1"></label>
+                <label class="teemo-form-wide"><span>API Key</span><div class="teemo-secret-field"><input id="apiKey" type="password" placeholder="输入 API Key"><button id="toggleApiKey" type="button">显示</button></div></label>
+              </div>
+              <div class="teemo-collapse-body teemo-form-grid">
+                <div class="teemo-form-wide">
+                  <span class="teemo-field-label">生图触发方式</span>
+                  <label class="teemo-check-label"><input id="imageIntentAi" type="radio" name="imageIntentMode" value="ai"><span>AI 智能判断（推荐）— 由 API 理解你是否真要出图</span></label>
+                  <label class="teemo-check-label"><input id="imageIntentKeyword" type="radio" name="imageIntentMode" value="keyword"><span>关键词触发 — 消息里带「生图 / 画图」等词才出图</span></label>
+                </div>
+                <label class="teemo-form-wide teemo-check-label"><input id="webBrowseEnabled" type="checkbox"><span>联网读取网页链接 — 消息里有 http 链接时自动抓取正文给模型</span></label>
+              </div>
+            </details>
+            <div class="teemo-card-actions">
+              <button class="teemo-secondary-button" id="newApiButton" type="button">＋ 新增接口</button>
+              <button class="teemo-secondary-button" id="pauseApiButton" type="button">暂停使用</button>
+              <button class="teemo-secondary-button teemo-danger-button" id="deleteApiButton" type="button">删除当前接口</button>
+              <button class="teemo-secondary-button" id="testApiButton" type="button">测试 API 连接</button>
+              <button class="teemo-primary-button" id="saveApiButton">保存 API 配置</button>
+            </div>
+          </section>
+
+          <section class="teemo-settings-card teemo-local-access-card">
+            <div class="teemo-card-heading">
+              <div><h2>本地文件读取权限</h2><p>Teemo 只能读取你主动授权的文件夹，默认只读</p></div>
+              <span id="localAccessStatus"></span>
+            </div>
+            <div class="teemo-local-access-list" id="localAccessList"></div>
+            <div class="teemo-card-actions">
+              <button class="teemo-primary-button" id="addLocalAccessButton" type="button">授权文件夹</button>
+            </div>
+          </section>
+
+          <section class="teemo-settings-card">
+            <div class="teemo-card-heading"><div><h2>视频音频分析</h2><p>自动提取 MP4/MOV 音轨，识别人声、音乐、节奏和乐器</p></div><span id="audioApiSaveStatus"></span></div>
+            <details class="teemo-settings-collapse" id="audioApiFormCollapse">
+              <summary><strong>编辑音频分析 API</strong><span>留空 Key 和地址时，自动复用已保存的 GPT/OpenAI 接口</span></summary>
+              <div class="teemo-collapse-body teemo-form-grid">
+                <label class="teemo-form-wide teemo-check-label"><input id="audioAnalysisEnabled" type="checkbox"><span>上传视频时自动分析音轨</span></label>
+                <label><span>音频理解模型</span><input id="audioAnalysisModel" placeholder="gpt-audio-1.5"></label>
+                <label><span>语音转写回退模型</span><input id="audioTranscriptionModel" placeholder="gpt-4o-mini-transcribe"></label>
+                <label class="teemo-form-wide"><span>音频 Base URL</span><input id="audioApiBaseUrl" placeholder="留空=自动复用 GPT 接口"></label>
+                <label class="teemo-form-wide"><span>音频 API Key</span><div class="teemo-secret-field"><input id="audioApiKey" type="password" placeholder="留空=自动复用 GPT 接口 Key"><button id="toggleAudioApiKey" type="button">显示</button></div></label>
+              </div>
+              <div class="teemo-comfy-hint">推荐 gpt-audio-1.5；若兼容接口不支持音频理解，会自动回退到 gpt-4o-mini-transcribe 识别人声。音轨在本机压缩后发送，临时文件会自动删除。</div>
+            </details>
+            <div class="teemo-card-actions">
+              <button class="teemo-primary-button" id="saveAudioApiButton" type="button">保存音频分析配置</button>
+            </div>
+          </section>
+
+          <section class="teemo-settings-card">
+            <div class="teemo-card-heading"><div><h2>生图 API</h2><p>云端文生图接口；ComfyUI 关闭时会走这里。Key / 地址留空则复用上方对话 API</p></div><span id="imageApiSaveStatus"></span></div>
+            <details class="teemo-settings-collapse" id="imageApiFormCollapse">
+              <summary><strong>编辑生图 API</strong><span>点击展开模型、尺寸、地址和 Key</span></summary>
+              <div class="teemo-collapse-body teemo-form-grid">
+                <label class="teemo-form-wide"><span>接口备注名称</span><input id="imageApiLabel" placeholder="例如：Seedream 生图、GPT-Image"></label>
+                <label><span>生图模型名称</span><input id="imageApiModelName" placeholder="doubao-seedream-4-5-251128"></label>
+                <label><span>默认尺寸</span><input id="imageApiSize" placeholder="2048x2048"></label>
+                <label class="teemo-form-wide"><span>生图 Base URL</span><input id="imageApiBaseUrl" placeholder="留空=复用对话地址，例如 https://ai.hctopup.com/v1"></label>
+                <label class="teemo-form-wide"><span>生图 API Key</span><div class="teemo-secret-field"><input id="imageApiKey" type="password" placeholder="留空=复用对话 Key"><button id="toggleImageApiKey" type="button">显示</button></div></label>
+              </div>
+              <div class="teemo-comfy-hint">推荐模型：Doubao-Seedream、gpt-image-1、gpt-image-2。填好后，关闭 ComfyUI 本地引擎时，聊天里识别到生图意图会走这个云端接口。</div>
+            </details>
+            <div class="teemo-card-actions">
+              <button class="teemo-secondary-button" id="testImageApiButton" type="button">测试生图连接</button>
+              <button class="teemo-primary-button" id="saveImageApiButton" type="button">保存生图 API</button>
+            </div>
+          </section>
+
+          <section class="teemo-settings-card">
+            <div class="teemo-card-heading"><div><h2>ComfyUI 本地生图</h2><p>直接使用这台电脑的 RTX 4070 Ti 生成图片并返回聊天</p></div><span id="comfySaveStatus"></span></div>
+            <div class="teemo-comfy-status" id="comfyConnectionStatus"><span class="teemo-status-dot"></span><strong>尚未检测</strong><span>默认地址 http://127.0.0.1:8188</span></div>
+            <div class="teemo-saved-block">
+              <div class="teemo-saved-block-title"><strong>当前工作流</strong><span>导入 ComfyUI 的 API JSON 后可快速切换</span></div>
+              <div class="teemo-workflow-controls">
+                <select id="comfyWorkflowSelect"></select>
+                <button class="teemo-secondary-button" id="importComfyWorkflowButton" type="button">导入 API JSON</button>
+                <button class="teemo-secondary-button teemo-danger-button" id="deleteComfyWorkflowButton" type="button">删除</button>
+              </div>
+              <div class="teemo-workflow-summary" id="comfyWorkflowSummary"></div>
+              <input id="comfyWorkflowFileInput" type="file" accept=".json,application/json" hidden>
+            </div>
+            <details class="teemo-settings-collapse">
+              <summary><strong>生图引擎、参数与存档</strong><span>点击展开引擎设置、高级参数和存档目录</span></summary>
+              <div class="teemo-collapse-body teemo-form-grid">
+                <label class="teemo-form-wide teemo-check-label"><input id="comfyEnabled" type="checkbox"><span>启用 ComfyUI 作为文生图引擎</span></label>
+                <label class="teemo-form-wide"><span>ComfyUI 地址</span><input id="comfyBaseUrl" placeholder="http://127.0.0.1:8188"></label>
+                <label class="teemo-form-wide"><span>Checkpoint 模型</span><select id="comfyCheckpoint"></select></label>
+                <label><span>图片宽度</span><input id="comfyWidth" type="number" min="256" max="2048" step="64"></label>
+                <label><span>图片高度</span><input id="comfyHeight" type="number" min="256" max="2048" step="64"></label>
+                <label><span>采样步数</span><input id="comfySteps" type="number" min="1" max="100"></label>
+                <label><span>CFG</span><input id="comfyCfg" type="number" min="1" max="30" step="0.5"></label>
+                <label class="teemo-form-wide"><span>反向提示词</span><textarea id="comfyNegativePrompt" rows="3"></textarea></label>
+              </div>
+              <div class="teemo-comfy-hint">基础工作流预设为 SDXL · 1024×1024 · 26 步。导入工作流会保留其中的模型、LoRA、VAE、尺寸和采样参数，只替换你的提示词与随机种子。</div>
+              <div class="teemo-saved-block teemo-archive-block">
+                <div class="teemo-saved-block-title"><strong>生图存档</strong><span>聊天里生成的图片会自动保存到本机，并写入索引</span></div>
+                <div class="teemo-archive-grid">
+                  <label class="teemo-form-wide teemo-check-label"><input id="archiveEnabled" type="checkbox"><span>自动存档聊天生图到本地文件夹</span></label>
+                  <label><span>Teemo 存档文件夹</span><input id="archiveDir" placeholder="D:\Teemo助手"></label>
+                  <button class="teemo-secondary-button" id="openArchiveDirButton" type="button">打开存档文件夹</button>
+                  <label><span>ComfyUI 出图目录</span><input id="comfyOutputDir" placeholder="I:\ComfyUI\ComfyUI\output"></label>
+                  <button class="teemo-secondary-button" id="openComfyOutputButton" type="button">打开出图目录</button>
+                </div>
+              </div>
+            </details>
+            <div class="teemo-card-actions">
+              <button class="teemo-secondary-button" id="testComfyButton">检测连接并刷新模型</button>
+              <button class="teemo-primary-button" id="saveComfyButton">保存 ComfyUI 配置</button>
+            </div>
+          </section>
+
+          <section class="teemo-settings-card">
+            <div class="teemo-card-heading">
+              <div><h2>Skill 管理</h2><p>与桌宠共享；点「编辑」会在该 Skill 下方展开填写区</p></div>
+              <div class="teemo-heading-actions">
+                <button class="teemo-secondary-button" id="newSkillGroupButton">新建分组</button>
+                <button class="teemo-secondary-button" id="newSkillButton">新建 Skill</button>
+                <button class="teemo-secondary-button" id="importSkillButton">导入 Markdown</button>
+              </div>
+            </div>
+            <input id="skillFileInput" type="file" accept=".md,text/markdown,text/plain" hidden>
+            <div class="teemo-skill-status-line"><span id="skillSaveStatus"></span></div>
+            <details class="teemo-settings-collapse teemo-skill-collapse" open>
+              <summary><strong>桌宠已保存的 Skill</strong><span>可手动分组；编辑时在对应条目内展开</span></summary>
+              <div class="teemo-skill-list" id="skillList"></div>
+            </details>
+          </section>
+
+          <section class="teemo-settings-card">
+            <div class="teemo-card-heading">
+              <div><h2>界面显示</h2><p>调整聊天文字大小，立刻生效</p></div>
+              <span id="chatFontStatus"></span>
+            </div>
+            <div class="teemo-form-grid">
+              <label class="teemo-form-wide teemo-font-size-label">
+                <span>聊天字号 <strong id="chatFontSizeValue">16</strong> px</span>
+                <input id="chatFontSize" type="range" min="12" max="22" step="1" value="16">
+              </label>
+              <div class="teemo-font-size-preview" id="chatFontPreview">这是预览文字：调大后这里也会变大。</div>
+              <div class="teemo-card-actions" style="margin:0;padding:0;border:0">
+                <button class="teemo-secondary-button" id="resetChatFontButton" type="button">恢复默认 16</button>
+              </div>
+            </div>
+          </section>
+          <footer class="teemo-settings-version" aria-label="应用版本">
+            <span>Teemo 助理</span>
+            <span class="teemo-settings-version-dot">·</span>
+            <span id="appVersionLabel">正在读取版本…</span>
+            <button class="teemo-version-update-button" id="checkUpdateButton" type="button">检查更新</button>
+            <span id="updateCheckStatus"></span>
+          </footer>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div class="teemo-modal-backdrop" id="renameModal" hidden>
+    <div class="teemo-modal">
+      <h2>重命名对话</h2>
+      <input id="renameInput" maxlength="50" placeholder="输入新的对话名称">
+      <div><button class="teemo-secondary-button" id="renameCancelButton">取消</button><button class="teemo-primary-button" id="renameSaveButton">保存</button></div>
+    </div>
+  </div>
+
+  <div class="teemo-modal-backdrop" id="folderModal" hidden>
+    <div class="teemo-modal">
+      <h2 id="folderModalTitle">新建分组</h2>
+      <p class="teemo-modal-tip" id="folderModalTip">给分组起个名字，方便整理对话</p>
+      <input id="folderInput" maxlength="30" placeholder="例如：生图、提示词">
+      <div>
+        <button class="teemo-secondary-button" id="folderCancelButton" type="button">取消</button>
+        <button class="teemo-primary-button" id="folderSaveButton" type="button">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="teemo-modal-backdrop" id="confirmModal" hidden>
+    <div class="teemo-modal">
+      <h2 id="confirmModalTitle">确认</h2>
+      <p class="teemo-modal-tip" id="confirmModalTip"></p>
+      <div>
+        <button class="teemo-secondary-button" id="confirmCancelButton" type="button">取消</button>
+        <button class="teemo-primary-button" id="confirmOkButton" type="button">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../src/stores/settings.js"></script>
+  <script src="../src/services/Teemo-comfyui.js"></script>
+  <script src="../src/services/Teemo-audio-analysis.js"></script>
+  <script src="../src/services/Teemo-image-intent.js"></script>
+  <script src="../src/services/Teemo-image-archive.js"></script>
+  <script src="../src/services/Teemo-web-browse.js"></script>
+  <script src="../src/services/ai.js"></script>
+  <script src="../src/services/skills.js"></script>
+  <script src="../src/services/rule-capture.js"></script>
+  <script src="../src/services/Teemo-message-sanitize.js"></script>
+  <script src="../src/services/chat-history.js"></script>
+  <script src="../src/utils/markdown.js"></script>
+  <script src="Teemo-chat-window.js"></script>
+</body>
+</html>

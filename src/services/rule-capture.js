@@ -15,7 +15,7 @@
 (function() {
   // 按来源区分的两个规范合集：私聊(自己主动新增) 与 群聊(同事对话沉淀)，分开存放避免互相污染
   const COLLECTIONS = {
-    self:  { id: 'rule_collection_self',  name: '我的规范',     icon: '📘', desc: '我主动沉淀的规范，可持续追加' },
+    self:  { id: 'rule_collection_self',  name: 'Teemo 新增回复规则', icon: '⭐', desc: '对话中新增的回复规则' },
     group: { id: 'rule_collection_group', name: '同事沉淀规范', icon: '📗', desc: '群聊中同事对话沉淀的规范，可持续追加' },
   };
 
@@ -31,7 +31,30 @@
       this.listeners = new Set();
       // 会话内去重：同一段规范文本短时间内只捕获一次，避免重复建 skill
       this._recent = new Map();   // 规范文本指纹 -> 时间戳
+      this._migrateSelfCollectionName();
       window.ruleCaptureService = this;
+    }
+
+    /** 把旧的「我的规范」显示名同步为「Teemo 新增回复规则」 */
+    _migrateSelfCollectionName() {
+      try {
+        const col = COLLECTIONS.self;
+        const existing = this.skills.get(col.id)
+          || (this.skills.getAll() || []).find(item => item && item.name === '我的规范');
+        if (!existing) return;
+        if (existing.name === col.name && existing.desc === col.desc) return;
+        this.skills.upload({
+          ...existing,
+          id: existing.id || col.id,
+          name: col.name,
+          icon: col.icon,
+          desc: col.desc,
+          systemPrompt: existing.systemPrompt || '',
+          ruleMatchers: existing.ruleMatchers || [],
+        });
+      } catch (error) {
+        console.warn('[ruleCapture] 迁移规则合集名称失败:', error && error.message);
+      }
     }
 
     /**
@@ -82,10 +105,12 @@
       if (/(记(?:住|下|录)|存(?:一?下|成|起来|档)?|沉淀|收藏|保存|加入)[^。\n]{0,12}(规范|规则|标准|要求|约定|技能|skill)/i.test(t)) return true;
       // 2) 规范/规则 …… 记/存/沉淀/收藏
       if (/(规范|规则|标准|要求|约定)[^。\n]{0,12}(记(?:住|下|录)|存(?:一?下|成|起来|档)?|沉淀|收藏|保存|存成技能)/.test(t)) return true;
-      // 3) 新增/添加/新建/录入/登记 …… 规则/规范/条目（如"按照上面的规范新增规则"）
-      if (/(新增|添加|新建|加(?:一?条)?|录入|登记|记录|沉淀)[^。\n]{0,8}(规则|规范|条目|要求|约定)/.test(t)) return true;
+      // 3) 新增/添加/增加/新建/录入/登记 …… 规则/规范/条目/技能/skill
+      if (/(新增|添加|增加|新建|加(?:一?个|一?条)?|录入|登记|记录|沉淀)[^。\n]{0,12}(规则|规范|条目|要求|约定|技能|skill)/i.test(t)) return true;
       // 4) 按照/根据/把/将 …… 规范/规则 …… 新增/添加/记/存/录入
       if (/(按照?|根据|把|将)[^。\n]{0,20}(规范|规则|标准|要求|约定)[^。\n]{0,10}(新增|添加|新建|记|存|录入|沉淀|保存|加入)/.test(t)) return true;
+      // 5) 直接说“增加一个 skill / 帮我做一个技能”
+      if (/(增加|添加|新增|新建|做一个|建一个)[^。\n]{0,8}(skill|技能)/i.test(t)) return true;
       return false;
     }
 
@@ -174,7 +199,63 @@
      */
     _wantsNewSkill(text) {
       const t = String(text || '');
-      return /(新建|新增|单独|另(?:建|存|外)|另开|新开|重新|创建|建(?:一)?个)[^。\n]{0,8}(skill|技能|规范技能|规则技能)/i.test(t);
+      return /(新建|新增|增加|添加|单独|另(?:建|存|外)|另开|新开|重新|创建|建(?:一)?个|做一个)[^。\n]{0,10}(skill|技能|规范技能|规则技能)/i.test(t);
+    }
+
+    /** 从 AI 回复里提取「# Skill: …」完整 Markdown 块 */
+    _extractSkillMarkdown(assistantText) {
+      const text = String(assistantText || '').trim();
+      if (!text) return '';
+      const fence = text.match(/```(?:markdown|md)?\s*\n([\s\S]*?#\s*Skill[:：][\s\S]*?)```/i);
+      if (fence && fence[1]) return fence[1].trim();
+      const start = text.search(/#\s*Skill[:：]/i);
+      if (start < 0) return '';
+      return text.slice(start).trim();
+    }
+
+    /**
+     * 根据用户意图 + AI 回复自动落库：
+     * - 明确新建 Skill：优先从 AI 输出的 Skill Markdown 创建独立 Skill
+     * - 普通记住规则：追加到「Teemo 新增回复规则」
+     */
+    async captureFromConversation(userText, assistantText, opts = {}) {
+      const user = String(userText || '');
+      const assistant = String(assistantText || '');
+      const source = opts.source === 'group' ? 'group' : 'self';
+      const wantsSkill = this._wantsNewSkill(user) || this.looksLikeManualSave(user);
+      if (!wantsSkill && !this.looksLikeRuleRequest(user)) {
+        return { created: false, reason: 'no-trigger' };
+      }
+
+      const skillMd = this._extractSkillMarkdown(assistant);
+      if (skillMd && this._wantsNewSkill(user)) {
+        try {
+          const skill = this.skills.uploadFromMarkdown
+            ? this.skills.uploadFromMarkdown(skillMd, 'auto-skill.md')
+            : this.skills.upload({
+              name: (skillMd.match(/#\s*Skill[:：]\s*(.+)/i) || [])[1] || '自动 Skill',
+              icon: '⭐',
+              desc: '对话中自动新增的 Skill',
+              systemPrompt: skillMd,
+              category: 'custom',
+            });
+          this._emit(skill, { mode: 'new', ruleName: skill.name, kind: 'skill' });
+          return { created: true, mode: 'new', kind: 'skill', skill };
+        } catch (error) {
+          console.warn('[ruleCapture] Skill Markdown 落库失败:', error && error.message);
+        }
+      }
+
+      // 规则类：把 AI 整理结果 + 用户原话一起交给抽取/追加
+      const context = [
+        assistant ? `【AI整理】\n${assistant}` : '',
+        user ? `【用户原话】\n${user}` : '',
+      ].filter(Boolean).join('\n\n');
+      return this.captureFromText(user, {
+        force: true,
+        context,
+        source,
+      });
     }
 
     /**
@@ -184,7 +265,14 @@
      */
     _appendToCollection(parsed, matcher, source) {
       const col = COLLECTIONS[source] || COLLECTIONS.self;
-      const existing = this.skills.get(col.id);
+      // 兼容旧名称「我的规范」：若已存在同 id，继续追加并同步新显示名
+      let existing = this.skills.get(col.id);
+      if (!existing && source === 'self') {
+        existing = (this.skills.getAll() || []).find(item =>
+          item && (item.name === '我的规范' || item.name === 'Teemo 新增回复规则')
+        ) || null;
+      }
+      const targetId = (existing && existing.id) || col.id;
       const when = new Date().toLocaleString('zh-CN');
       // 单条规范片段：用二级标题分节，便于合集里区分多条规范来源
       const section = `## ${parsed.name || '规范'}（${when}）\n\n${String(parsed.rules).trim()}`;
@@ -201,7 +289,7 @@
       const ruleMatchers = matcher ? prevMatchers.concat([matcher]) : prevMatchers;
 
       return this.skills.upload({
-        id: col.id,
+        id: targetId,
         name: col.name,
         icon: col.icon,
         desc: col.desc,
