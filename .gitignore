@@ -14,6 +14,31 @@ npm-debug.log*
 
 # 本地用户数据
 config.local.json
+settings.json
+chat-history.json
+skills.json
+projects.json
+todos.json
+work-stats.json
+task-context.json
+local-access.json
+
+# 用户生成内容、缓存和个人认知数据
+uploads/
+user-data/
+cache/
+memory/
+cognition/
+**/userData/
+**/memory/
+**/cognition/
+
+# 本地凭据和环境文件
+*.local.json
+*.local.jsonc
+.env
+.env.*
+!.env.example
 
 # 打包产物（体积大，且可能打包进本地凭据，不入库）
 dist/

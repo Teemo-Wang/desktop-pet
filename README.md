@@ -1,4 +1,13 @@
-# 哈啰桌面 AI 助手（Desktop Pet）
+# Teemo助理
+
+> 当前版本：`v1.1.7` ｜ Windows Electron 桌面 AI 助手
+
+唯一正式开发源码：`D:\Teemo助手\Teemo机器人项目\Teemo-source`
+
+P0 已封板：`219b92a` ｜ `v1.1.6-p0-closed`
+当前开发分支：`Teemo/p1-agent-core`
+
+旧“哈啰设计助手”名称仅保留在历史兼容说明中，不代表当前产品名称。
 
 ## 项目背景
 

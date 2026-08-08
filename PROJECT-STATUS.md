@@ -1,6 +1,16 @@
-# 哈啰桌面 AI 助手（Desktop Pet）— 项目进度与规划
+# Teemo助理 — 项目进度与规划
 
-> 文档版本：v1.2 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.1.6（P0 基线已封板）**
+> 文档版本：v1.3 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.1.7（P0 已封板，P1 待开始）**
+
+## 当前状态
+
+- Product：`Teemo助理`
+- Version：`v1.1.7`
+- Source：`D:\Teemo助手\Teemo机器人项目\Teemo-source`
+- P0：`CLOSED`
+- P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
+- Current Development：`P1 Agent Core`
+- Current Branch：`Teemo/p1-agent-core`
 
 ## P0 阶段收尾（2026-08-09）
 
