@@ -10,9 +10,11 @@
   window.cognitionCollector = new window.TeemoCognitionCollector({ cognitionService: window.cognitionService });
   window.contextBuilder = new window.TeemoContextBuilder({ cognitionService: window.cognitionService });
   window.teemoPermissionClient = new window.TeemoPermissionClient({ ipcRenderer });
+  window.teemoFileClient = new window.TeemoFileClient({ ipcRenderer });
   window.teemoToolRegistry = window.TeemoBuiltinTools.createRegistry({
     permissionService: window.teemoPermissionClient,
   });
+  window.TeemoFileTools.register(window.teemoToolRegistry, { fileClient: window.teemoFileClient });
   window.agentCore = new window.TeemoAgentCore({
     aiService: window.aiService,
     contextBuilder: window.contextBuilder,

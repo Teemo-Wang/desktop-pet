@@ -5,6 +5,7 @@ const { spawn } = require('child_process');
 const TeemoFileService = require('./src/services/TeemoFileService');
 const TeemoPermissionService = require('./src/permissions/TeemoPermissionService');
 const registerTeemoPermissionIpc = require('./src/permissions/TeemoPermissionIpc');
+const registerTeemoFileToolIpc = require('./src/tools/file/TeemoFileToolIpc');
 const dingtalkBridge = require('./dingtalk-bridge');
 const materialBridge = require('./material-bridge');
 
@@ -24,6 +25,11 @@ function localAccessFilePath() {
 function loadLocalAccessRoots() {
   return fileService.loadAuthorizedRoots(localAccessFilePath());
 }
+
+registerTeemoFileToolIpc(ipcMain, fileService, {
+  rootsProvider: loadLocalAccessRoots,
+  permissionService: teemoPermissionService,
+});
 
 function saveLocalAccessRoots(roots) {
   fileService.saveAuthorizedRoots(localAccessFilePath(), roots);

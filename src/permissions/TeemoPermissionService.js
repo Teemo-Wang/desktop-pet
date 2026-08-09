@@ -26,6 +26,8 @@ class TeemoPermissionService {
     this.grants = new Map();
     this.pending = new Map();
     this.audit = [];
+    this.executionAuthorizations = new Map();
+    this.executionAuthorizationTtlMs = Number(options.executionAuthorizationTtlMs) || 2 * 60 * 1000;
   }
 
   _normalizeRequest(input = {}) {
@@ -37,6 +39,7 @@ class TeemoPermissionService {
       toolName: safeText(input.toolName, 120),
       permission,
       resource: input.resource == null ? null : this.resourceMatcher.normalize(input.resource),
+      requiresExecutionAuthorization: input.requiresExecutionAuthorization === true,
       reason: safeText(input.reason, 240) || null,
     };
     if (!request.toolCallId || !request.toolName || !PERMISSIONS.has(permission)) return null;
@@ -169,6 +172,9 @@ class TeemoPermissionService {
     pending.audit.decision = result.decision;
     pending.audit.scope = result.scope || null;
     pending.audit.resolvedAt = new Date().toISOString();
+    if (result.decision === 'allow' && pending.normalized.requiresExecutionAuthorization) {
+      this._recordExecutionAuthorization(pending.normalized);
+    }
     pending.resolve(result);
     return true;
   }
@@ -177,7 +183,13 @@ class TeemoPermissionService {
     const request = this._normalizeRequest(input);
     if (!request) return { decision: 'deny', reason: 'permission_request_invalid', source: 'fail_closed' };
     const evaluated = this.evaluate(request);
-    if (evaluated.decision !== 'prompt') return evaluated;
+    if (evaluated.decision !== 'prompt') {
+      if (evaluated.decision === 'allow' && request.permission !== 'none'
+        && request.requiresExecutionAuthorization) {
+        this._recordExecutionAuthorization(request);
+      }
+      return evaluated;
+    }
     const signal = options.signal || null;
     if (signal && signal.aborted) return { decision: 'deny', reason: 'cancelled', source: 'abort' };
 
@@ -268,6 +280,43 @@ class TeemoPermissionService {
       }
     }
     return cancelled;
+  }
+
+  _recordExecutionAuthorization(request) {
+    if (!request || !request.toolCallId || request.permission === 'none') return false;
+    for (const [toolCallId, authorization] of this.executionAuthorizations) {
+      if (authorization.expiresAt < Date.now()) this.executionAuthorizations.delete(toolCallId);
+    }
+    this.executionAuthorizations.set(request.toolCallId, Object.freeze({
+      toolCallId: request.toolCallId,
+      sessionId: request.sessionId,
+      toolName: request.toolName,
+      permission: request.permission,
+      resource: request.resource,
+      expiresAt: Date.now() + this.executionAuthorizationTtlMs,
+    }));
+    return true;
+  }
+
+  consumeExecutionAuthorization(input = {}) {
+    const request = this._normalizeRequest(input);
+    if (!request) return false;
+    const authorization = this.executionAuthorizations.get(request.toolCallId);
+    if (!authorization || authorization.expiresAt < Date.now()) {
+      this.executionAuthorizations.delete(request.toolCallId);
+      return false;
+    }
+    const matches = authorization.sessionId === request.sessionId
+      && authorization.toolName === request.toolName
+      && authorization.permission === request.permission
+      && authorization.resource === request.resource;
+    if (!matches) return false;
+    this.executionAuthorizations.delete(request.toolCallId);
+    return true;
+  }
+
+  discardExecutionAuthorization(toolCallId) {
+    return this.executionAuthorizations.delete(safeText(toolCallId, 120));
   }
 }
 

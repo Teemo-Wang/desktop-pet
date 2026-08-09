@@ -1,6 +1,6 @@
 # Teemo助理 — 项目进度与规划
 
-> 文档版本：v1.9 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.1.7（P1-4 已封板）**
+> 文档版本：v1.10 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.1.7（P1-5 待 GPT 审阅）**
 
 ## 当前状态
 
@@ -9,7 +9,7 @@
 - Source：`D:\Teemo助手\Teemo机器人项目\Teemo-source`
 - P0：`CLOSED`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
-- Current Development：`P1-4 Permission Layer CLOSED / PASS；下一阶段 P1-5 Safe File Tools`
+- Current Development：`P1-5 Safe File Tools 实现与本地验证完成；等待 GPT 审阅`
 - Current Branch：`Teemo/p1-agent-core`
 
 ## P0 阶段收尾（2026-08-09）
@@ -58,6 +58,15 @@
 - 新增最小权限确认 UI，但生产 Registry 仍只有 permission=none 的两个安全 builtin，不会增加真实系统权限。
 - GPT 严格审阅确认：`P1-4 Permission Layer STATUS: CLOSED / RESULT: PASS / BLOCKERS: 0`。
 - 详细记录见 `docs/P1-4-PERMISSION-LAYER.md`；阶段实现提交为 `625cd1f`，恢复标签为 `v1.1.7-p1.4-permission-layer`。
+
+## P1-5 阶段（2026-08-09，等待 GPT 审阅）
+
+- 新增 `list_directory`、`read_file`、`search_files`、`search_text`、`create_file`、`patch_file`、`rename_file` 七个正式 Agent 文件工具；没有删除、Git、Shell、网络或执行能力。
+- 模型路径先由 Main `TeemoFileService` 规范化并检查授权根，再生成 `file:///` Permission Resource；获准后在真实 I/O 前第二次解析并检查文件身份，阻止 traversal、UNC/device/ADS、symlink/junction 逃逸和授权等待期 TOCTOU。
+- Main 准备操作同时绑定 renderer owner 与 `toolCallId`；文件执行必须消费中央 Permission Service 的一次性授权凭证，直接调用文件 IPC 不能绕过权限。
+- 写入仅限保守纯文本白名单；create 独占不覆盖，patch 强制 expectedSha256/精确唯一编辑/原子替换，rename 强制 expectedSha256/同授权根/不覆盖；没有 delete。
+- 桌宠和独立聊天窗口由同一 `TeemoFileTools` Definition Factory 注册相同工具，共享 Main 授权根与权限状态。
+- 单元/安全/并发回归及隔离 Electron 双 renderer、完整应用烟测均通过；详细记录见 `docs/P1-5-FILE-TOOLS.md`。
 
 ### P0 已知风险
 

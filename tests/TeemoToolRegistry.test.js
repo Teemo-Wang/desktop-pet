@@ -41,6 +41,7 @@ async function main() {
     definition({ inputSchema: null }),
     definition({ metadata: 'private' }),
     definition({ handler: 'not-a-function' }),
+    definition({ resolvePermissionResource: 'not-a-function' }),
   ]) {
     const isolatedRegistry = new TeemoToolRegistry();
     assert.throws(() => isolatedRegistry.register(invalid), error => error.code === 'INVALID_TOOL_DEFINITION');
@@ -115,7 +116,9 @@ async function main() {
     handler: async (_args, context) => {
       duringAbort.abort();
       assert.equal(context.signal, duringAbort.signal);
-      assert.deepEqual(Object.keys(context).sort(), ['runId', 'sessionId', 'signal', 'step']);
+      assert.deepEqual(Object.keys(context).sort(), [
+        'permissionPreparation', 'permissionResource', 'runId', 'sessionId', 'signal', 'step',
+      ]);
       return { ignored: true };
     },
   }));

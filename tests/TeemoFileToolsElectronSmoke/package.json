@@ -1,0 +1,5 @@
+{
+  "name": "teemo-file-tools-electron-smoke",
+  "private": true,
+  "main": "TeemoFileToolsElectronSmoke.js"
+}

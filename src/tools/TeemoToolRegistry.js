@@ -133,6 +133,13 @@
     return { ...base, error: { code, message } };
   }
 
+  function publicFailure(error, fallbackCode, fallbackMessage) {
+    if (error && error.teemoSafe === true && typeof error.code === 'string') {
+      return { code: error.code, message: String(error.message || fallbackMessage) };
+    }
+    return { code: fallbackCode, message: fallbackMessage };
+  }
+
   class TeemoToolRegistry {
     constructor(options = {}) {
       this._tools = new Map();
@@ -161,6 +168,11 @@
       if (typeof definition.handler !== 'function') {
         throw registryError('INVALID_TOOL_DEFINITION', 'Tool handler must be a function.');
       }
+      for (const hook of ['resolvePermissionResource', 'releasePermissionResource']) {
+        if (definition[hook] != null && typeof definition[hook] !== 'function') {
+          throw registryError('INVALID_TOOL_DEFINITION', `${hook} must be a function.`);
+        }
+      }
       if (definition.metadata != null && !isPlainObject(definition.metadata)) {
         throw registryError('INVALID_TOOL_DEFINITION', 'Tool metadata must be an object.');
       }
@@ -178,6 +190,12 @@
         inputSchema,
         metadata,
         handler: definition.handler,
+        resolvePermissionResource: typeof definition.resolvePermissionResource === 'function'
+          ? definition.resolvePermissionResource
+          : null,
+        releasePermissionResource: typeof definition.releasePermissionResource === 'function'
+          ? definition.releasePermissionResource
+          : null,
       });
       this._tools.set(name, stored);
       return this.get(name);
@@ -196,6 +214,8 @@
         inputSchema: clone(definition.inputSchema),
         metadata: clone(definition.metadata),
         handler: definition.handler,
+        resolvePermissionResource: definition.resolvePermissionResource,
+        releasePermissionResource: definition.releasePermissionResource,
       };
     }
 
@@ -215,6 +235,8 @@
       const tool = typeof name === 'string' ? name : '';
       const toolCallId = makeToolCallId();
       const startedAt = new Date().toISOString();
+      let definitionForRelease = null;
+      let permissionResolution = null;
       try {
         const definition = this._tools.get(tool);
         if (!definition) {
@@ -246,6 +268,31 @@
           });
         }
         if (permission !== 'none') {
+          if (typeof definition.resolvePermissionResource === 'function') {
+            try {
+              permissionResolution = await definition.resolvePermissionResource(input, Object.freeze({
+                toolCallId,
+                runId: context.runId || null,
+                sessionId: context.sessionId || null,
+                signal: signal || null,
+              }));
+              definitionForRelease = definition;
+            } catch (error) {
+              const failure = publicFailure(error, 'FILE_RESOURCE_RESOLUTION_FAILED', 'Tool resource could not be resolved safely.');
+              return resultEnvelope({
+                ok: false, tool, toolCallId, startedAt,
+                code: failure.code, message: failure.message,
+              });
+            }
+            if (!isPlainObject(permissionResolution)
+              || typeof permissionResolution.resource !== 'string'
+              || !permissionResolution.resource.trim()) {
+              return resultEnvelope({
+                ok: false, tool, toolCallId, startedAt,
+                code: 'FILE_RESOURCE_RESOLUTION_FAILED', message: 'Tool resource could not be resolved safely.',
+              });
+            }
+          }
           const permissionService = this.permissionService;
           const authorize = permissionService && (
             typeof permissionService.authorize === 'function'
@@ -268,8 +315,13 @@
               sessionId: context.sessionId || null,
               toolName: tool,
               permission,
-              resource: definition.metadata.resource || null,
-              reason: definition.metadata.permissionReason || null,
+              resource: permissionResolution
+                ? permissionResolution.resource
+                : (definition.metadata.resource || null),
+              requiresExecutionAuthorization: !!permissionResolution,
+              reason: permissionResolution && permissionResolution.reason
+                ? permissionResolution.reason
+                : (definition.metadata.permissionReason || null),
             }, {
               signal: signal || null,
               timeoutMs: context.permissionTimeoutMs,
@@ -320,6 +372,8 @@
           sessionId: context.sessionId || null,
           step: Number.isInteger(context.step) ? context.step : null,
           signal: signal || null,
+          permissionResource: permissionResolution ? permissionResolution.resource : null,
+          permissionPreparation: permissionResolution ? permissionResolution.preparation : null,
         });
         try {
           const data = await definition.handler(input, executionContext);
@@ -337,9 +391,10 @@
               code: 'TOOL_CANCELLED', message: 'Tool execution was cancelled.',
             });
           }
+          const failure = publicFailure(error, 'TOOL_HANDLER_FAILED', 'Tool handler failed.');
           return resultEnvelope({
             ok: false, tool, toolCallId, startedAt,
-            code: 'TOOL_HANDLER_FAILED', message: 'Tool handler failed.',
+            code: failure.code, message: failure.message,
           });
         }
       } catch (_) {
@@ -347,6 +402,18 @@
           ok: false, tool, toolCallId, startedAt,
           code: 'TOOL_REGISTRY_INTERNAL_ERROR', message: 'Tool registry encountered an internal error.',
         });
+      } finally {
+        if (definitionForRelease && permissionResolution
+          && typeof definitionForRelease.releasePermissionResource === 'function') {
+          try {
+            await definitionForRelease.releasePermissionResource(
+              permissionResolution.preparation,
+              Object.freeze({ toolCallId, runId: context.runId || null, sessionId: context.sessionId || null }),
+            );
+          } catch (_) {
+            // Main keeps prepared resources owner-bound and short-lived; cleanup is best effort.
+          }
+        }
       }
     }
   }

@@ -42,6 +42,22 @@ function registerMock(registry, options = {}) {
 async function main() {
   {
     const service = new TeemoPermissionService();
+    const fileRequest = permissionRequest({ resource: 'file:///D:/Teemo/project/file.txt' });
+    assert.equal(service.evaluate(fileRequest).decision, 'prompt');
+    assert.ok(service.grant(fileRequest, { scope: 'resource' }));
+    assert.equal(service.evaluate(permissionRequest({
+      toolCallId: 'file-child', resource: 'file:///D:/Teemo/project/file.txt/child',
+    })).decision, 'allow');
+    assert.equal(service.evaluate(permissionRequest({
+      toolCallId: 'file-prefix', resource: 'file:///D:/Teemo/project/file.txt-other',
+    })).decision, 'prompt');
+    assert.equal(service.evaluate(permissionRequest({
+      toolCallId: 'file-unc', resource: 'file://server/share/file.txt',
+    })).decision, 'deny');
+  }
+
+  {
+    const service = new TeemoPermissionService();
     assert.deepEqual(
       service.evaluate(permissionRequest({ permission: 'none' })),
       { decision: 'allow', source: 'none_required' },

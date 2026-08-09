@@ -29,10 +29,15 @@
     ? new window.TeemoContextBuilder({ cognitionService })
     : null;
   const permissionClient = window.TeemoPermissionClient ? new window.TeemoPermissionClient({ ipcRenderer }) : null;
+  const fileClient = window.TeemoFileClient ? new window.TeemoFileClient({ ipcRenderer }) : null;
   const toolRegistry = window.TeemoBuiltinTools ? window.TeemoBuiltinTools.createRegistry({
     permissionService: permissionClient,
   }) : null;
+  if (toolRegistry && window.TeemoFileTools && fileClient) {
+    window.TeemoFileTools.register(toolRegistry, { fileClient });
+  }
   window.teemoPermissionClient = permissionClient;
+  window.teemoFileClient = fileClient;
   window.teemoToolRegistry = toolRegistry;
   const agentCore = window.TeemoAgentCore ? new window.TeemoAgentCore({
     aiService: ai,
