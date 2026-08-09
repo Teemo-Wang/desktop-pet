@@ -242,17 +242,20 @@
       const rank = items => this.intelligence.rank(items, query, { now, allItems: allKnowledge });
       const relevant = item => !query.trim()
         || Number(item.intelligence && item.intelligence.relevanceMatchCount) > 0
-        || Boolean(item.intelligence && item.intelligence.genericFollowUp)
         || Boolean(item.intelligence && item.intelligence.personalProfileQuery);
+      const resolved = item => !Boolean(item.intelligence && item.intelligence.unresolvedCorrection);
       const recent = rank(this._active(this.data.recentContext))
+        .filter(resolved)
         .filter(relevant)
         .filter(item => item.intelligence.freshness !== 'stale');
       const rankedProfile = rank(this._active(this.data.profile));
-      const relevantProfile = rankedProfile.filter(relevant);
+      const relevantProfile = rankedProfile.filter(resolved).filter(relevant);
       return clone({
         profile: relevantProfile,
         recentContext: recent,
-        projectContext: options.projectId ? rank(this._active(this.data.projectContexts[String(options.projectId)] || [])) : [],
+        projectContext: options.projectId
+          ? rank(this._active(this.data.projectContexts[String(options.projectId)] || [])).filter(resolved)
+          : [],
       });
     }
 
@@ -324,6 +327,7 @@
           confidence: observation.confidence,
           evidenceCount: observation.evidenceCount,
           evidenceDays: this.intelligence.evidenceDays(observation),
+          correctionResolution: observation.correctionResolution || undefined,
           status: 'active',
           supersededBy: null,
           createdAt: observedAt,
@@ -338,6 +342,7 @@
         entry.confidence = Math.max(entry.confidence || 0, observation.confidence || 0);
         entry.evidenceCount = Math.max(entry.evidenceCount || 1, observation.evidenceCount || 1);
         entry.evidenceDays = this.intelligence.evidenceDays(observation);
+        if (observation.correctionResolution) entry.correctionResolution = observation.correctionResolution;
         entry.updatedAt = observedAt;
         entry.lastObservedAt = observedAt;
         Object.assign(entry, extras);
@@ -566,6 +571,7 @@
         confidence: observation.confidence,
         evidenceCount: observation.evidenceCount,
         evidenceDays: this.intelligence.evidenceDays(observation),
+        correctionResolution: observation.correctionResolution || undefined,
         projectId: target.domain === 'project' ? target.projectId : undefined,
         source: observation.source,
         status: 'active',
@@ -617,21 +623,35 @@
         const projectId = scope === 'project' ? String(input.projectId || '').trim() : null;
         if (scope === 'project' && !projectId) return { ok: false, skipped: 'missing_project', revision: currentRevision };
 
-        let ambiguousCorrection = false;
+        const category = String(input.category || 'preference');
+        const initialIdentity = this.intelligence.compositeIdentity({ content, category, scope, projectId });
+        const existingCorrection = input.isCorrection
+          ? this.data.observations.find(item => (
+            item
+            && item.status !== 'superseded'
+            && this.intelligence.compositeIdentity(item) === initialIdentity
+          ))
+          : null;
+        let correctionResolution = existingCorrection && existingCorrection.correctionResolution
+          ? existingCorrection.correctionResolution
+          : null;
         if (input.isCorrection) {
           const anchorKey = fingerprint(input.correctionAnchor);
-          if (anchorKey && anchorKey.length >= 2) {
+          if (existingCorrection) {
+            correctionResolution = correctionResolution || 'unmatched';
+          } else if (anchorKey && anchorKey.length >= 2) {
             const scopes = Array.isArray(input.correctionScopes) && input.correctionScopes.length
               ? input.correctionScopes
               : ['global', 'recent', 'project'];
             const candidates = this.data.observations.filter(item => (
               item
               && item.status !== 'superseded'
+              && item.category !== 'correction'
               && scopes.includes(item.scope)
               && (!projectId || item.scope !== 'project' || item.projectId === projectId)
               && (item.fingerprint.includes(anchorKey) || anchorKey.includes(item.fingerprint))
             ));
-            ambiguousCorrection = candidates.length > 1;
+            correctionResolution = candidates.length > 1 ? 'ambiguous' : candidates.length === 1 ? 'resolved' : 'unmatched';
             if (candidates.length === 1) {
               const item = candidates[0];
               item.status = 'superseded';
@@ -645,6 +665,7 @@
               .filter(item => item.scope !== 'project' && item.sourceSessionId === String(input.sourceSessionId))
               .sort((a, b) => String(b.lastObservedAt || '').localeCompare(String(a.lastObservedAt || '')));
             if (candidates.length === 1) {
+              correctionResolution = 'resolved';
               const referenced = candidates[0];
               content = `${referenced.content}（仅适用于当前项目）`;
               referenced.status = 'superseded';
@@ -652,12 +673,13 @@
               referenced.supersededReason = 'collector_scope_change';
               referenced.updatedAt = nowIso(this.clock);
               this._markKnowledgeSuperseded(referenced.id, null);
-            }
+            } else correctionResolution = 'unmatched';
+          } else {
+            correctionResolution = 'unmatched';
           }
         }
 
         const observedAt = nowIso(this.clock);
-        const category = String(input.category || 'preference');
         const identity = this.intelligence.compositeIdentity({ content, category, scope, projectId });
         let observation = this.data.observations.find(item => (
           item && item.status !== 'superseded' && this.intelligence.compositeIdentity(item) === identity
@@ -672,6 +694,7 @@
           observation.updatedAt = observedAt;
           observation.confidence = Math.max(Number(observation.confidence) || 0, Number(input.confidence) || 0);
           if (input.sourceSessionId) observation.sourceSessionId = String(input.sourceSessionId);
+          if (input.isCorrection) observation.correctionResolution = correctionResolution || 'unmatched';
         } else {
           observation = {
             id: makeId('obs'),
@@ -685,6 +708,7 @@
             projectId,
             sourceSessionId: input.sourceSessionId ? String(input.sourceSessionId) : null,
             source: 'collector',
+            correctionResolution: input.isCorrection ? (correctionResolution || 'unmatched') : undefined,
             status: 'active',
             supersededBy: null,
             supersededReason: null,
@@ -720,7 +744,7 @@
           observation: clone(observation),
           promoted,
           scope,
-          ambiguousCorrection: Boolean(input.isCorrection && ambiguousCorrection),
+          ambiguousCorrection: Boolean(input.isCorrection && correctionResolution === 'ambiguous'),
           revision: Math.max(0, Number(this.data.revision) || 0),
         };
       };

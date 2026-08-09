@@ -169,4 +169,11 @@ P2-4 不新增聊天日志、行为追踪、Embedding Store、chain-of-thought�
 - broad design-domain 只作为 ranking boost，不再单独获得 relevance admission；准入要求实际 keyword/concept overlap、明确 personal-profile query 或带真实相关对话的 generic follow-up。
 - 补充成人向 Profile vs 儿童教育 UI、像素海报 Profile vs 金融后台 UI 的负向 send/stream 测试，以及金属内容相关和 personal-profile query 正向测试。
 
-当前等待第二轮 blocker fix commit 与更新后的完整 review bundle 复审。
+第三轮源码复审 Gate 为 `STATUS: FAIL / BLOCKERS: 2`，继续仅处理 P2-4：
+
+- correction 持久化可选 additive 字段 `correctionResolution`。`ambiguous` / `unmatched` 在重启和跨日重复后仍保持 `pending`，不进入 Profile、Recent 或 Project Cognition Context；只有明确唯一目标的 `resolved` correction 才可作为已确认认知使用。
+- exact repeated ambiguous correction 保留原 resolution，不会因为后续候选数量变化而自动猜测；唯一 anchor 仍正常 supersede 唯一旧 cognition。
+- `genericFollowUp` 只保留为排序加分，不再独立获得 relevance admission。当前消息必须有实际 keyword/concept overlap、明确 personal-profile query，或最近真实对话提供相关 overlap。
+- 补充 ambiguous correction 重启、跨两天三次证据、Context 排除，以及无前文/无关前文/相关前文的 send/stream 正反测试。
+
+当前等待第三轮 blocker fix commit 与更新后的完整 review bundle 复审，仍未标记 PASS/CLOSED。

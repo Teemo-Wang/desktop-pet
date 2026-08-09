@@ -85,6 +85,12 @@ function main() {
     assert.equal(singleBuilder.build({ messages: [{ role: 'user', content: '帮我写一段程序。' }] }).systemMessage, null);
     assert.equal(singleBuilder.build({ messages: [{ role: 'user', content: '帮我设计一个儿童教育 App UI。' }] }).systemMessage, null);
     assert.equal(singleBuilder.build({ messages: [{ role: 'user', content: '优化金融后台 UI。' }] }).systemMessage, null);
+    assert.equal(singleBuilder.build({ messages: [{ role: 'user', content: '这个怎么样？' }] }).systemMessage, null);
+    assert.equal(singleBuilder.build({ messages: [
+      { role: 'user', content: '今天星期几？' },
+      { role: 'assistant', content: '今天是星期日。' },
+      { role: 'user', content: '继续呢？' },
+    ] }).systemMessage, null, 'generic follow-up without relevant prior context must not admit Cognition');
     assert.match(
       singleBuilder.build({ messages: [{ role: 'user', content: '按照我平时喜欢的方向再来一版。' }] }).systemMessage.content,
       /长期偏好成人向视觉题材/

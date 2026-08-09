@@ -140,6 +140,31 @@ async function main() {
     assert.equal(anchoredService.listObservations().filter(item => /我喜欢高反射金属/.test(item.content)).length, 2, 'one-to-many anchor must preserve all candidates');
     const pendingCorrection = anchoredService.getManagementSnapshot().recentContext.find(item => /之前说高反射金属/.test(item.content));
     assert.equal(pendingCorrection.intelligence.state, 'pending');
+    assert.equal(pendingCorrection.correctionResolution, 'ambiguous');
+    const restartedAnchored = new TeemoCognitionService({ dataDir: anchoredDir, clock: () => new Date(tick) });
+    let persistedCorrection = restartedAnchored.getManagementSnapshot().recentContext.find(item => /之前说高反射金属/.test(item.content));
+    assert.equal(persistedCorrection.correctionResolution, 'ambiguous');
+    assert.equal(persistedCorrection.intelligence.state, 'pending', 'ambiguous correction must survive restart');
+    const restartedAnchoredCollector = new TeemoCognitionCollector({ cognitionService: restartedAnchored });
+    await restartedAnchoredCollector.collectTurn({
+      userMessage: '之前说高反射金属那条不再适用。',
+      sessionId: 'anchor-correction-repeat-1',
+    });
+    tick += 24 * 60 * 60 * 1000;
+    await restartedAnchoredCollector.collectTurn({
+      userMessage: '之前说高反射金属那条不再适用。',
+      sessionId: 'anchor-correction-repeat-2',
+    });
+    persistedCorrection = restartedAnchored.getManagementSnapshot().recentContext.find(item => /之前说高反射金属/.test(item.content));
+    assert.equal(persistedCorrection.evidenceCount, 3);
+    assert.equal(persistedCorrection.intelligence.evidenceDayCount, 2);
+    assert.equal(persistedCorrection.correctionResolution, 'ambiguous');
+    assert.equal(persistedCorrection.intelligence.state, 'pending', 'repeated cross-day evidence must not resolve ambiguity');
+    assert.equal(restartedAnchored.getProfile().some(item => /之前说高反射金属/.test(item.content)), false);
+    const ambiguousContext = new TeemoContextBuilder({ cognitionService: restartedAnchored }).build({
+      messages: [{ role: 'user', content: '继续优化高反射金属设计。' }],
+    });
+    assert.doesNotMatch(ambiguousContext.systemMessage.content, /之前说高反射金属那条不再适用/);
     await anchoredCollector.collectTurn({ userMessage: '我喜欢强烈渐变材质。', sessionId: 'unique-anchor' });
     const uniqueCorrection = await anchoredCollector.collectTurn({
       userMessage: '之前说强烈渐变材质那条不再适用，现在更喜欢克制色彩。',
@@ -240,8 +265,52 @@ async function main() {
     });
     assert.equal(cognitionMessage(singleSend.calls[0]), undefined);
     assert.equal(cognitionMessage(singleStream.calls[0]), undefined, 'single sensitive-topic Profile must not leak into unrelated design send/stream');
+    await new TeemoAgentCore({ aiService: singleSend, contextBuilder: singleBuilder }).run({
+      messages: [{ role: 'user', content: '这个怎么样？' }],
+      disableActionContract: true,
+      skipCognitionCollection: true,
+    });
+    await new TeemoAgentCore({ aiService: singleStream, contextBuilder: singleBuilder }).runStream({
+      messages: [
+        { role: 'user', content: '今天星期几？' },
+        { role: 'assistant', content: '今天是星期日。' },
+        { role: 'user', content: '继续呢？' },
+      ],
+      disableActionContract: true,
+      skipCognitionCollection: true,
+    });
+    assert.equal(cognitionMessage(singleSend.calls[1]), undefined);
+    assert.equal(cognitionMessage(singleStream.calls[1]), undefined, 'generic follow-up requires relevant prior conversation in send/stream');
     const personalBundle = singleBuilder.build({ messages: [{ role: 'user', content: '按照我平时喜欢的方向再来一版。' }] });
     assert.match(personalBundle.systemMessage.content, /长期偏好成人向视觉题材/);
+
+    const followUpMessages = [
+      { role: 'user', content: '上一版银行卡金属反射太强。' },
+      { role: 'assistant', content: '可以降低高光强度。' },
+      { role: 'user', content: '这个怎么样？' },
+    ];
+    const followUpDir = fs.mkdtempSync(path.join(dir, 'follow-up-'));
+    const followUpService = new TeemoCognitionService({ dataDir: followUpDir, clock: () => new Date(tick) });
+    const followUpStart = followUpService.getManagementSnapshot();
+    followUpService.manualCreate(
+      { content: '长期偏好高反射金属材质', scope: 'global' },
+      { expectedRevision: followUpStart.revision }
+    );
+    const followUpBuilder = new TeemoContextBuilder({ cognitionService: followUpService });
+    const followUpSend = { calls: [], async send(messages) { this.calls.push(messages); return 'ok'; } };
+    const followUpStream = { calls: [], async stream(messages, onChunk) { this.calls.push(messages); onChunk('ok', 'ok'); return 'ok'; } };
+    await new TeemoAgentCore({ aiService: followUpSend, contextBuilder: followUpBuilder }).run({
+      messages: followUpMessages,
+      disableActionContract: true,
+      skipCognitionCollection: true,
+    });
+    await new TeemoAgentCore({ aiService: followUpStream, contextBuilder: followUpBuilder }).runStream({
+      messages: followUpMessages,
+      disableActionContract: true,
+      skipCognitionCollection: true,
+    });
+    assert.match(cognitionMessage(followUpSend.calls[0]).content, /高反射金属/);
+    assert.match(cognitionMessage(followUpStream.calls[0]).content, /高反射金属/);
 
     const failingAI = { calls: [], async send(messages) { this.calls.push(messages); return 'normal chat continues'; } };
     const failingResult = await new TeemoAgentCore({

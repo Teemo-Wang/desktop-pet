@@ -59,6 +59,19 @@ function main() {
   const manualRecent = Intelligence.derive(entry({ source: 'user_manual' }), { now });
   assert.equal(manualRecent.manualRecent, true);
   assert.equal(manualRecent.promotionEligible, false);
+  const ambiguousCorrection = Intelligence.derive(entry({
+    category: 'correction',
+    correctionResolution: 'ambiguous',
+  }), { now });
+  assert.equal(ambiguousCorrection.unresolvedCorrection, true);
+  assert.equal(ambiguousCorrection.pending, true);
+  assert.equal(ambiguousCorrection.state, 'pending', 'ambiguity stays pending after normal evidence thresholds');
+  assert.equal(ambiguousCorrection.promotionEligible, false);
+  const resolvedCorrection = Intelligence.derive(entry({
+    category: 'correction',
+    correctionResolution: 'resolved',
+  }), { now });
+  assert.equal(resolvedCorrection.unresolvedCorrection, false);
 
   const broadDomainOnly = Intelligence.relevanceDetails(
     entry({ scope: 'global', content: '长期偏好成人向视觉题材' }),

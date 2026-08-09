@@ -126,7 +126,11 @@
     const conflict = options.conflicts instanceof Set ? options.conflicts.has(identity) : false;
     const days = evidenceDays(item);
     const evidenceCount = Math.max(1, Number(item.evidenceCount) || 1);
-    const pending = item.scope === 'recent' && (evidenceCount < 3 || days.length < 2);
+    const correctionResolution = item.category === 'correction'
+      ? String(item.correctionResolution || 'unmatched')
+      : null;
+    const unresolvedCorrection = item.category === 'correction' && correctionResolution !== 'resolved';
+    const pending = unresolvedCorrection || (item.scope === 'recent' && (evidenceCount < 3 || days.length < 2));
     const manualRecent = item.scope === 'recent' && /^user_manual(?:_|$)/.test(String(item.source || ''));
     const factor = FRESHNESS_FACTORS[freshnessValue.state] || 1;
     const effectiveConfidence = Math.max(0, Math.min(1,
@@ -140,9 +144,11 @@
       && freshnessValue.state !== 'stale'
       && !conflict
       && !manualRecent;
-    const state = conflict
-      ? 'conflict'
-      : item.scope === 'global'
+    const state = unresolvedCorrection
+      ? 'pending'
+      : conflict
+        ? 'conflict'
+        : item.scope === 'global'
         ? 'stable'
         : freshnessValue.state === 'stale'
           ? 'stale'
@@ -159,6 +165,8 @@
       confidenceLabel: confidenceLabel(effectiveConfidence),
       conflict,
       pending,
+      correctionResolution,
+      unresolvedCorrection,
       manualRecent,
       promotionEligible,
       state,
