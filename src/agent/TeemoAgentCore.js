@@ -90,6 +90,8 @@
   class TeemoAgentCore {
     constructor(options = {}) {
       this.aiService = options.aiService || null;
+      this.contextBuilder = options.contextBuilder || null;
+      this.cognitionCollector = options.cognitionCollector || null;
       this.maxSteps = Number.isInteger(options.maxSteps) && options.maxSteps > 0 ? options.maxSteps : 4;
       this.tools = { ...createSafeTestTools(), ...(options.tools || {}) };
       this.activeRuns = new Map();
@@ -107,6 +109,9 @@
         startedAt: new Date().toISOString(),
         finishedAt: null,
         error: null,
+        cognitionContext: options.cognitionContext || null,
+        cognitionError: options.cognitionError || null,
+        cognitionCollection: null,
       };
       this.activeRuns.set(run.runId, run);
       return run;
@@ -114,12 +119,78 @@
 
     getRun(runId) { return this.activeRuns.get(runId) || null; }
 
+    async _prepareMessages(options, useActionContract) {
+      const initialMessages = Array.isArray(options.messages)
+        ? options.messages.map(message => ({ ...message }))
+        : [];
+      const messages = useActionContract
+        ? [{ role: 'system', content: ACTION_CONTRACT }, ...initialMessages]
+        : initialMessages;
+      const builder = options.contextBuilder || this.contextBuilder;
+      let cognitionContext = null;
+      let cognitionError = null;
+      if (builder && options.cognition !== false && typeof builder.build === 'function') {
+        try {
+          cognitionContext = await builder.build({
+            messages: initialMessages,
+            projectId: options.projectId || null,
+            projectContext: options.projectContext || null,
+            skillContext: options.skillContext || null,
+            conversationContext: options.conversationContext || null,
+            sessionId: options.sessionId || null,
+            maxChars: options.contextBudget,
+          });
+          if (cognitionContext && cognitionContext.systemMessage && cognitionContext.systemMessage.content) {
+            let insertAt = useActionContract ? 1 : 0;
+            while (insertAt < messages.length && messages[insertAt].role === 'system') insertAt += 1;
+            messages.splice(insertAt, 0, { ...cognitionContext.systemMessage });
+          }
+        } catch (_) {
+          // Cognition is an optional enhancement. Never break normal chat.
+          cognitionError = { code: 'CONTEXT_BUILD_FAILED' };
+          cognitionContext = null;
+        }
+      }
+      return { messages, initialMessages, cognitionContext, cognitionError };
+    }
+
+    _scheduleCollection(options, run, initialMessages, content) {
+      const collector = options.cognitionCollector || this.cognitionCollector;
+      if (!collector || options.skipCognitionCollection || typeof collector.collectTurn !== 'function') return null;
+      let userMessage = options.userMessage;
+      if (userMessage == null) {
+        for (let index = initialMessages.length - 1; index >= 0; index -= 1) {
+          if (initialMessages[index] && initialMessages[index].role === 'user') {
+            userMessage = initialMessages[index].content;
+            break;
+          }
+        }
+      }
+      if (userMessage == null) return null;
+      const promise = Promise.resolve().then(() => collector.collectTurn({
+        userMessage,
+        assistantMessage: content,
+        sessionId: run.sessionId,
+        projectId: options.projectId || null,
+      })).then(result => {
+        run.cognitionCollection = result && typeof result === 'object'
+          ? { ok: result.ok !== false, skipped: result.skipped || null, promoted: Boolean(result.promoted), scope: result.scope || null }
+          : { ok: true, skipped: null, promoted: false, scope: null };
+        return result;
+      }).catch(() => {
+        run.cognitionCollection = { ok: false, error: 'COLLECTOR_FAILED' };
+        return run.cognitionCollection;
+      });
+      run.collectionPromise = promise;
+      return promise;
+    }
+
     async runStream(options = {}) {
       const ai = options.aiService || this.aiService;
       if (!ai || typeof ai.stream !== 'function') throw new Error('Agent Core 缺少 AIService.stream');
-      const initialMessages = Array.isArray(options.messages) ? options.messages : [];
-      const messages = options.disableActionContract ? initialMessages : [{ role: 'system', content: ACTION_CONTRACT }, ...initialMessages];
-      const run = this.createRun({ ...options, messages });
+      const prepared = await this._prepareMessages(options, !options.disableActionContract);
+      const { messages, initialMessages, cognitionContext, cognitionError } = prepared;
+      const run = this.createRun({ ...options, messages, cognitionContext, cognitionError });
       const signal = options.signal;
       const maxSteps = Number.isInteger(options.maxSteps) && options.maxSteps > 0 ? options.maxSteps : this.maxSteps;
       const tools = options.tools ? { ...this.tools, ...options.tools } : this.tools;
@@ -137,6 +208,7 @@
           if (action.type === 'direct_response' || action.type === 'final_response') {
             run.status = 'completed';
             run.finishedAt = new Date().toISOString();
+            this._scheduleCollection(options, run, initialMessages, action.content);
             return { ok: true, run, action, content: action.content };
           }
           if (action.type === 'agent_error') throw Object.assign(new Error(action.message), { code: action.code });
@@ -166,11 +238,9 @@
     async run(options = {}) {
       const ai = options.aiService || this.aiService;
       if (!ai || typeof ai.send !== 'function') throw new Error('Agent Core 缺少 AIService');
-      const initialMessages = Array.isArray(options.messages) ? options.messages : [];
-      const messages = options.disableActionContract
-        ? initialMessages
-        : [{ role: 'system', content: ACTION_CONTRACT }, ...initialMessages];
-      const run = this.createRun({ ...options, messages });
+      const prepared = await this._prepareMessages(options, !options.disableActionContract);
+      const { messages, initialMessages, cognitionContext, cognitionError } = prepared;
+      const run = this.createRun({ ...options, messages, cognitionContext, cognitionError });
       const signal = options.signal;
       const maxSteps = Number.isInteger(options.maxSteps) && options.maxSteps > 0 ? options.maxSteps : this.maxSteps;
       const tools = options.tools ? { ...this.tools, ...options.tools } : this.tools;
@@ -185,6 +255,7 @@
           if (action.type === 'direct_response' || action.type === 'final_response') {
             run.status = 'completed';
             run.finishedAt = new Date().toISOString();
+            this._scheduleCollection(options, run, initialMessages, action.content);
             return { ok: true, run, action, content: action.content };
           }
           if (action.type === 'agent_error') throw Object.assign(new Error(action.message), { code: action.code });

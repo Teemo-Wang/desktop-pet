@@ -7,6 +7,7 @@
   "scripts": {
     "start": "electron .",
     "test:agent-core": "node tests/TeemoAgentCore.test.js",
+    "test:cognition": "node tests/TeemoCognition.test.js",
     "dist": "electron-builder --publish never",
     "dist:mac": "electron-builder --mac --publish never",
     "dist:win": "electron-builder --win --publish never",

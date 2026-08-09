@@ -10,7 +10,10 @@
   const path = require('path');
   const { spawn } = require('child_process');
 
-  const TEMP_ROOT = path.join(os.homedir(), '.hellobike-pet', 'Teemo-audio-temp');
+  const TEMP_ROOT = path.join(
+    path.resolve(process.env.TEEMO_ASSISTANT_DATA_DIR || path.join(os.homedir(), '.hellobike-pet')),
+    'Teemo-audio-temp',
+  );
 
   function _safeJson(text) {
     try { return JSON.parse(text); } catch (_) { return null; }

@@ -32,6 +32,8 @@ cognition/
 **/userData/
 **/memory/
 **/cognition/
+!src/cognition/
+!src/cognition/*.js
 
 # 本地凭据和环境文件
 *.local.json

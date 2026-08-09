@@ -943,9 +943,13 @@
         };
         const agentCore = window.agentCore;
         if (agentCore && typeof agentCore.runStream === 'function') {
+          const cognitionProject = typeof this.getProjectContext === 'function' ? this.getProjectContext() : null;
           const agentResult = await agentCore.runStream({
             messages: apiMessages,
             sessionId: active.id || null,
+            userMessage: displayText,
+            projectId: cognitionProject && cognitionProject.projectId,
+            projectContext: cognitionProject,
             signal: this.streamAbortCtrl.signal,
             disableActionContract: true,
             onChunk,

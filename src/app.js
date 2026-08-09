@@ -6,7 +6,14 @@
 
   // Services
   window.aiService = new window.AIService();
-  window.agentCore = new window.TeemoAgentCore({ aiService: window.aiService });
+  window.cognitionService = new window.TeemoCognitionService();
+  window.cognitionCollector = new window.TeemoCognitionCollector({ cognitionService: window.cognitionService });
+  window.contextBuilder = new window.TeemoContextBuilder({ cognitionService: window.cognitionService });
+  window.agentCore = new window.TeemoAgentCore({
+    aiService: window.aiService,
+    contextBuilder: window.contextBuilder,
+    cognitionCollector: window.cognitionCollector,
+  });
   const dtService = new window.DingTalkService();
   const yqService = new window.YuqueService();
   const store = new window.SettingsStore();
@@ -41,6 +48,10 @@
   const todos = new window.TodosComponent(document.getElementById('todosPanel'), todoService);
   const skills = new window.SkillsComponent(document.getElementById('skillsPanel'), skillService);
   const workspace = new window.WorkspaceComponent(document.getElementById('workspacePanel'), { projects: projectService, todos: todoService });
+  chat.getProjectContext = () => {
+    const projectId = workspace.getActiveProjectId();
+    return projectId ? { projectId, project: projectService.getById(projectId) } : null;
+  };
   const apiPanel = new window.APIConnectComponent(document.getElementById('apiPanel'), { ai: window.aiService, dingtalk: dtService, yuque: yqService, material: materialService }, store);
   const prefPanel = new window.PreferencesComponent(document.getElementById('prefPanel'), store);
   const notif = new window.NotificationComponent();

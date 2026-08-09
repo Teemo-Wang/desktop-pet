@@ -15,7 +15,7 @@
   const os = require('os');
 
   // 钉钉会话持久化文件（真实模式下的历史会话 + 回复地址）
-  const STORE_DIR = path.join(os.homedir(), '.hellobike-pet');
+  const STORE_DIR = path.resolve(process.env.TEEMO_ASSISTANT_DATA_DIR || path.join(os.homedir(), '.hellobike-pet'));
   const STORE_FILE = path.join(STORE_DIR, 'dingtalk-history.json');
   // 单会话消息上限，超过则裁剪最旧的，避免文件无限增长
   const MAX_MESSAGES_PER_CONV = 200;  // 存储上限，超过则裁剪最旧的

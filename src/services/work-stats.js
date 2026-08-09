@@ -14,7 +14,7 @@
   const path = require('path');
   const os = require('os');
 
-  const DIR = path.join(os.homedir(), '.hellobike-pet');
+  const DIR = path.resolve(process.env.TEEMO_ASSISTANT_DATA_DIR || path.join(os.homedir(), '.hellobike-pet'));
   const FILE = path.join(DIR, 'work-stats.json');
   // 历史保留天数（超过自动裁剪）
   const RETAIN_DAYS = 30;

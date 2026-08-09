@@ -49,6 +49,11 @@
       this.el.classList.remove('open');
     }
 
+    /** 当前项目作用域；供聊天 Context Builder 使用，不写入全局 Profile。 */
+    getActiveProjectId() {
+      return this._view === 'detail' ? this._activeProjectId : null;
+    }
+
     /** 从外部跳转到首页的今日待办视图 */
     openToday() {
       this._view = 'home';

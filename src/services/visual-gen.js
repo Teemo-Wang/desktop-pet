@@ -7,7 +7,7 @@
   const path = require('path');
   const os = require('os');
 
-  const DIR = path.join(os.homedir(), '.hellobike-pet');
+  const DIR = path.resolve(process.env.TEEMO_ASSISTANT_DATA_DIR || path.join(os.homedir(), '.hellobike-pet'));
   const FILE = path.join(DIR, 'visual-records.json');
 
   // 设计类型关键词映射

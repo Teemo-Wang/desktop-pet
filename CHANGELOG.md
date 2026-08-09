@@ -2,6 +2,15 @@
 
 ## v1.1.7 - 2026-08-09
 
+### P1-2 Cognition + Context Builder（待 GPT 审阅）
+
+- 新增 Teemo Profile、Recent Context、按 projectId 隔离的 Project Context 和 Observation 数据模型。
+- 新增不调用模型的保守 Cognition Collector，支持重复证据升级、用户纠正 supersede 与敏感凭据拦截。
+- 新增有预算的模型无关 Context Builder，并以可选依赖接入 Agent Core 的流式/非流式路径。
+- Cognition 数据只通过 TeemoStorageService 保存到本地 `Teemo-cognition.json`；Builder/Collector 失败不影响普通聊天。
+- 补齐旧外围服务对 `TEEMO_ASSISTANT_DATA_DIR` 的隔离支持，避免完整 Electron 烟测读取正式用户目录。
+- 增加 `docs/P1-2-COGNITION-CONTEXT.md` 和 `npm.cmd run test:cognition` 隔离验证入口。
+
 ### P1-1 Agent Core
 
 - 新增模型无关的 `TeemoAgentCore` 基础执行循环、Run/Step 状态、统一 Action Contract、取消和最大步骤保护。

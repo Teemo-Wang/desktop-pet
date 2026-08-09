@@ -3,7 +3,10 @@
   const fs = require('fs');
   const os = require('os');
   const path = require('path');
-  const UPLOAD_DIR = path.join(os.homedir(), '.hellobike-pet', 'uploads');
+  const UPLOAD_DIR = path.join(
+    path.resolve(process.env.TEEMO_ASSISTANT_DATA_DIR || path.join(os.homedir(), '.hellobike-pet')),
+    'uploads',
+  );
 
   const MAX_FILE_SIZE = 15 * 1024 * 1024;
   const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
@@ -18,7 +21,18 @@
   const skills = new window.SkillService();
   const history = new window.ChatHistoryService();
   const ai = new window.AIService();
-  const agentCore = window.TeemoAgentCore ? new window.TeemoAgentCore({ aiService: ai }) : null;
+  const cognitionService = window.TeemoCognitionService ? new window.TeemoCognitionService() : null;
+  const cognitionCollector = window.TeemoCognitionCollector && cognitionService
+    ? new window.TeemoCognitionCollector({ cognitionService })
+    : null;
+  const contextBuilder = window.TeemoContextBuilder && cognitionService
+    ? new window.TeemoContextBuilder({ cognitionService })
+    : null;
+  const agentCore = window.TeemoAgentCore ? new window.TeemoAgentCore({
+    aiService: ai,
+    contextBuilder,
+    cognitionCollector,
+  }) : null;
   const ruleCapture = window.RuleCaptureService ? new window.RuleCaptureService(skills, ai) : null;
   const comfyui = new window.TeemoComfyUIService(store);
   window.comfyUIService = comfyui;
@@ -2620,6 +2634,7 @@
           const agentResult = await agentCore.runStream({
             messages: apiMessages,
             sessionId: active.id || null,
+            userMessage: text || displayText,
             signal: abortController.signal,
             disableActionContract: true,
             onChunk,
