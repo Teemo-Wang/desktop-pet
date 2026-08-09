@@ -80,6 +80,7 @@
     constructor(options = {}) {
       this.aiService = options.aiService || null;
       this.contextBuilder = options.contextBuilder || null;
+      this.creativeContextBuilder = options.creativeContextBuilder || null;
       this.cognitionCollector = options.cognitionCollector || null;
       this.maxSteps = Number.isInteger(options.maxSteps) && options.maxSteps > 0 ? options.maxSteps : 4;
       this.toolRegistry = options.toolRegistry || null;
@@ -100,6 +101,8 @@
         error: null,
         cognitionContext: options.cognitionContext || null,
         cognitionError: options.cognitionError || null,
+        creativeContext: options.creativeContext || null,
+        creativeError: options.creativeError || null,
         cognitionCollection: null,
       };
       this.activeRuns.set(run.runId, run);
@@ -177,7 +180,31 @@
           cognitionContext = null;
         }
       }
-      return { messages, initialMessages, cognitionContext, cognitionError };
+      const creativeBuilder = options.creativeContextBuilder || this.creativeContextBuilder;
+      let creativeContext = null;
+      let creativeError = null;
+      if (creativeBuilder && options.creative !== false && typeof creativeBuilder.build === 'function') {
+        try {
+          creativeContext = await creativeBuilder.build({
+            messages: initialMessages,
+            userMessage: options.userMessage,
+            projectId: options.projectId || null,
+            projectContext: options.projectContext || null,
+            skillContext: options.skillContext || null,
+            sessionId: options.sessionId || null,
+            maxChars: options.creativeContextBudget,
+          });
+          if (creativeContext && creativeContext.systemMessage && creativeContext.systemMessage.content) {
+            let insertAt = useActionContract ? 1 : 0;
+            while (insertAt < messages.length && messages[insertAt].role === 'system') insertAt += 1;
+            messages.splice(insertAt, 0, { ...creativeContext.systemMessage });
+          }
+        } catch (_) {
+          creativeError = { code: 'CREATIVE_CONTEXT_BUILD_FAILED' };
+          creativeContext = null;
+        }
+      }
+      return { messages, initialMessages, cognitionContext, cognitionError, creativeContext, creativeError };
     }
 
     _scheduleCollection(options, run, initialMessages, content) {
@@ -215,8 +242,8 @@
       const ai = options.aiService || this.aiService;
       if (!ai || typeof ai.stream !== 'function') throw new Error('Agent Core 缺少 AIService.stream');
       const prepared = await this._prepareMessages(options, !options.disableActionContract);
-      const { messages, initialMessages, cognitionContext, cognitionError } = prepared;
-      const run = this.createRun({ ...options, messages, cognitionContext, cognitionError });
+      const { messages, initialMessages, cognitionContext, cognitionError, creativeContext, creativeError } = prepared;
+      const run = this.createRun({ ...options, messages, cognitionContext, cognitionError, creativeContext, creativeError });
       const signal = options.signal;
       const maxSteps = Number.isInteger(options.maxSteps) && options.maxSteps > 0 ? options.maxSteps : this.maxSteps;
       const registry = options.toolRegistry || this.toolRegistry;
@@ -260,8 +287,8 @@
       const ai = options.aiService || this.aiService;
       if (!ai || typeof ai.send !== 'function') throw new Error('Agent Core 缺少 AIService');
       const prepared = await this._prepareMessages(options, !options.disableActionContract);
-      const { messages, initialMessages, cognitionContext, cognitionError } = prepared;
-      const run = this.createRun({ ...options, messages, cognitionContext, cognitionError });
+      const { messages, initialMessages, cognitionContext, cognitionError, creativeContext, creativeError } = prepared;
+      const run = this.createRun({ ...options, messages, cognitionContext, cognitionError, creativeContext, creativeError });
       const signal = options.signal;
       const maxSteps = Number.isInteger(options.maxSteps) && options.maxSteps > 0 ? options.maxSteps : this.maxSteps;
       const registry = options.toolRegistry || this.toolRegistry;

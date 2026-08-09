@@ -1,6 +1,6 @@
 # Teemo助理 — 项目进度与规划
 
-> 文档版本：v1.18 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.2.1（P2 Personal Intelligence IN PROGRESS）**
+> 文档版本：v1.19 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.2.1（P2 Personal Intelligence IN PROGRESS）**
 
 ## 当前状态
 
@@ -10,8 +10,17 @@
 - P0：`CLOSED`
 - P1：`CLOSED / PASS / BLOCKERS: 0`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
-- Current Development：`P2-1 Cognition UI / Memory Center CLOSED / PASS / BLOCKERS: 0`
+- Current Development：`P2-2 Agent Creative Profile IMPLEMENTED / WAITING REVIEW`
 - Current Branch：`Teemo/p2-personal-intelligence`
+
+## P2-2 阶段（2026-08-09，IMPLEMENTED / WAITING REVIEW）
+
+- 新增独立于 Cognition 的版本化 Agent Creative Profile：10 条专业原则、9 个评价维度、权重总和 100，以及 General/Brand/Marketing/UI/3D/Motion 六个 Domain Lens。
+- 新增相关性门控、默认 1,400 字符预算的 Creative Context Builder，并以可选依赖平行接入 Agent Core；普通非设计聊天不注入，失败时独立降级。
+- 约束优先级为当前用户明确要求 > 项目约束 > Skill 规范 > Creative Judgment；GPT、Grok、DeepSeek 共用同一 Provider-neutral Profile。
+- 新增“Teemo 的设计判断”只读页面和独立开关；本地状态仅保存 enabled/version/revision，不保存或学习用户偏好与个人素材。
+- 专项单元与隔离 Electron smoke 已通过；P1/P2-1 全量回归与 GPT 严格审阅待完成。详细记录见 `docs/P2-2-CREATIVE-PROFILE.md`。
+- 未实现 P2-3 Challenge/Creative Director、P2-4 Cognition Intelligence Upgrade 或 P3 Personal Inspiration Intelligence；当前不得标记 PASS/CLOSED。
 
 ## v1.2.1 维护更新（2026-08-09）
 

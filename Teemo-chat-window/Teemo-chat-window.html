@@ -31,6 +31,11 @@
           <div><strong>Teemo 对我的了解</strong><span>认知与记忆</span></div>
           <span class="teemo-settings-chevron">›</span>
         </button>
+        <button class="teemo-sidebar-memory teemo-sidebar-creative" id="TeemoCreativeButton" title="查看 Teemo 的设计判断">
+          <span class="teemo-sidebar-memory-icon">◈</span>
+          <div><strong>Teemo 的设计判断</strong><span>专业判断框架</span></div>
+          <span class="teemo-settings-chevron">›</span>
+        </button>
         <button class="teemo-sidebar-foot" id="settingsButton" title="打开设置">
           <img src="../icon/Teemo-app.png" alt="">
           <div><strong>Teemo</strong><span id="modelLabel">私人助理</span></div>
@@ -117,6 +122,42 @@
           </div>
           <div class="teemo-memory-status" id="memoryStatus" aria-live="polite"></div>
           <div class="teemo-memory-list" id="memoryList"></div>
+        </div>
+      </main>
+
+      <main class="teemo-settings-page teemo-creative-page" id="TeemoCreativeView" hidden>
+        <div class="teemo-settings-head teemo-memory-head">
+          <button id="TeemoCreativeBackButton" class="teemo-back-button">← 返回聊天</button>
+          <div class="teemo-memory-head-copy"><h1>Teemo 的设计判断</h1><p>独立评价设计质量的专业框架，与个人偏好分开管理</p></div>
+          <div class="teemo-memory-head-actions">
+            <span class="teemo-creative-version" id="TeemoCreativeVersion"></span>
+            <label class="teemo-memory-switch"><input id="TeemoCreativeEnabled" type="checkbox" checked><span>启用 Teemo 设计判断</span></label>
+          </div>
+        </div>
+        <div class="teemo-creative-content">
+          <section class="teemo-creative-distinction">
+            <div><span>你的偏好</span><strong>Cognition 了解你喜欢什么</strong><p>例如：你喜欢更极简、更克制的科技视觉。</p></div>
+            <div><span>专业判断</span><strong>Creative Profile 判断设计为什么好</strong><p>例如：继续做减法可能削弱品牌识别与记忆点。</p></div>
+          </section>
+          <div class="teemo-creative-status" id="TeemoCreativeStatus" aria-live="polite"></div>
+          <section class="teemo-creative-section">
+            <header><div><span>01</span><h2>核心原则</h2></div><p>稳定、专业、独立、可解释</p></header>
+            <div class="teemo-creative-principles" id="TeemoCreativePrinciples"></div>
+          </section>
+          <section class="teemo-creative-section">
+            <header><div><span>02</span><h2>评价维度</h2></div><p>权重用于保持判断结构，不代表伪精确评分</p></header>
+            <div class="teemo-creative-dimensions" id="TeemoCreativeDimensions"></div>
+          </section>
+          <section class="teemo-creative-section">
+            <header><div><span>03</span><h2>设计领域</h2></div><p>不同媒介使用不同判断重点</p></header>
+            <div class="teemo-creative-domains" id="TeemoCreativeDomains"></div>
+            <div class="teemo-creative-domain-detail" id="TeemoCreativeDomainDetail"></div>
+          </section>
+          <section class="teemo-creative-priority">
+            <span>约束优先级</span>
+            <strong>明确要求 → 项目约束 → Skill 规范 → 专业判断</strong>
+            <p>Teemo 会在约束内给出专业建议，不会擅自改写品牌色、文案、尺寸或任务要求。</p>
+          </section>
         </div>
       </main>
 
@@ -370,6 +411,9 @@
   <script src="../src/cognition/TeemoCognitionService.js"></script>
   <script src="../src/cognition/TeemoCognitionCollector.js"></script>
   <script src="../src/cognition/TeemoContextBuilder.js"></script>
+  <script src="../src/creative/TeemoCreativeProfileDefaults.js"></script>
+  <script src="../src/creative/TeemoCreativeProfileService.js"></script>
+  <script src="../src/creative/TeemoCreativeContextBuilder.js"></script>
   <script src="../src/permissions/TeemoPermissionPrompt.js"></script>
   <script src="../src/permissions/TeemoPermissionClient.js"></script>
   <script src="../src/tools/TeemoToolRegistry.js"></script>
@@ -387,6 +431,7 @@
   <script src="../src/services/chat-history.js"></script>
   <script src="../src/services/projects.js"></script>
   <script src="../src/cognition/TeemoCognitionCenter.js"></script>
+  <script src="../src/creative/TeemoCreativeProfileCenter.js"></script>
   <script src="../src/utils/markdown.js"></script>
   <script src="Teemo-chat-window.js"></script>
 </body>

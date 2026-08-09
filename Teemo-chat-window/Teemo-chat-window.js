@@ -28,6 +28,12 @@
   const contextBuilder = window.TeemoContextBuilder && cognitionService
     ? new window.TeemoContextBuilder({ cognitionService })
     : null;
+  const creativeProfileService = window.TeemoCreativeProfileService
+    ? new window.TeemoCreativeProfileService()
+    : null;
+  const creativeContextBuilder = window.TeemoCreativeContextBuilder && creativeProfileService
+    ? new window.TeemoCreativeContextBuilder({ profileService: creativeProfileService })
+    : null;
   const permissionClient = window.TeemoPermissionClient ? new window.TeemoPermissionClient({ ipcRenderer }) : null;
   const fileClient = window.TeemoFileClient ? new window.TeemoFileClient({ ipcRenderer }) : null;
   const gitClient = window.TeemoGitClient ? new window.TeemoGitClient({ ipcRenderer }) : null;
@@ -52,6 +58,7 @@
   const agentCore = window.TeemoAgentCore ? new window.TeemoAgentCore({
     aiService: ai,
     contextBuilder,
+    creativeContextBuilder,
     cognitionCollector,
     toolRegistry,
   }) : null;
@@ -104,9 +111,11 @@
     settingsBack: document.getElementById('settingsBackButton'),
     memoryButton: document.getElementById('memoryButton'),
     memoryBack: document.getElementById('memoryBackButton'),
+    creativeButton: document.getElementById('TeemoCreativeButton'),
     chatView: document.getElementById('chatView'),
     settingsView: document.getElementById('settingsView'),
     memoryView: document.getElementById('memoryView'),
+    creativeView: document.getElementById('TeemoCreativeView'),
     chatFontSize: document.getElementById('chatFontSize'),
     chatFontSizeValue: document.getElementById('chatFontSizeValue'),
     chatFontPreview: document.getElementById('chatFontPreview'),
@@ -1505,6 +1514,7 @@
     populateSettings();
     els.chatView.hidden = true;
     if (els.memoryView) els.memoryView.hidden = true;
+    if (els.creativeView) els.creativeView.hidden = true;
     els.settingsView.hidden = false;
   }
 
@@ -1512,6 +1522,7 @@
     refreshModelConfig();
     els.settingsView.hidden = true;
     if (els.memoryView) els.memoryView.hidden = true;
+    if (els.creativeView) els.creativeView.hidden = true;
     els.chatView.hidden = false;
     renderAll();
     els.input.focus();
@@ -1534,12 +1545,43 @@
   function showMemory() {
     els.chatView.hidden = true;
     els.settingsView.hidden = true;
+    if (els.creativeView) els.creativeView.hidden = true;
     if (els.memoryView) els.memoryView.hidden = false;
     const center = ensureCognitionCenter();
     if (center) center.show();
   }
 
   function hideMemory() {
+    if (els.memoryView) els.memoryView.hidden = true;
+    els.settingsView.hidden = true;
+    els.chatView.hidden = false;
+    renderAll();
+    els.input.focus();
+  }
+
+  let creativeProfileCenter = null;
+
+  function ensureCreativeProfileCenter() {
+    if (!creativeProfileCenter && window.TeemoCreativeProfileCenter && creativeProfileService) {
+      creativeProfileCenter = new window.TeemoCreativeProfileCenter({
+        service: creativeProfileService,
+        onBack: hideCreativeProfile,
+      });
+    }
+    return creativeProfileCenter;
+  }
+
+  function showCreativeProfile() {
+    els.chatView.hidden = true;
+    els.settingsView.hidden = true;
+    if (els.memoryView) els.memoryView.hidden = true;
+    if (els.creativeView) els.creativeView.hidden = false;
+    const center = ensureCreativeProfileCenter();
+    if (center) center.show();
+  }
+
+  function hideCreativeProfile() {
+    if (els.creativeView) els.creativeView.hidden = true;
     if (els.memoryView) els.memoryView.hidden = true;
     els.settingsView.hidden = true;
     els.chatView.hidden = false;
@@ -2820,6 +2862,7 @@
   els.settingsButton.addEventListener('click', showSettings);
   els.settingsBack.addEventListener('click', hideSettings);
   if (els.memoryButton) els.memoryButton.addEventListener('click', showMemory);
+  if (els.creativeButton) els.creativeButton.addEventListener('click', showCreativeProfile);
   if (els.addLocalAccess) els.addLocalAccess.addEventListener('click', authorizeLocalFolder);
   if (els.checkUpdate) {
     els.checkUpdate.addEventListener('click', async () => {

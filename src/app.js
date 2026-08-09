@@ -9,6 +9,8 @@
   window.cognitionService = new window.TeemoCognitionService();
   window.cognitionCollector = new window.TeemoCognitionCollector({ cognitionService: window.cognitionService });
   window.contextBuilder = new window.TeemoContextBuilder({ cognitionService: window.cognitionService });
+  window.creativeProfileService = new window.TeemoCreativeProfileService();
+  window.creativeContextBuilder = new window.TeemoCreativeContextBuilder({ profileService: window.creativeProfileService });
   window.teemoPermissionClient = new window.TeemoPermissionClient({ ipcRenderer });
   window.teemoFileClient = new window.TeemoFileClient({ ipcRenderer });
   window.teemoGitClient = new window.TeemoGitClient({ ipcRenderer });
@@ -22,6 +24,7 @@
   window.agentCore = new window.TeemoAgentCore({
     aiService: window.aiService,
     contextBuilder: window.contextBuilder,
+    creativeContextBuilder: window.creativeContextBuilder,
     cognitionCollector: window.cognitionCollector,
     toolRegistry: window.teemoToolRegistry,
   });
