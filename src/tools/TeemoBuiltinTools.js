@@ -18,7 +18,7 @@
         required: ['text'],
         additionalProperties: false,
       },
-      metadata: { category: 'system', sideEffect: 'none' },
+      metadata: { category: 'system', permission: 'none', sideEffect: 'none' },
       handler: async args => ({ text: args.text }),
     },
     {
@@ -30,7 +30,7 @@
         required: [],
         additionalProperties: false,
       },
-      metadata: { category: 'system', sideEffect: 'none' },
+      metadata: { category: 'system', permission: 'none', sideEffect: 'none' },
       handler: async (_args, context) => ({
         runId: context.runId,
         sessionId: context.sessionId,
@@ -48,9 +48,9 @@
     }));
   }
 
-  function createRegistry() {
+  function createRegistry(options = {}) {
     if (typeof TeemoToolRegistry !== 'function') throw new Error('TeemoToolRegistry is not available.');
-    const registry = new TeemoToolRegistry();
+    const registry = new TeemoToolRegistry(options);
     for (const definition of createDefinitions()) registry.register(definition);
     return registry;
   }

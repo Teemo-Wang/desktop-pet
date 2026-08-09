@@ -12,7 +12,7 @@ function definition(overrides = {}) {
       required: ['left', 'right'],
       additionalProperties: false,
     },
-    metadata: { category: 'test', sideEffect: 'none', privateNote: 'not public' },
+    metadata: { category: 'test', permission: 'none', sideEffect: 'none', privateNote: 'not public' },
     handler: async args => ({ total: args.left + args.right }),
     ...overrides,
   };

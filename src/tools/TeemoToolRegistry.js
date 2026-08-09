@@ -10,6 +10,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   const TOOL_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
   const JSON_SCHEMA_TYPES = new Set(['object', 'array', 'string', 'number', 'integer', 'boolean', 'null']);
+  const PERMISSIONS = new Set(['none', 'read', 'write', 'execute']);
 
   function clone(value) {
     if (value == null) return value;
@@ -133,8 +134,9 @@
   }
 
   class TeemoToolRegistry {
-    constructor() {
+    constructor(options = {}) {
       this._tools = new Map();
+      this.permissionService = options.permissionService || null;
     }
 
     register(definition) {
@@ -235,6 +237,83 @@
             ok: false, tool, toolCallId, startedAt,
             code: 'TOOL_ARGUMENT_VALIDATION_FAILED', message: validationError,
           });
+        }
+        const permission = definition.metadata && definition.metadata.permission;
+        if (!PERMISSIONS.has(permission)) {
+          return resultEnvelope({
+            ok: false, tool, toolCallId, startedAt,
+            code: 'PERMISSION_CHECK_FAILED', message: 'Tool permission metadata is missing or invalid.',
+          });
+        }
+        if (permission !== 'none') {
+          const permissionService = this.permissionService;
+          const authorize = permissionService && (
+            typeof permissionService.authorize === 'function'
+              ? permissionService.authorize.bind(permissionService)
+              : (typeof permissionService.requestPermission === 'function'
+                ? permissionService.requestPermission.bind(permissionService)
+                : null)
+          );
+          if (!authorize) {
+            return resultEnvelope({
+              ok: false, tool, toolCallId, startedAt,
+              code: 'PERMISSION_CHECK_FAILED', message: 'Permission service is unavailable.',
+            });
+          }
+          let decision;
+          try {
+            decision = await authorize({
+              toolCallId,
+              runId: context.runId || null,
+              sessionId: context.sessionId || null,
+              toolName: tool,
+              permission,
+              resource: definition.metadata.resource || null,
+              reason: definition.metadata.permissionReason || null,
+            }, {
+              signal: signal || null,
+              timeoutMs: context.permissionTimeoutMs,
+              onPrompt: request => {
+                if (typeof context.onPermissionWaiting === 'function') context.onPermissionWaiting(request);
+              },
+            });
+          } catch (_) {
+            return resultEnvelope({
+              ok: false, tool, toolCallId, startedAt,
+              code: 'PERMISSION_CHECK_FAILED', message: 'Permission check failed closed.',
+            });
+          }
+          if (signal && signal.aborted) {
+            return resultEnvelope({
+              ok: false, tool, toolCallId, startedAt, cancelled: true,
+              code: 'TOOL_CANCELLED', message: 'Tool execution was cancelled.',
+            });
+          }
+          if (!decision || decision.decision !== 'allow') {
+            const reason = decision && decision.reason;
+            if (reason === 'cancelled') {
+              return resultEnvelope({
+                ok: false, tool, toolCallId, startedAt, cancelled: true,
+                code: 'TOOL_CANCELLED', message: 'Tool execution was cancelled.',
+              });
+            }
+            if (reason === 'timeout') {
+              return resultEnvelope({
+                ok: false, tool, toolCallId, startedAt,
+                code: 'PERMISSION_TIMEOUT', message: 'Permission request timed out.',
+              });
+            }
+            if (reason === 'check_failed' || reason === 'permission_request_invalid') {
+              return resultEnvelope({
+                ok: false, tool, toolCallId, startedAt,
+                code: 'PERMISSION_CHECK_FAILED', message: 'Permission check failed closed.',
+              });
+            }
+            return resultEnvelope({
+              ok: false, tool, toolCallId, startedAt,
+              code: 'PERMISSION_DENIED', message: 'User denied permission for this tool.',
+            });
+          }
         }
         const executionContext = Object.freeze({
           runId: context.runId || null,

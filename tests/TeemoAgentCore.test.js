@@ -82,6 +82,7 @@ async function main() {
     const registry = new TeemoToolRegistry();
     registry.register({
       name: 'echo', description: 'Fail safely.', inputSchema: emptyObjectSchema(),
+      metadata: { permission: 'none' },
       handler: async () => { throw new Error('boom'); },
     });
     const core = new TeemoAgentCore({ aiService: ai, toolRegistry: registry });
@@ -106,6 +107,7 @@ async function main() {
     const registry = new TeemoToolRegistry();
     registry.register({
       name: 'stop_now', description: 'Abort the current test run.', inputSchema: emptyObjectSchema(),
+      metadata: { permission: 'none' },
       handler: async () => controller.abort(),
     });
     const core = new TeemoAgentCore({ aiService: ai, toolRegistry: registry });
@@ -144,6 +146,7 @@ async function main() {
         name: 'wait_for_abort',
         description: 'Abort one isolated test run.',
         inputSchema: emptyObjectSchema(),
+        metadata: { permission: 'none' },
         handler: async (_args, context) => {
           controllerA.abort();
           return { runId: context.runId };

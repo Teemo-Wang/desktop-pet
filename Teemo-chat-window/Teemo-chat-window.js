@@ -28,7 +28,12 @@
   const contextBuilder = window.TeemoContextBuilder && cognitionService
     ? new window.TeemoContextBuilder({ cognitionService })
     : null;
-  const toolRegistry = window.TeemoBuiltinTools ? window.TeemoBuiltinTools.createRegistry() : null;
+  const permissionClient = window.TeemoPermissionClient ? new window.TeemoPermissionClient({ ipcRenderer }) : null;
+  const toolRegistry = window.TeemoBuiltinTools ? window.TeemoBuiltinTools.createRegistry({
+    permissionService: permissionClient,
+  }) : null;
+  window.teemoPermissionClient = permissionClient;
+  window.teemoToolRegistry = toolRegistry;
   const agentCore = window.TeemoAgentCore ? new window.TeemoAgentCore({
     aiService: ai,
     contextBuilder,

@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+<head><meta charset="UTF-8"><title>Teemo Permission Smoke</title></head>
+<body>
+  <script>
+    window.TeemoPermissionPrompt = { request: () => new Promise(() => {}) };
+  </script>
+  <script src="../../src/permissions/TeemoPermissionClient.js"></script>
+  <script src="../../src/tools/TeemoToolRegistry.js"></script>
+  <script>
+    const { ipcRenderer } = require('electron');
+    const client = new window.TeemoPermissionClient({ ipcRenderer });
+    const registry = new window.TeemoToolRegistry({ permissionService: client });
+    const calls = {};
+
+    function register(name, permission) {
+      calls[name] = 0;
+      registry.register({
+        name,
+        description: `Harmless ${permission} smoke tool.`,
+        inputSchema: { type: 'object', properties: {}, required: [], additionalProperties: false },
+        metadata: {
+          permission,
+          resource: permission === 'none' ? null : 'teemo-test://shared/resource',
+          permissionReason: 'Electron integration smoke test.',
+          sideEffect: 'mock_only',
+        },
+        handler: async () => {
+          calls[name] += 1;
+          return { calls: calls[name] };
+        },
+      });
+    }
+
+    register('test_none_action', 'none');
+    register('test_session_action', 'write');
+    register('test_once_action', 'write');
+    register('test_deny_action', 'execute');
+    register('test_abort_action', 'read');
+
+    window.runTool = async (name, sessionId) => ({
+      result: await registry.execute(name, {}, { runId: `run-${name}`, sessionId, step: 1 }),
+      calls: calls[name],
+    });
+    window.runAbortTool = async sessionId => {
+      const controller = new AbortController();
+      const execution = registry.execute('test_abort_action', {}, {
+        runId: 'run-abort', sessionId, step: 1, signal: controller.signal,
+      });
+      setTimeout(() => controller.abort(), 25);
+      const result = await execution;
+      return { result, calls: calls.test_abort_action };
+    };
+    window.teemoPermissionSmokeReady = true;
+  </script>
+</body>
+</html>

@@ -108,7 +108,7 @@
 
     getRun(runId) { return this.activeRuns.get(runId) || null; }
 
-    async _executeTool(registry, action, run, signal) {
+    async _executeTool(registry, action, run, signal, onStatus) {
       if (!registry || typeof registry.execute !== 'function') {
         throw Object.assign(new Error(`未知 Tool：${action.tool || '(空)'}`), { code: 'UNKNOWN_TOOL' });
       }
@@ -118,6 +118,10 @@
         sessionId: run.sessionId,
         step: run.step,
         signal,
+        onPermissionWaiting: request => {
+          run.status = 'permission_waiting';
+          if (typeof onStatus === 'function') onStatus(`等待 Tool 权限：${action.tool}`, run, request);
+        },
       });
       const call = {
         toolCallId: envelope.toolCallId,
@@ -234,7 +238,7 @@
             return { ok: true, run, action, content: action.content };
           }
           if (action.type === 'agent_error') throw Object.assign(new Error(action.message), { code: action.code });
-          const result = await this._executeTool(registry, action, run, signal);
+          const result = await this._executeTool(registry, action, run, signal, options.onStatus);
           if (signal && signal.aborted) throw abortError();
           run.messages.push({ role: 'assistant', content: JSON.stringify(action) });
           run.messages.push({ role: 'tool', name: action.tool, content: JSON.stringify(result) });
@@ -276,7 +280,7 @@
             return { ok: true, run, action, content: action.content };
           }
           if (action.type === 'agent_error') throw Object.assign(new Error(action.message), { code: action.code });
-          const result = await this._executeTool(registry, action, run, signal);
+          const result = await this._executeTool(registry, action, run, signal, options.onStatus);
           if (signal && signal.aborted) throw abortError();
           run.messages.push({ role: 'assistant', content: JSON.stringify(action) });
           run.messages.push({ role: 'tool', name: action.tool, content: JSON.stringify(result) });

@@ -3,6 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const TeemoFileService = require('./src/services/TeemoFileService');
+const TeemoPermissionService = require('./src/permissions/TeemoPermissionService');
+const registerTeemoPermissionIpc = require('./src/permissions/TeemoPermissionIpc');
 const dingtalkBridge = require('./dingtalk-bridge');
 const materialBridge = require('./material-bridge');
 
@@ -12,6 +14,8 @@ const TEEMO_ARCHIVE_DIR = 'D:\\Teemo助手';
 const TEEMO_COMFY_OUTPUT_DIR = 'I:\\ComfyUI\\ComfyUI\\output';
 const LOCAL_ACCESS_FILE = 'local-file-access.json';
 const fileService = new TeemoFileService();
+const teemoPermissionService = new TeemoPermissionService();
+registerTeemoPermissionIpc(ipcMain, teemoPermissionService);
 
 function localAccessFilePath() {
   return path.join(app.getPath('userData'), LOCAL_ACCESS_FILE);

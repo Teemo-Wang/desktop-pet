@@ -1,0 +1,5 @@
+{
+  "name": "teemo-permission-electron-smoke",
+  "private": true,
+  "main": "TeemoPermissionElectronSmoke.js"
+}
