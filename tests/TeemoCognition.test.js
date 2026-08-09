@@ -76,6 +76,47 @@ async function main() {
     assert.equal(service.getProfile().some(item => /大圆角/.test(item.content)), false);
     assert.equal(service.getProjectContext('project-A').some(item => /大圆角/.test(item.content)), true);
 
+    await collector.collectTurn({
+      userMessage: '我比较喜欢蓝色这个版本。',
+      projectId: 'project-A',
+      sessionId: 'active-project-ambiguous',
+    });
+    assert.equal(service.getProjectContext('project-A').some(item => /蓝色这个版本/.test(item.content)), true);
+    assert.equal(service.getProfile().some(item => /蓝色这个版本/.test(item.content)), false);
+
+    await collector.collectTurn({
+      userMessage: '以后我所有项目默认都更喜欢简约一些。',
+      projectId: 'project-A',
+      sessionId: 'active-project-global',
+    });
+    assert.equal(service.getProfile().some(item => /所有项目默认/.test(item.content)), true);
+    assert.equal(service.getProjectContext('project-A').some(item => /所有项目默认/.test(item.content)), false);
+
+    await collector.collectTurn({
+      userMessage: '我最近比较喜欢这种金属材质。',
+      sessionId: 'no-active-project',
+    });
+    assert.equal(service.getRecentContext().some(item => /金属材质/.test(item.content)), true);
+    assert.equal(service.getProfile().some(item => /金属材质/.test(item.content)), false);
+
+    await collector.collectTurn({ userMessage: '我比较喜欢克制的排版。', sessionId: 'ambiguous-reference' });
+    await collector.collectTurn({ userMessage: '最近开始关注新的 AI 工具。', sessionId: 'ambiguous-reference' });
+    const ambiguousBefore = service.listObservations()
+      .filter(item => item.sourceSessionId === 'ambiguous-reference')
+      .map(item => item.id)
+      .sort();
+    await collector.collectTurn({
+      userMessage: '这个只适用于这个项目。',
+      projectId: 'project-A',
+      sessionId: 'ambiguous-reference',
+    });
+    const ambiguousStillActive = service.listObservations()
+      .filter(item => ambiguousBefore.includes(item.id))
+      .map(item => item.id)
+      .sort();
+    assert.deepEqual(ambiguousStillActive, ambiguousBefore);
+    assert.equal(service.getProjectContext('project-A').some(item => /克制的排版.*仅适用于/.test(item.content)), false);
+
     for (let index = 0; index < 3; index += 1) {
       await collector.collectTurn({ userMessage: '我喜欢留白丰富的版式。', sessionId: `repeat-${index}` });
     }

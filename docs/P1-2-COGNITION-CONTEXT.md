@@ -103,7 +103,8 @@ P1-2 使用保守、可测试的确定性采集器，不调用 AIService，也�
 - “以后都 / 以后默认 / 我一直 / 我通常 / 我比较喜欢 / 记住”等明确长期表达：写 Observation，并直接升级为 Profile。
 - “最近 / 近期 / 这段时间 / 目前”等表达：写 Recent Context。
 - “这次 / 暂时 / 试一下”等临时表达：只写 Recent；存在当前 projectId 且明确提到本项目时写 Project。
-- “这个项目 / 本项目 / 当前项目 / 项目要求”等表达：只写对应 projectId。
+- 存在 active projectId 时，风格、色彩、材质、排版、视觉、方案选择等模糊审美表达默认写当前 Project；只有“我一直 / 我平时都 / 所有项目 / 跨项目 / 以后都”等明确跨项目长期表达才允许进入 Profile。
+- “这个项目 / 本项目 / 当前项目 / 项目要求”等明确表达：只写对应 projectId。
 - 普通偏好：先写 Recent Observation；同类有效表达累计 3 次后可升级 Profile。
 - 普通知识问答、随机聊天、没有偏好/目标/约束信号的内容：跳过。
 
@@ -113,7 +114,7 @@ Collector 仅基于用户消息建立认知，绝不把模型回答或模型推�
 
 “不是 / 更正 / 不再 / 现在不 / 只适用于这个项目”等明确纠正优先。服务把匹配的旧 Observation 和对应知识项标为 `superseded`，保留历史，不做全量删除；新表达成为当前 active 认知。
 
-对于“这个只适用于这个项目”这类指代表达，Collector 只在同一 session 内引用最近一条 global/recent Observation，把旧全局认知 supersede，并将其内容迁入当前 projectId 的 Project Context。
+对于“这个只适用于这个项目”这类指代表达，Collector 只在同一 session 内恰好存在一个 active global/recent 候选时，才把旧认知 supersede 并迁入当前 projectId。存在多个候选时不猜测指代：保留旧认知，只记录 correction Observation。
 
 ## 6. Context Builder
 

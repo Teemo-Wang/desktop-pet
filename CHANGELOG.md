@@ -9,6 +9,7 @@
 - 新增有预算的模型无关 Context Builder，并以可选依赖接入 Agent Core 的流式/非流式路径。
 - Cognition 数据只通过 TeemoStorageService 保存到本地 `Teemo-cognition.json`；Builder/Collector 失败不影响普通聊天。
 - 补齐旧外围服务对 `TEEMO_ASSISTANT_DATA_DIR` 的隔离支持，避免完整 Electron 烟测读取正式用户目录。
+- GPT 审阅后收紧作用域：active project 下的模糊审美默认归项目；指代纠正只有唯一候选时才允许 supersede/migrate。
 - 增加 `docs/P1-2-COGNITION-CONTEXT.md` 和 `npm.cmd run test:cognition` 隔离验证入口。
 
 ### P1-1 Agent Core
