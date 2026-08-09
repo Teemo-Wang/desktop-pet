@@ -33,6 +33,8 @@
 
     exists(fileName) { return fs.existsSync(this.getPath(fileName)); }
 
+    getReadState(fileName) { return this.readStates.get(this.getPath(fileName)) || 'unknown'; }
+
     _setReadState(filePath, state) {
       this.readStates.set(filePath, state);
     }
@@ -104,6 +106,32 @@
       });
       this._setReadState(filePath, 'ok');
       return value;
+    }
+
+    withFileLock(fileName, callback, options = {}) {
+      const filePath = this.getPath(fileName);
+      const lockPath = `${filePath}.teemo-lock`;
+      const staleMs = Math.max(5000, Number(options.staleMs) || 30000);
+      let handle = null;
+      try {
+        try {
+          handle = fs.openSync(lockPath, 'wx');
+        } catch (error) {
+          if (error.code !== 'EEXIST') throw error;
+          let stale = false;
+          try { stale = Date.now() - fs.statSync(lockPath).mtimeMs > staleMs; } catch (_) { stale = true; }
+          if (!stale) return { acquired: false, value: null };
+          try { fs.unlinkSync(lockPath); } catch (_) { return { acquired: false, value: null }; }
+          try { handle = fs.openSync(lockPath, 'wx'); } catch (_) { return { acquired: false, value: null }; }
+        }
+        fs.writeFileSync(handle, `${process.pid}\n${Date.now()}`, 'utf8');
+        return { acquired: true, value: callback() };
+      } finally {
+        if (handle != null) {
+          try { fs.closeSync(handle); } catch (_) { /* preserve callback result/error */ }
+          try { fs.unlinkSync(lockPath); } catch (_) { /* lock is stale-safe */ }
+        }
+      }
     }
 
     readText(fileName, fallback = '') {

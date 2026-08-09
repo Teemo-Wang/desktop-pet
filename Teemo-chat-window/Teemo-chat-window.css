@@ -555,6 +555,13 @@ button { color: inherit; }
 .teemo-memory-labels .scope.project { color: #d1b995; background: rgba(170,125,61,.13); }
 .teemo-memory-labels .inactive-label { color: #bd8585; background: rgba(180,80,80,.12); }
 .teemo-memory-card time { flex: 0 0 auto; color: #666; font-size: 9px; }
+.teemo-memory-labels .intelligence-state { border-color: rgba(255,255,255,.13); color: #aaa; }
+.teemo-memory-labels .intelligence-state.stable { border-color: rgba(74,181,125,.32); color: #83d3a8; }
+.teemo-memory-labels .intelligence-state.recent { border-color: rgba(74,147,214,.34); color: #8abde7; }
+.teemo-memory-labels .intelligence-state.aging,
+.teemo-memory-labels .intelligence-state.pending { border-color: rgba(206,161,72,.34); color: #d5b56e; }
+.teemo-memory-labels .intelligence-state.stale,
+.teemo-memory-labels .intelligence-state.conflict { border-color: rgba(205,92,92,.34); color: #df9191; }
 .teemo-memory-card > p { min-height: 42px; margin: 13px 0 11px; color: #e1e1e1; font-size: 12px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
 .teemo-memory-meta { display: flex; flex-wrap: wrap; gap: 10px; color: #747474; font-size: 9px; }
 .teemo-memory-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 13px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.055); }

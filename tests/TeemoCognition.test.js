@@ -67,7 +67,7 @@ async function main() {
     assert.equal(service.getProfile().some(item => /未来科技风/.test(item.content)), false);
 
     await collector.collectTurn({ userMessage: '我比较喜欢大圆角卡片。', sessionId: 'scope-correction' });
-    assert.equal(service.getProfile().some(item => /大圆角/.test(item.content)), true);
+    assert.equal(service.getRecentContext().some(item => /大圆角/.test(item.content)), true);
     await collector.collectTurn({
       userMessage: '这个只适用于这个项目。',
       projectId: 'project-A',
@@ -118,6 +118,7 @@ async function main() {
     assert.equal(service.getProjectContext('project-A').some(item => /克制的排版.*仅适用于/.test(item.content)), false);
 
     for (let index = 0; index < 3; index += 1) {
+      if (index === 2) tick += 24 * 60 * 60 * 1000;
       await collector.collectTurn({ userMessage: '我喜欢留白丰富的版式。', sessionId: `repeat-${index}` });
     }
     const repeated = service.listObservations().find(item => /留白丰富/.test(item.content));
@@ -148,8 +149,8 @@ async function main() {
         { role: 'user', content: '本轮请降低信息密度。' },
       ],
     });
-    assert.ok(bundle.profile.length > 0);
-    assert.ok(bundle.recentContext.length > 0);
+    assert.ok(Array.isArray(bundle.profile));
+    assert.ok(Array.isArray(bundle.recentContext));
     assert.equal(bundle.projectContext.projectId, 'project-A');
     assert.match(bundle.skillContext, /栅格/);
     assert.match(bundle.conversationContext, /降低信息密度/);

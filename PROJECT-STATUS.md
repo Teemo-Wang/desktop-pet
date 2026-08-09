@@ -1,6 +1,6 @@
 # Teemo助理 — 项目进度与规划
 
-> 文档版本：v1.20 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.2.1（P2 Personal Intelligence IN PROGRESS）**
+> 文档版本：v1.21 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.2.1（P2 Personal Intelligence IN PROGRESS）**
 
 ## 当前状态
 
@@ -10,8 +10,18 @@
 - P0：`CLOSED`
 - P1：`CLOSED / PASS / BLOCKERS: 0`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
-- Current Development：`P2-3 CLOSED / PASS；NEXT P2-4 Cognition Intelligence`
+- Current Development：`P2-4 Cognition Intelligence IMPLEMENTED / WAITING REVIEW`
 - Current Branch：`Teemo/p2-personal-intelligence`
+
+## P2-4 阶段（2026-08-09，IMPLEMENTED / WAITING REVIEW）
+
+- 新增独立、确定性、Provider-neutral 的 Cognition Intelligence 层；Cognition 顶层 schema 仍为 v2，旧文件无 read-time migration。
+- 新增 composite identity、exact dedup、evidence natural days、Recent freshness、effective confidence、明确冲突与 promotion eligibility。
+- Collector 单轮改为一次锁内提交和一次 revision 增量；冲突最多 retry 1 次，单日三次重复不晋升，Project 永不自动晋升。
+- Context 保持 5200 字符预算，按 Current Project > Relevant Recent > Relevant Profile 排序；stale Recent 默认排除，跨 project 严格隔离。
+- Cognition 以不可信 JSON data block 注入；role-like text 不获得指令权限。Memory Center 增加状态、有效可信度、最后确认和证据次数。
+- 四套 P2-4 专项测试、两套 Cognition Electron smoke 和 P1/P2-1/P2-2/P2-3 全量回归已通过，正式用户数据零触碰。详见 `docs/P2-4-COGNITION-INTELLIGENCE.md`。
+- 当前等待 GPT strict review；未标记 PASS/CLOSED，未创建 P2-4 recovery tag，未开发 P2-5 或 P3。
 
 ## P2-3 阶段（2026-08-09，CLOSED / PASS）
 

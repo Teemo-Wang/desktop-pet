@@ -11,14 +11,14 @@
   if (typeof window !== 'undefined') window.TeemoCognitionCollector = Collector;
   if (typeof module === 'object' && module.exports) module.exports = Collector;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (TeemoCognitionService) {
-  const LONG_TERM = /(?:以后都|以后默认|一直(?:都)?|我通常|我一般|我比较喜欢|长期|记住(?:我|这一点|这个)?)/;
+  const LONG_TERM = /(?:以后都|以后默认|一直(?:都)?|我通常|我一般|长期|记住(?:我|这一点|这个)?)/;
   const RECENT = /(?:最近|近期|这段时间|目前|刚开始|现在(?:在|开始)?)/;
   const TEMPORARY = /(?:这次|本次|今天|暂时|先|试一下|试试|这一版|这版)/;
   const PROJECT = /(?:这个项目|本项目|当前项目|该项目|这个银行卡项目|项目里|项目中|项目要求|项目需要)/;
   const PROJECT_DOMAIN = /(?:风格|色彩|颜色|配色|材质|排版|版式|视觉|方案|版本|构图|背景|比例|卡通|简约|复杂|品牌|尺寸|角色|画面|主色|留白|科技)/;
-  const EXPLICIT_PROJECT_GLOBAL = /(?:我一直|我平时(?:都)?|我通常|我一般|所有项目|全部项目|每个项目|跨项目|以后我?所有项目|记住以后我(?:一直|通常|平时|都)|以后都|以后默认)/;
+  const EXPLICIT_PROJECT_GLOBAL = /(?:所有项目|全部项目|每个项目|跨项目|以后我?所有项目)/;
   const CORRECTION = /(?:不是|更正|纠正|改成|不再|现在不|只适用于|仅适用于|不要再|之前说错)/;
-  const SIGNAL = /(?:喜欢|偏好|习惯|通常|默认|避免|不要|不喜欢|想试|尝试|只适用于|仅适用于|目标|关注|研究|使用|工作方式|视觉|风格|配色|颜色|尺寸|品牌|限制|要求|记住)/;
+  const SIGNAL = /(?:喜欢|偏好|习惯|通常|默认|避免|不要|不喜欢|不再|更正|纠正|不对|有误|适用|想试|尝试|只适用于|仅适用于|目标|关注|研究|使用|工作方式|视觉|风格|配色|颜色|色彩|尺寸|品牌|限制|要求|记住|项目|人物|卡通)/;
 
   function extractText(content) {
     if (typeof content === 'string') return content;
@@ -38,8 +38,12 @@
   }
 
   function correctionAnchor(text) {
-    const anchor = String(text || '')
+    const value = String(text || '');
+    const explicitTarget = value.match(/(?:之前|原来)(?:说)?(?:我)?(.+?)(?:那条|这条)?(?:不再适用|不对|有误|改成|现在)/);
+    const candidate = explicitTarget && explicitTarget[1] ? explicitTarget[1] : value;
+    const anchor = candidate
       .replace(/(?:不是|更正一下|纠正一下|之前说错了|记住|以后|现在|我|只适用于|仅适用于|这个项目|本项目|当前项目|该项目|不要再|不再|不喜欢|喜欢|偏好|了)/g, '')
+      .replace(/(?:之前|原来|说|那条|这条|不对|有误|适用)/g, '')
       .replace(/[，。！？,.!?；;：:\s]/g, '')
       .slice(0, 80);
     return /^(?:这个|这一点|此项|它)$/.test(anchor) ? '' : anchor;
@@ -56,11 +60,6 @@
     async collectTurn(input = {}) {
       const service = input.cognitionService || this.cognitionService;
       if (!service) return { ok: false, skipped: 'disabled' };
-      // 两个 renderer 共享同一个本地 Cognition 文件；每轮采集前读取最新状态。
-      if (typeof service.reload === 'function') service.reload();
-      if (typeof service.isEnabled === 'function' && !service.isEnabled()) {
-        return { ok: true, skipped: 'disabled' };
-      }
       const text = extractText(input.userMessage).trim();
       if (!text || !SIGNAL.test(text)) return { ok: true, skipped: 'no_signal' };
       if (TeemoCognitionService.isSensitiveText(text)) return { ok: true, skipped: 'sensitive' };
@@ -76,57 +75,47 @@
       else if ((isLongTerm || isExplicitProjectGlobal) && !isTemporary) scope = 'global';
       else if (RECENT.test(text) || isTemporary || SIGNAL.test(text)) scope = 'recent';
 
-      let observationContent = text;
-      if (isCorrection) {
-        const anchor = correctionAnchor(text);
-        if (anchor) {
-          service.supersedeSimilar(anchor, {
-            scopes: scope === 'project' ? ['global', 'recent', 'project'] : ['global', 'recent'],
-            projectId,
-          });
-        } else if (scope === 'project' && /(?:只适用于|仅适用于)/.test(text)) {
-          const candidates = service.listObservations()
-            .filter(item => item.scope !== 'project' && (!input.sessionId || item.sourceSessionId === input.sessionId))
-            .sort((a, b) => String(b.lastObservedAt || '').localeCompare(String(a.lastObservedAt || '')));
-          // P1-2 does not pretend to understand ambiguous pronouns. Migrate
-          // only when the current session has exactly one active candidate.
-          if (candidates.length === 1) {
-            const referenced = candidates[0];
-            observationContent = `${referenced.content}（仅适用于当前项目）`;
-            service.supersedeObservation(referenced.id);
-          }
-        }
-      }
-
-      const result = service.recordObservation({
+      const mutation = {
         category: categoryFor(text, isCorrection),
         scope,
-        content: observationContent,
+        content: text,
         confidence: isLongTerm || isExplicitProjectGlobal || isCorrection ? 0.95 : (scope === 'project' ? 0.85 : 0.7),
         projectId,
         sourceSessionId: input.sessionId || null,
-      });
-      if (!result.ok) return result;
+        isCorrection,
+        isTemporary,
+        correctionAnchor: isCorrection ? correctionAnchor(text) : '',
+        correctionScopes: scope === 'project' ? ['global', 'recent', 'project'] : ['global', 'recent'],
+        allowSingleSessionMigration: isCorrection && scope === 'project' && /(?:只适用于|仅适用于)/.test(text),
+      };
 
-      const observation = result.observation;
-      let promoted = false;
-      if (scope === 'project') {
-        service.updateProjectFromObservation(projectId, observation);
-      } else if (scope === 'global') {
-        service.promoteToProfile(observation);
-        promoted = true;
-      } else {
-        service.updateRecentFromObservation(observation);
-        if (!isTemporary && !isCorrection && observation.evidenceCount >= this.repeatThreshold) {
-          service.promoteToProfile(observation);
-          promoted = true;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        // Renderer windows share one local file. Revision is checked again
+        // while holding the storage lock, then a stale writer retries once.
+        if (typeof service.reload === 'function') service.reload();
+        if (typeof service.isReadable === 'function' && !service.isReadable()) {
+          return { ok: true, skipped: 'unreadable' };
         }
+        if (typeof service.isEnabled === 'function' && !service.isEnabled()) {
+          return { ok: true, skipped: 'disabled' };
+        }
+        const state = typeof service.getState === 'function' ? service.getState() : { revision: null };
+        const result = typeof service.commitCollectorTurn === 'function'
+          ? service.commitCollectorTurn(mutation, { expectedRevision: state.revision })
+          : { ok: false, code: 'COLLECTOR_COMMIT_UNAVAILABLE' };
+        if (result && result.code === 'COGNITION_CHANGED' && attempt === 0) continue;
+        if (result && result.code === 'COGNITION_CHANGED') {
+          return { ok: true, skipped: 'concurrent_change', code: 'COGNITION_CONCURRENT_CHANGE', retryCount: 1 };
+        }
+        return result && result.ok
+          ? { ...result, retryCount: attempt }
+          : result;
       }
-
-      return { ok: true, observation, promoted, scope };
+      return { ok: true, skipped: 'concurrent_change', code: 'COGNITION_CONCURRENT_CHANGE', retryCount: 1 };
     }
   }
 
   TeemoCognitionCollector.extractText = extractText;
+  TeemoCognitionCollector.correctionAnchor = correctionAnchor;
   return TeemoCognitionCollector;
 });

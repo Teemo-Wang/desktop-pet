@@ -1,5 +1,14 @@
 # Changelog
 
+## P2-4 - 2026-08-09（IMPLEMENTED / WAITING REVIEW）
+
+- 新增 `TeemoCognitionIntelligence`，运行时派生 composite identity、exact dedup、freshness、effective confidence、conflict、promotion eligibility 和 relevance；顶层 schema 保持 v2，无 read-time migration。
+- Collector 改为一次锁内业务提交与一次 revision 增量，冲突最多 retry 1 次；Recent 晋升要求至少 3 次证据、跨 2 个自然日、无冲突且未 stale，Project/Manual Recent 不自动晋升。
+- Context 保持 5200 字符预算，按 Current Project > Relevant Recent > Relevant Profile 选择；stale Recent 默认排除，Cognition 以不可信 JSON data block 注入并阻止 role-like prompt injection 获得指令权限。
+- “Teemo 对我的了解”增加稳定/近期/逐渐陈旧/已陈旧/有冲突/待确认、有效可信度、最后确认和证据次数，不新增导航或统计面板。
+- 新增四套 P2-4 专项测试；P1/P2-1/P2-2/P2-3 全量回归、两套 Cognition Electron smoke、语法与 diff 检查通过，版本仍为 1.2.1。
+- 当前等待 GPT strict review；未创建 P2-4 recovery tag，未开发 P2-5/P3。
+
 ## P2-3 - 2026-08-09（CLOSED / PASS）
 
 - 新增 session-local、runtime-only 的 Creative Director 状态：balanced/challenge 与 light/standard/strong，不写磁盘且重启恢复 balanced。

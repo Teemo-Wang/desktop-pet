@@ -34,6 +34,17 @@
     })[value] || '其他';
   }
 
+  function intelligenceStateLabel(value) {
+    return ({
+      stable: '稳定',
+      recent: '近期',
+      aging: '逐渐陈旧',
+      stale: '已陈旧',
+      conflict: '有冲突',
+      pending: '待确认',
+    })[value] || '待确认';
+  }
+
   function formatDate(value) {
     if (!value) return '时间未知';
     const date = new Date(value);
@@ -138,7 +149,8 @@
         this.snapshot = this.service.getManagementSnapshot();
         this._renderProjects();
         this.render();
-        if (message) this._setStatus(message);
+        if (this.snapshot.unreadable) this._setStatus('认知文件读取异常，已停止新增和上下文注入；原文件不会被覆盖', true);
+        else if (message) this._setStatus(message);
       } catch (error) {
         this._setStatus(error.message || '读取认知失败', true);
       }
@@ -228,14 +240,17 @@
     _card(entry) {
       const scope = entry._domain === 'profile' ? '长期认知' : entry._domain === 'recent' ? '近期认知' : `项目：${this._projectName(entry.projectId)}`;
       const inactive = entry.status === 'superseded';
+      const intelligence = entry.intelligence || {};
+      const effectiveConfidence = intelligence.effectiveConfidence == null ? entry.confidence : intelligence.effectiveConfidence;
+      const state = inactive ? null : (intelligence.state || (entry._domain === 'profile' ? 'stable' : 'pending'));
       const attrs = `data-domain="${escapeHtml(entry._domain)}" data-id="${escapeHtml(entry.id)}" data-project-id="${escapeHtml(entry.projectId || '')}"`;
       return `<article class="teemo-memory-card${inactive ? ' inactive' : ''}" ${attrs}>
         <div class="teemo-memory-card-top">
-          <div class="teemo-memory-labels"><span class="scope ${escapeHtml(entry._domain)}">${escapeHtml(scope)}</span><span>${escapeHtml(categoryLabel(entry.category))}</span>${inactive ? '<span class="inactive-label">不再适用</span>' : ''}</div>
+          <div class="teemo-memory-labels"><span class="scope ${escapeHtml(entry._domain)}">${escapeHtml(scope)}</span><span>${escapeHtml(categoryLabel(entry.category))}</span>${state ? `<span class="intelligence-state ${escapeHtml(state)}">${escapeHtml(intelligenceStateLabel(state))}</span>` : ''}${inactive ? '<span class="inactive-label">不再适用</span>' : ''}</div>
           <time>${escapeHtml(formatDate(entry.updatedAt || entry.lastObservedAt))}</time>
         </div>
         <p>${escapeHtml(entry.content)}</p>
-        <div class="teemo-memory-meta"><span>可信度 ${confidenceLabel(entry.confidence)}</span><span>${Math.max(1, Number(entry.evidenceCount) || 1)} 次依据</span>${entry.source && /^user_manual/.test(entry.source) ? '<span>用户明确添加</span>' : '<span>对话中形成</span>'}</div>
+        <div class="teemo-memory-meta"><span>有效可信度 ${confidenceLabel(effectiveConfidence)}</span><span>${Math.max(1, Number(intelligence.evidenceCount) || Number(entry.evidenceCount) || 1)} 次依据</span><span>最后确认 ${escapeHtml(formatDate(intelligence.lastConfirmedAt || entry.lastObservedAt || entry.updatedAt))}</span>${entry.source && /^user_manual/.test(entry.source) ? '<span>用户明确添加</span>' : '<span>对话中形成</span>'}</div>
         <div class="teemo-memory-actions">
           <button type="button" data-memory-action="evidence">为什么这么认为？</button>
           ${inactive ? '' : '<button type="button" data-memory-action="edit">纠正 / 修改</button><button type="button" data-memory-action="move">调整范围</button><button type="button" class="danger" data-memory-action="supersede">不再适用</button>'}
@@ -497,5 +512,6 @@
 
   TeemoCognitionCenter.confidenceLabel = confidenceLabel;
   TeemoCognitionCenter.categoryLabel = categoryLabel;
+  TeemoCognitionCenter.intelligenceStateLabel = intelligenceStateLabel;
   return TeemoCognitionCenter;
 });

@@ -136,8 +136,8 @@ async function main() {
 
     const mixed = service.manualCreateBatch({ content: `${longContent}\n\n新增的独立工作习惯。`, scope: 'global', category: 'workflow' }, { expectedRevision: batch.snapshot.revision });
     assert.equal(mixed.ok, true);
-    assert.equal(mixed.createdCount, 1);
-    assert.equal(mixed.duplicateCount, preview.itemCount);
+    assert.equal(mixed.createdCount, preview.itemCount + 1, 'category is part of the composite identity');
+    assert.equal(mixed.duplicateCount, 0);
     assert.ok(service.getProfile().some(item => item.content === '新增的独立工作习惯。'));
 
     const sensitive = service.manualCreateBatch({ content: '个人资料\n\nAPI Key: sk-abcdefghijklmnop', scope: 'global' }, { expectedRevision: mixed.snapshot.revision });

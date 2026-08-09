@@ -7,11 +7,14 @@
   const StorageService = root && root.TeemoStorageService
     ? root.TeemoStorageService
     : require('../services/TeemoStorageService');
-  const Service = factory(StorageService);
+  const Intelligence = root && root.TeemoCognitionIntelligence
+    ? root.TeemoCognitionIntelligence
+    : require('./TeemoCognitionIntelligence');
+  const Service = factory(StorageService, Intelligence);
   if (root) root.TeemoCognitionService = Service;
   if (typeof window !== 'undefined') window.TeemoCognitionService = Service;
   if (typeof module === 'object' && module.exports) module.exports = Service;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function (TeemoStorageService) {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (TeemoStorageService, TeemoCognitionIntelligence) {
   const VERSION = 2;
   const VALID_SCOPES = new Set(['global', 'recent', 'project']);
   const VALID_DOMAINS = new Set(['profile', 'recent', 'project']);
@@ -112,10 +115,8 @@
     const text = String(value == null ? '' : value);
     if (!text) return false;
     return [
-      /\b(?:api[ _-]?key|access[ _-]?token|refresh[ _-]?token|token|authorization|client[ _-]?secret|secret|password|passwd)\b/i,
-      /(?:密码|口令|密钥|令牌|授权码)/i,
-      /\b(?:api[ _-]?key|access[ _-]?token|refresh[ _-]?token|authorization|client[ _-]?secret|password|passwd)\b\s*[:=：]\s*\S+/i,
-      /(?:密码|口令|密钥|令牌|授权码)\s*[:=：]\s*\S+/i,
+      /\b(?:api[ _-]?key|access[ _-]?token|refresh[ _-]?token|token|authorization|client[ _-]?secret|secret|password|passwd)\b\s*(?::|=|is)\s*\S+/i,
+      /(?:密码|口令|密钥|令牌|授权码)\s*(?:[:=：]|是|为)\s*\S{4,}/i,
       /\bBearer\s+[A-Za-z0-9._~+\/-]{12,}/i,
       /\b(?:sk|rk|ghp|github_pat|xox[baprs])-?[A-Za-z0-9_-]{12,}\b/i,
     ].some(pattern => pattern.test(text));
@@ -144,12 +145,19 @@
       this.storage = options.storage || new TeemoStorageService(options);
       this.fileName = options.fileName || 'Teemo-cognition.json';
       this.clock = typeof options.clock === 'function' ? options.clock : () => new Date();
+      this.intelligence = options.intelligence || TeemoCognitionIntelligence;
+      this.unreadable = false;
       this.data = this._load();
     }
 
     _load() {
-      if (!this.storage.exists(this.fileName)) return emptyData();
+      if (!this.storage.exists(this.fileName)) {
+        this.unreadable = false;
+        return emptyData();
+      }
       const value = this.storage.readJson(this.fileName, null);
+      this.unreadable = typeof this.storage.getReadState === 'function'
+        && this.storage.getReadState(this.fileName) === 'error';
       return normalizeData(value);
     }
 
@@ -180,11 +188,14 @@
       this.storage.writeJson(this.fileName, this.data);
     }
 
-    isEnabled() { return this.data.enabled !== false; }
+    isReadable() { return !this.unreadable; }
+
+    isEnabled() { return !this.unreadable && this.data.enabled !== false; }
 
     getState() {
       return {
         enabled: this.isEnabled(),
+        unreadable: this.unreadable,
         revision: Math.max(0, Number(this.data.revision) || 0),
         updatedAt: this.data.updatedAt || null,
       };
@@ -222,6 +233,29 @@
       return clone(items);
     }
 
+    getIntelligentContext(options = {}) {
+      const now = this.clock();
+      const allKnowledge = this._knowledgeCollections()
+        .flatMap(({ items }) => this._active(items));
+      const query = String(options.query || '');
+      const rank = items => this.intelligence.rank(items, query, { now, allItems: allKnowledge });
+      const relevant = item => !query.trim()
+        || Number(item.intelligence && item.intelligence.relevanceMatchCount) > 0
+        || Boolean(item.intelligence && item.intelligence.genericFollowUp);
+      const recent = rank(this._active(this.data.recentContext))
+        .filter(relevant)
+        .filter(item => item.intelligence.freshness !== 'stale');
+      const rankedProfile = rank(this._active(this.data.profile));
+      const relevantProfile = rankedProfile.filter(relevant);
+      return clone({
+        profile: relevantProfile.length || !query.trim()
+          ? relevantProfile
+          : (rankedProfile.length === 1 ? rankedProfile : []),
+        recentContext: recent,
+        projectContext: options.projectId ? rank(this._active(this.data.projectContexts[String(options.projectId)] || [])) : [],
+      });
+    }
+
     recordObservation(input = {}) {
       const content = normalizeContent(input.content);
       if (!content) return { ok: false, skipped: 'empty' };
@@ -231,14 +265,18 @@
       if (scope === 'project' && !projectId) return { ok: false, skipped: 'missing_project' };
       const observedAt = nowIso(this.clock);
       const key = fingerprint(content);
+      const identity = this.intelligence.compositeIdentity({ ...input, content, scope, projectId });
       const existing = this.data.observations.find(item => (
         item.status !== 'superseded'
-        && item.scope === scope
-        && (item.projectId || null) === projectId
-        && item.fingerprint === key
+        && this.intelligence.compositeIdentity(item) === identity
       ));
       if (existing) {
         existing.evidenceCount = Math.max(1, Number(existing.evidenceCount) || 1) + 1;
+        const observedDay = this.intelligence.naturalDay(observedAt);
+        existing.evidenceDays = Array.from(new Set([
+          ...this.intelligence.evidenceDays(existing),
+          observedDay,
+        ].filter(Boolean))).sort();
         existing.lastObservedAt = observedAt;
         existing.updatedAt = observedAt;
         existing.confidence = Math.max(existing.confidence || 0, Number(input.confidence) || 0);
@@ -254,6 +292,7 @@
         fingerprint: key,
         confidence: Math.max(0, Math.min(1, Number(input.confidence) || 0.6)),
         evidenceCount: 1,
+        evidenceDays: [this.intelligence.naturalDay(observedAt)].filter(Boolean),
         projectId,
         sourceSessionId: input.sourceSessionId ? String(input.sourceSessionId) : null,
         source: String(input.source || 'collector'),
@@ -268,9 +307,13 @@
       return { ok: true, created: true, observation: clone(observation) };
     }
 
-    _upsertKnowledge(collection, observation, extras = {}) {
+    _upsertKnowledgeCurrent(collection, observation, extras = {}) {
       const observedAt = observation.lastObservedAt || nowIso(this.clock);
-      let entry = collection.find(item => item.status !== 'superseded' && item.fingerprint === observation.fingerprint);
+      const identity = this.intelligence.compositeIdentity({ ...observation, ...extras });
+      let entry = collection.find(item => (
+        item.status !== 'superseded'
+        && this.intelligence.compositeIdentity(item) === identity
+      ));
       if (!entry) {
         entry = {
           id: makeId('cog'),
@@ -280,6 +323,7 @@
           fingerprint: observation.fingerprint,
           confidence: observation.confidence,
           evidenceCount: observation.evidenceCount,
+          evidenceDays: this.intelligence.evidenceDays(observation),
           status: 'active',
           supersededBy: null,
           createdAt: observedAt,
@@ -293,10 +337,16 @@
         entry.content = observation.content;
         entry.confidence = Math.max(entry.confidence || 0, observation.confidence || 0);
         entry.evidenceCount = Math.max(entry.evidenceCount || 1, observation.evidenceCount || 1);
+        entry.evidenceDays = this.intelligence.evidenceDays(observation);
         entry.updatedAt = observedAt;
         entry.lastObservedAt = observedAt;
         Object.assign(entry, extras);
       }
+      return entry;
+    }
+
+    _upsertKnowledge(collection, observation, extras = {}) {
+      const entry = this._upsertKnowledgeCurrent(collection, observation, extras);
       this._persist();
       return clone(entry);
     }
@@ -409,9 +459,14 @@
     _managementSnapshotFromCurrent() {
       const safeItems = items => (Array.isArray(items) ? items : [])
         .filter(item => item && !isSensitiveText(item.content));
+      const allKnowledge = this._knowledgeCollections().flatMap(({ items }) => safeItems(items));
+      const annotate = items => this.intelligence.annotate(safeItems(items), {
+        now: this.clock(),
+        allItems: allKnowledge,
+      });
       const projectContexts = {};
       Object.entries(this.data.projectContexts).forEach(([projectId, items]) => {
-        projectContexts[projectId] = safeItems(items);
+        projectContexts[projectId] = annotate(items);
       });
       const allItems = [
         ...this.data.profile,
@@ -422,10 +477,11 @@
       return clone({
         version: VERSION,
         enabled: this.isEnabled(),
+        unreadable: this.unreadable,
         revision: Math.max(0, Number(this.data.revision) || 0),
         updatedAt: this.data.updatedAt || null,
-        profile: safeItems(this.data.profile),
-        recentContext: safeItems(this.data.recentContext),
+        profile: annotate(this.data.profile),
+        recentContext: annotate(this.data.recentContext),
         projectContexts,
         observations: safeItems(this.data.observations),
         hiddenSensitiveCount: allItems.filter(item => item && isSensitiveText(item.content)).length,
@@ -471,6 +527,7 @@
         fingerprint: fingerprint(input.content),
         confidence: Math.max(0, Math.min(1, Number(input.confidence) || 1)),
         evidenceCount: Math.max(1, Number(input.evidenceCount) || 1),
+        evidenceDays: [this.intelligence.naturalDay(observedAt)].filter(Boolean),
         projectId: input.scope === 'project' ? String(input.projectId || '') : null,
         sourceSessionId: input.sourceSessionId ? String(input.sourceSessionId) : null,
         source: String(input.source || 'user_manual'),
@@ -495,6 +552,7 @@
         fingerprint: observation.fingerprint,
         confidence: observation.confidence,
         evidenceCount: observation.evidenceCount,
+        evidenceDays: this.intelligence.evidenceDays(observation),
         projectId: target.domain === 'project' ? target.projectId : undefined,
         source: observation.source,
         status: 'active',
@@ -506,11 +564,12 @@
       };
     }
 
-    _supersedeByFingerprint(key, replacementId, reason) {
+    _supersedeByIdentity(reference, replacementId, reason) {
+      const identity = this.intelligence.compositeIdentity(reference || {});
       const now = nowIso(this.clock);
       this._knowledgeCollections().forEach(({ items }) => {
         items.forEach(item => {
-          if (item && item.status !== 'superseded' && item.fingerprint === key) {
+          if (item && item.status !== 'superseded' && this.intelligence.compositeIdentity(item) === identity) {
             item.status = 'superseded';
             item.supersededBy = replacementId || null;
             item.supersededReason = reason || 'user';
@@ -527,6 +586,131 @@
       observation.supersededBy = replacementId || null;
       observation.supersededReason = reason || 'user';
       observation.updatedAt = nowIso(this.clock);
+    }
+
+    commitCollectorTurn(input = {}, options = {}) {
+      const execute = () => {
+        this.reload();
+        const currentRevision = Math.max(0, Number(this.data.revision) || 0);
+        if (options.expectedRevision != null && Number(options.expectedRevision) !== currentRevision) {
+          return { ok: false, code: 'COGNITION_CHANGED', revision: currentRevision };
+        }
+        if (!this.isEnabled()) return { ok: true, skipped: 'disabled', revision: currentRevision };
+
+        let content = normalizeContent(input.content);
+        if (!content) return { ok: false, skipped: 'empty', revision: currentRevision };
+        if (isSensitiveText(content)) return { ok: false, skipped: 'sensitive', revision: currentRevision };
+        const scope = VALID_SCOPES.has(input.scope) ? input.scope : 'recent';
+        const projectId = scope === 'project' ? String(input.projectId || '').trim() : null;
+        if (scope === 'project' && !projectId) return { ok: false, skipped: 'missing_project', revision: currentRevision };
+
+        if (input.isCorrection) {
+          const anchorKey = fingerprint(input.correctionAnchor);
+          if (anchorKey && anchorKey.length >= 2) {
+            const scopes = Array.isArray(input.correctionScopes) && input.correctionScopes.length
+              ? input.correctionScopes
+              : ['global', 'recent', 'project'];
+            this.data.observations.forEach(item => {
+              if (!item || item.status === 'superseded' || !scopes.includes(item.scope)) return;
+              if (projectId && item.scope === 'project' && item.projectId !== projectId) return;
+              if (!item.fingerprint.includes(anchorKey) && !anchorKey.includes(item.fingerprint)) return;
+              item.status = 'superseded';
+              item.supersededBy = null;
+              item.supersededReason = 'collector_correction';
+              item.updatedAt = nowIso(this.clock);
+              this._markKnowledgeSuperseded(item.id, null);
+            });
+          } else if (scope === 'project' && input.allowSingleSessionMigration && input.sourceSessionId) {
+            const candidates = this._active(this.data.observations)
+              .filter(item => item.scope !== 'project' && item.sourceSessionId === String(input.sourceSessionId))
+              .sort((a, b) => String(b.lastObservedAt || '').localeCompare(String(a.lastObservedAt || '')));
+            if (candidates.length === 1) {
+              const referenced = candidates[0];
+              content = `${referenced.content}（仅适用于当前项目）`;
+              referenced.status = 'superseded';
+              referenced.supersededBy = null;
+              referenced.supersededReason = 'collector_scope_change';
+              referenced.updatedAt = nowIso(this.clock);
+              this._markKnowledgeSuperseded(referenced.id, null);
+            }
+          }
+        }
+
+        const observedAt = nowIso(this.clock);
+        const category = String(input.category || 'preference');
+        const identity = this.intelligence.compositeIdentity({ content, category, scope, projectId });
+        let observation = this.data.observations.find(item => (
+          item && item.status !== 'superseded' && this.intelligence.compositeIdentity(item) === identity
+        ));
+        if (observation) {
+          observation.evidenceCount = Math.max(1, Number(observation.evidenceCount) || 1) + 1;
+          observation.evidenceDays = Array.from(new Set([
+            ...this.intelligence.evidenceDays(observation),
+            this.intelligence.naturalDay(observedAt),
+          ].filter(Boolean))).sort();
+          observation.lastObservedAt = observedAt;
+          observation.updatedAt = observedAt;
+          observation.confidence = Math.max(Number(observation.confidence) || 0, Number(input.confidence) || 0);
+          if (input.sourceSessionId) observation.sourceSessionId = String(input.sourceSessionId);
+        } else {
+          observation = {
+            id: makeId('obs'),
+            category,
+            scope,
+            content,
+            fingerprint: fingerprint(content),
+            confidence: Math.max(0, Math.min(1, Number(input.confidence) || 0.6)),
+            evidenceCount: 1,
+            evidenceDays: [this.intelligence.naturalDay(observedAt)].filter(Boolean),
+            projectId,
+            sourceSessionId: input.sourceSessionId ? String(input.sourceSessionId) : null,
+            source: 'collector',
+            status: 'active',
+            supersededBy: null,
+            supersededReason: null,
+            createdAt: observedAt,
+            updatedAt: observedAt,
+            lastObservedAt: observedAt,
+          };
+          this.data.observations.push(observation);
+        }
+
+        let promoted = false;
+        if (scope === 'project') {
+          if (!Array.isArray(this.data.projectContexts[projectId])) this.data.projectContexts[projectId] = [];
+          this._upsertKnowledgeCurrent(this.data.projectContexts[projectId], observation, { scope: 'project', projectId });
+        } else if (scope === 'global') {
+          this._upsertKnowledgeCurrent(this.data.profile, observation, { scope: 'global' });
+          promoted = true;
+        } else {
+          this._upsertKnowledgeCurrent(this.data.recentContext, observation, { scope: 'recent' });
+          const derived = this.intelligence.derive(observation, {
+            now: this.clock(),
+            conflicts: this.intelligence.conflictIdentities(this.data.observations),
+          });
+          if (!input.isTemporary && derived.promotionEligible) {
+            this._upsertKnowledgeCurrent(this.data.profile, observation, { scope: 'global' });
+            promoted = true;
+          }
+        }
+
+        this._persist();
+        return {
+          ok: true,
+          observation: clone(observation),
+          promoted,
+          scope,
+          revision: Math.max(0, Number(this.data.revision) || 0),
+        };
+      };
+
+      if (this.storage && typeof this.storage.withFileLock === 'function') {
+        const locked = this.storage.withFileLock(this.fileName, execute);
+        return locked.acquired
+          ? locked.value
+          : { ok: false, code: 'COGNITION_CHANGED', revision: this.getState().revision };
+      }
+      return execute();
     }
 
     setEnabled(enabled, options = {}) {
@@ -546,9 +730,14 @@
       const scope = VALID_SCOPES.has(input.scope) ? input.scope : 'global';
       const target = this._scopeTarget(scope, input.projectId);
       if (!target) return { ok: false, code: 'PROJECT_REQUIRED', message: '项目认知必须选择项目' };
-      const key = fingerprint(content);
+      const identity = this.intelligence.compositeIdentity({
+        content,
+        category: input.category,
+        scope,
+        projectId: target.projectId,
+      });
       const duplicate = this._knowledgeCollections().some(({ items }) => items.some(item => (
-        item && item.status !== 'superseded' && item.fingerprint === key
+        item && item.status !== 'superseded' && this.intelligence.compositeIdentity(item) === identity
       )));
       if (duplicate) return { ok: false, code: 'COGNITION_DUPLICATE', message: '已有相同的有效认知，请编辑或迁移原认知' };
       const observation = this._newObservation({
@@ -582,14 +771,19 @@
 
       const existingKeys = new Set();
       this._knowledgeCollections().forEach(({ items }) => items.forEach(item => {
-        if (item && item.status !== 'superseded' && item.fingerprint) existingKeys.add(item.fingerprint);
+        if (item && item.status !== 'superseded') existingKeys.add(this.intelligence.compositeIdentity(item));
       }));
 
       const contents = splitManualContent(rawContent);
       const pending = [];
       let duplicateCount = 0;
       contents.forEach(content => {
-        const key = fingerprint(content);
+        const key = this.intelligence.compositeIdentity({
+          content,
+          category: input.category,
+          scope,
+          projectId: target.projectId,
+        });
         if (!key || existingKeys.has(key)) {
           duplicateCount += 1;
           return;
@@ -650,7 +844,7 @@
         source: 'user_manual_edit',
         sourceObservationId: found.entry.observationId,
       });
-      this._supersedeByFingerprint(found.entry.fingerprint, observation.id, 'user_edit');
+      this._supersedeByIdentity(found.entry, observation.id, 'user_edit');
       this._supersedeObservationById(found.entry.observationId, observation.id, 'user_edit');
       const cognition = this._newKnowledge(observation, target);
       this.data.observations.push(observation);
@@ -664,7 +858,7 @@
       if (conflict) return conflict;
       const found = this._findKnowledge(input.domain, input.id, input.projectId);
       if (!found || found.entry.status === 'superseded') return { ok: false, code: 'COGNITION_NOT_FOUND', message: '认知不存在或已失效' };
-      this._supersedeByFingerprint(found.entry.fingerprint, null, 'user');
+      this._supersedeByIdentity(found.entry, null, 'user');
       this._supersedeObservationById(found.entry.observationId, null, 'user');
       this._persist();
       return { ok: true, snapshot: this._managementSnapshotFromCurrent() };
@@ -691,7 +885,7 @@
         source: 'user_manual_scope',
         sourceObservationId: found.entry.observationId,
       });
-      this._supersedeByFingerprint(found.entry.fingerprint, observation.id, 'user_scope_change');
+      this._supersedeByIdentity(found.entry, observation.id, 'user_scope_change');
       this._supersedeObservationById(found.entry.observationId, observation.id, 'user_scope_change');
       const cognition = this._newKnowledge(observation, target);
       this.data.observations.push(observation);
