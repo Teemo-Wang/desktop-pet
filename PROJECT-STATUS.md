@@ -1,6 +1,6 @@
 # Teemo助理 — 项目进度与规划
 
-> 文档版本：v1.23 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.2.1（P2 Personal Intelligence FINAL ACCEPTANCE）**
+> 文档版本：v1.24 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.2.1（P2 Personal Intelligence CLOSED / PASS）**
 
 ## 当前状态
 
@@ -9,9 +9,18 @@
 - Source：`D:\Teemo助手\Teemo机器人项目\Teemo-source`
 - P0：`CLOSED`
 - P1：`CLOSED / PASS / BLOCKERS: 0`
+- P2：`CLOSED / PASS / BLOCKERS: 0`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
-- Current Development：`P2 FINAL ACCEPTANCE READY`
+- Current Development：`RELEASE / INSTALL / RESTART`
 - Current Branch：`Teemo/p2-personal-intelligence`
+
+## P2 Final Acceptance（2026-08-09，CLOSED / PASS）
+
+- P2-1 Cognition UI、P2-2 Agent Creative Profile、P2-3 Creative Director、P2-4 Cognition Intelligence 与 P2-5 Skill Intelligence 全部关闭并保留独立恢复标签。
+- 跨层事实源、Context 顺序、约束优先级、send/stream、Provider-neutral、Session/Restart 隔离、损坏状态 fail closed 与正式数据隔离均通过总验收。
+- 最终 22 组 Node、9 组 Electron、32 条 Skill benchmark、50 个 P2 变更 JS 语法、累计 diff 与 1.2.1 版本映射全部通过。
+- GPT Final Acceptance 确认 `PASS / BLOCKERS: 0 / CAN_CLOSE_P2: YES / NEXT_STAGE_ALLOWED: RELEASE-INSTALL-RESTART`。
+- 当前仅允许构建、安装并重启 v1.2.1；不进入 P3。详见 `docs/Teemo-P2-FINAL-ACCEPTANCE.md`。
 
 ## P2-5 阶段（2026-08-09，CLOSED / PASS）
 

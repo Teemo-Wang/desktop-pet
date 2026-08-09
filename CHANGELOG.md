@@ -1,5 +1,12 @@
 # Changelog
 
+## P2 Personal Intelligence Final Acceptance - 2026-08-09（CLOSED / PASS）
+
+- P2-1 至 P2-5 全部关闭并保留独立 recovery tag；P1 与既有 P2 tag 均验证未移动。
+- 跨层 Source of Truth、Context 顺序、约束优先级、send/stream、双 Renderer、Session/Restart、损坏状态与正式数据隔离通过总验收。
+- 最终 22 组 Node、9 组 Electron、32-case Skill benchmark、50 个 P2 变更 JS 语法、累计 diff 与 v1.2.1 版本映射全部 PASS。
+- GPT Final Acceptance 确认 `PASS / BLOCKERS: 0 / CAN_CLOSE_P2: YES / NEXT_STAGE_ALLOWED: RELEASE-INSTALL-RESTART`；未进入 P3。
+
 ## P2-5 - 2026-08-09（CLOSED / PASS）
 
 - 建立 Teemo Skill Specification v1，保留导入 Raw Skill 原文并与 `Teemo-skill-registry.json` Internal Manifest 永久分离。
@@ -13,14 +20,14 @@
 - 8 个 P2-5 测试入口、32 条 deterministic benchmark、22 组 Node 和 9 组 Electron smoke 全部通过；版本保持 1.2.1。
 - GPT 四轮 strict review 最终确认 `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P2-FINAL-ACCEPTANCE`；恢复标签为 `v1.2.1-p2.5-skill-intelligence`。
 
-## P2-4 - 2026-08-09（IMPLEMENTED / WAITING REVIEW）
+## P2-4 - 2026-08-09（CLOSED / PASS）
 
 - 新增 `TeemoCognitionIntelligence`，运行时派生 composite identity、exact dedup、freshness、effective confidence、conflict、promotion eligibility 和 relevance；顶层 schema 保持 v2，无 read-time migration。
 - Collector 改为一次锁内业务提交与一次 revision 增量，冲突最多 retry 1 次；Recent 晋升要求至少 3 次证据、跨 2 个自然日、无冲突且未 stale，Project/Manual Recent 不自动晋升。
 - Context 保持 5200 字符预算，按 Current Project > Relevant Recent > Relevant Profile 选择；stale Recent 默认排除，Cognition 以不可信 JSON data block 注入并阻止 role-like prompt injection 获得指令权限。
 - “Teemo 对我的了解”增加稳定/近期/逐渐陈旧/已陈旧/有冲突/待确认、有效可信度、最后确认和证据次数，不新增导航或统计面板。
 - 新增四套 P2-4 专项测试；P1/P2-1/P2-2/P2-3 全量回归、两套 Cognition Electron smoke、语法与 diff 检查通过，版本仍为 1.2.1。
-- 当前等待 GPT strict review；未创建 P2-4 recovery tag，未开发 P2-5/P3。
+- GPT strict review 最终确认 `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P2-5`；恢复标签为 `v1.2.1-p2.4-cognition-intelligence`。
 - GPT 首轮审阅后补齐 active project 中“以后所有项目”显式跨项目路由，并删除 single Profile 对无关请求的无条件 fallback；新增正反、敏感题材与 send/stream 测试。
 - P2-1 Management 写 API 与 Collector 统一使用同一文件锁，避免两个 renderer/UI 与后台采集交叉覆盖；`evidenceDays` 采用 UTC 日期去重并限制最近 64 天。
 - GPT 第二轮源码复审后阻止 Manual Recent lineage 自动晋升；correction 仅唯一 anchor candidate 自动 supersede，一对多保持待确认。

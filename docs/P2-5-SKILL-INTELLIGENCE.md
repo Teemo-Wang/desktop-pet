@@ -73,4 +73,4 @@ Electron smoke 使用独立 `TEEMO_ASSISTANT_DATA_DIR` 和 userData，验证实�
 
 ## 9. 阶段边界
 
-P2-5 未实现 LLM Router、Embedding、Vector DB、Semantic Search、自动学习 Router、行为追踪数据库、Safety Engine、Provider Capability Matrix、GUI Automation、Cloud Sync、Multi-Agent 或 P3 Inspiration。GPT 四轮 strict review 最终确认 `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P2-FINAL-ACCEPTANCE`。阶段恢复标签为 `v1.2.1-p2.5-skill-intelligence`；下一步只能进入 P2 Final Acceptance。
+P2-5 未实现 LLM Router、Embedding、Vector DB、Semantic Search、自动学习 Router、行为追踪数据库、Safety Engine、Provider Capability Matrix、GUI Automation、Cloud Sync、Multi-Agent 或 P3 Inspiration。GPT 四轮 strict review 最终确认 `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P2-FINAL-ACCEPTANCE`。阶段恢复标签为 `v1.2.1-p2.5-skill-intelligence`；后续 P2 Final Acceptance 已确认 `PASS / BLOCKERS: 0 / CAN_CLOSE_P2: YES / NEXT_STAGE_ALLOWED: RELEASE-INSTALL-RESTART`。

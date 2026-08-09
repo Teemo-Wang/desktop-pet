@@ -4,8 +4,8 @@
 
 - Product：Teemo助理
 - Branch：`Teemo/p2-personal-intelligence`
-- Phase：P2 FINAL ACCEPTANCE
-- State：`READY / P2-5 CLOSED`
+- Phase：P2 Personal Intelligence
+- State：`CLOSED / PASS / BLOCKERS: 0`
 - App Version：`v1.2.1`
 - P1 Recovery Tag：`v1.2.0-p1-agent-foundation`
 - P2-1 Recovery Tag：`v1.2.0-p2.1-cognition-ui`
@@ -27,15 +27,15 @@
 - hard-rejected Session 清理与 multi-Skill survivor retention；invalid Manifest 隔离、合法邻居 save/reset、双 UI 显式 Repair 和重启持久化。
 - 8 组专项测试、32 条 benchmark 与隔离 Electron smoke 已通过。
 
-## 当前验收进度
+## 最终验收结果
 
 1. P2-5 实现、专项测试和 22 Node / 9 Electron 全量回归完成；文档见 `docs/P2-5-SKILL-INTELLIGENCE.md`。
 2. GPT 四轮 strict review 最终确认 `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES`。
-3. P2-5 关闭提交与恢复标签固定为当前阶段恢复点，不移动 P2-1 至 P2-4 的既有标签。
-4. 当前只执行 `P2-FINAL-ACCEPTANCE`：验证 P2-1 至 P2-5 跨模块契约、完整回归、版本、标签和安装包。
-5. 只有 P2 Final Acceptance PASS 后才构建正式 Windows installer、安装并重启 Teemo助理。
-6. 不进入 P3。
+3. P2-5 关闭提交与恢复标签固定为当前阶段恢复点，P1 与 P2-1 至 P2-4 的既有标签均未移动。
+4. P2 Final Acceptance 已完成跨模块契约、完整回归、版本、标签与正式数据隔离核验。
+5. GPT 确认 `PASS / BLOCKERS: 0 / CAN_CLOSE_P2: YES / NEXT_STAGE_ALLOWED: RELEASE-INSTALL-RESTART`。
+6. 当前执行正式 Windows installer 构建、安装和重启；不进入 P3。
 
 ## 禁止扩展
 
-当前不得开发 P3 Inspiration、Semantic Search、Embedding、Vector DB、LLM Router、自动学习 Router、行为追踪数据库、Safety Engine、Cloud Sync、Multi-Agent、GUI Automation 或 Provider Native Tool Calling。P2 Final Acceptance 只做验收、文档、恢复点和发布安装，不新增功能。
+当前不得开发 P3 Inspiration、Semantic Search、Embedding、Vector DB、LLM Router、自动学习 Router、行为追踪数据库、Safety Engine、Cloud Sync、Multi-Agent、GUI Automation 或 Provider Native Tool Calling。当前只做 v1.2.1 发布安装与重启，不新增功能。
