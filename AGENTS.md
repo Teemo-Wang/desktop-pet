@@ -10,6 +10,8 @@
 - 当前主要方向：个人设计生产力 Agent
 - 产品显示名称：`Teemo助理`
 - 安装包、快捷方式和后续版本命名统一使用：`Teemo助理`
+- 版本标签统一使用 `vX.Y.Z-*`；界面版本、`package.json` / `package-lock.json` 与安装包版本必须等于标签前缀 `X.Y.Z`
+- 界面不得硬编码版本号，应通过 Electron `app.getVersion()` 的可信 IPC 读取；正式构建前必须运行 `npm run verify:release-version`
 - 启动图标统一使用 `icon/Teemo-app.png`，源文件为 `D:\Teemo助手\Teemo.png`
 - “哈啰设计助手”不再是本项目的产品名称；旧业务接口、数据目录和历史文档中的兼容字符串不得用于新版本命名
 - 当前稳定版本基线：`v1.1.6-local-baseline`

@@ -6,6 +6,7 @@
 - Branch：`Teemo/p1-agent-core`
 - Phase：P1 Agent Foundation 封板
 - State：`CLOSED / PASS / BLOCKERS: 0`
+- App Version：`v1.2.0`
 - Recovery Tag：`v1.2.0-p1-agent-foundation`
 - Guardrail：P1 已结束；没有自动进入 P2
 

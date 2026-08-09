@@ -1,6 +1,6 @@
-# Teemo助理 V1.1.7 使用 SOP
+# Teemo助理 V1.2.0 使用 SOP
 
-> 适用版本：`v1.1.7`
+> 适用版本：`v1.2.0`
 > 产品：Windows Electron 桌面 AI 助手
 > 当前源码：`D:\Teemo助手\Teemo机器人项目\Teemo-source`
 > 更新日期：2026-08-09
@@ -21,7 +21,9 @@ Teemo助理是面向个人设计生产力的桌面 AI 助手，提供多模型�
 C:\Users\Teemo\AppData\Local\Programs\teemo-assistant\Teemo助理.exe
 ```
 
-开始菜单入口：`Teemo助理`。启动后可在设置或关于信息中确认版本为 `v1.1.7`。
+开始菜单入口：`Teemo助理`。启动后可在设置或关于信息中确认版本为 `v1.2.0`。
+
+版本规则：发布标签使用 `vX.Y.Z-*`，界面、package/lockfile 和安装包必须显示同一 `X.Y.Z`。界面通过 Electron `app.getVersion()` 动态读取，不单独硬编码；正式构建会自动执行版本一致性检查。
 
 ### 开发版
 
@@ -74,7 +76,7 @@ Teemo 默认不能浏览任意本地路径。使用“本地文件”前：
 3. 在聊天窗口点击“本地文件”，从已授权目录中选择文档。
 4. 不再需要时点击“取消授权”。
 
-当前能力为只读：支持授权目录校验、路径越界拦截、文本/代码文件、PDF 和 DOCX 读取；不提供文件修改、删除或 Shell 执行。
+P1 文件能力支持授权目录内的安全读取、搜索、文本创建、精确 patch 与不覆盖 rename；不提供 delete。Git 只开放本地 read、显式 stage 与 staged-only commit；执行只开放明确授权的 npm script 与 Node-only process，不提供任意 Shell。
 
 请只授权必要目录。未授权目录、授权目录外的路径和路径穿越请求必须被拒绝。
 
@@ -127,13 +129,13 @@ C:\Users\Teemo\AppData\Roaming\teemo-assistant
 
 - 唯一开发源码是 `Teemo-source`，禁止修改安装目录、`dist`、`app.asar` 或解包产物。
 - 开发前先阅读根目录 `AGENTS.md`，检查分支、工作区状态和相关调用关系。
-- 当前 P0 基线：提交 `219b92a`，标签 `v1.1.6-p0-closed`；当前开发分支：`Teemo/p1-agent-core`。
+- 当前 P0 基线：提交 `219b92a`，标签 `v1.1.6-p0-closed`；P1 封板标签：`v1.2.0-p1-agent-foundation`；当前分支：`Teemo/p1-agent-core`。
 - 底层能力优先通过 `AIService`、`TeemoStorageService`、`TeemoFileService` 调用。
 - 修改后至少执行语法检查、受影响功能测试、应用启动检查和 `git diff/status` 检查。
 - 新增文件、节点或需要重命名的项目资产优先使用 `Teemo` 前缀；用户明确指定的文件名除外。
 
 ## 13. 当前版本边界
 
-已具备：多模型 AI、流式聊天、技能系统、项目/待办、本地文档只读、PDF/DOCX 读取、图片/视频处理、ComfyUI 接入、Windows 安装包和 Teemo 图标。
+已具备：多模型 AI、流式聊天、技能系统、项目/待办、P1 Agent Core、Cognition、统一 Tool Registry/Permission、安全文件/Git/受控执行工具、PDF/DOCX 读取、图片/视频处理、ComfyUI 接入、Windows 安装包和 Teemo 图标。
 
-暂不属于当前版本：Agent Core、Tool Calling、统一 Permission Layer 的完整实现、文件写入/删除、Shell 执行、Memory/Cognition 系统。
+暂不属于当前版本：任意 Shell、文件删除、destructive/remote Git、Provider 原生 Tool Calling 产品化、P2 新能力。

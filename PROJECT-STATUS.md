@@ -1,11 +1,11 @@
 # Teemo助理 — 项目进度与规划
 
-> 文档版本：v1.14 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.1.7（P1 Agent Foundation CLOSED / PASS）**
+> 文档版本：v1.15 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.2.0（P1 Agent Foundation CLOSED / PASS）**
 
 ## 当前状态
 
 - Product：`Teemo助理`
-- Version：`v1.1.7`
+- Version：`v1.2.0`
 - Source：`D:\Teemo助手\Teemo机器人项目\Teemo-source`
 - P0：`CLOSED`
 - P1：`CLOSED / PASS / BLOCKERS: 0`
@@ -15,7 +15,8 @@
 
 ## P0 阶段收尾（2026-08-09）
 
-- 产品命名已统一为 `Teemo助理`；当前源码版本为 `v1.1.7`，后续安装包、快捷方式和版本显示不得再使用“哈啰设计助手”。
+- 产品命名已统一为 `Teemo助理`；当前源码、界面与安装包版本为 `v1.2.0`，后续安装包、快捷方式和版本显示不得再使用“哈啰设计助手”。
+- 版本规则：发布标签 `vX.Y.Z-*` 的数字前缀是版本事实源；`package.json`、lockfile、界面 `app.getVersion()` 与安装包文件名必须一致，构建前由 `npm run verify:release-version` 强制检查。
 - P0-1：唯一正式开发源码为 `D:\Teemo助手\Teemo机器人项目\Teemo-source`，Git 基线分支和可构建标签已建立。
 - P0-2：AI、存储、本地文件能力已整理为 AIService、TeemoStorageService、TeemoFileService 统一入口。
 - P0-3：根目录 `AGENTS.md` 已建立，作为 Codex、Kiro、Grok 等 AI Coding Agent 的最高优先级协作规则。

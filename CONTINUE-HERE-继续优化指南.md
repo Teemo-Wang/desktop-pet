@@ -1,11 +1,13 @@
 # Teemo助理 · 继续优化指南（交接文档）
 
 > 用途：在**新对话**里用 `#File` 引用本文件（或直接把内容粘给 AI），即可快速接上进度继续优化。
-> 最后更新：2026-08-09（P0 已封板，P1 待开始）｜当前版本 v1.1.7
+> 最后更新：2026-08-09（P1 Agent Foundation 已封板，未进入 P2）｜当前版本 v1.2.0
 
 > 当前唯一源码：`D:\Teemo助手\Teemo机器人项目\Teemo-source`
 > P0 恢复点：`219b92a` / `v1.1.6-p0-closed`
+> P1 恢复点：`v1.2.0-p1-agent-foundation`
 > P1 开发分支：`Teemo/p1-agent-core`
+> P1 当前事实源：`CURRENT-TASK.md`、`PROJECT-STATUS.md`、`docs/P1-AGENT-FOUNDATION-SUMMARY.md`
 
 ---
 
@@ -42,7 +44,7 @@
 - 运行时：Electron 31，原生 HTML/CSS/JS（无框架）
 - 数据/配置：`~/.hellobike-pet/`（settings.json、skills.json、task-context.json、chat-history.json 等）
 - 启动：`cd docs/desktop-pet && npm start`
-- 当前版本：v1.1.1
+- 当前版本：v1.2.0
 
 ## 二、关键目录/文件
 

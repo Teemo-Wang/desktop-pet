@@ -1,11 +1,12 @@
 {
   "name": "teemo-assistant",
-  "version": "1.1.7",
+  "version": "1.2.0",
   "description": "哈啰桌面AI机器人 - 设计助手",
   "main": "main.js",
   "author": "Teemo Wang",
   "scripts": {
     "start": "electron .",
+    "verify:release-version": "node scripts/TeemoVerifyReleaseVersion.js",
     "test:agent-core": "node tests/TeemoAgentCore.test.js",
     "test:cognition": "node tests/TeemoCognition.test.js",
     "test:tools": "node tests/TeemoToolRegistry.test.js",
@@ -13,9 +14,13 @@
     "test:file-tools": "node tests/TeemoFileTools.test.js",
     "test:git-tools": "node tests/TeemoGitTools.test.js",
     "test:execute": "node tests/TeemoExecuteTools.test.js",
+    "predist": "npm run verify:release-version",
     "dist": "electron-builder --publish never",
+    "predist:mac": "npm run verify:release-version",
     "dist:mac": "electron-builder --mac --publish never",
+    "predist:win": "npm run verify:release-version",
     "dist:win": "electron-builder --win --publish never",
+    "prerelease": "npm run verify:release-version",
     "release": "electron-builder --publish always"
   },
   "build": {

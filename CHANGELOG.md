@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.2.0 - 2026-08-09
+
+### 版本与 P1 封板一致
+
+- 将 `package.json`、lockfile、设置界面动态版本与 Windows 安装包版本统一为 `1.2.0`，对应标签 `v1.2.0-p1-agent-foundation` 的数字前缀。
+- 新增 `scripts/TeemoVerifyReleaseVersion.js` 与构建前生命周期检查；最近可达标签 `vX.Y.Z-*` 与 package/UI/installer 版本不一致时拒绝打包。
+- P1 Agent Foundation 保持 `CLOSED / PASS / BLOCKERS: 0`，没有进入 P2。
+
 ## v1.1.7 - 2026-08-09
 
 ### P1-6 Git + Controlled Execute（CLOSED / PASS）
