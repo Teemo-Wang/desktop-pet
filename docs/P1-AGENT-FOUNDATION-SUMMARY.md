@@ -1,6 +1,6 @@
 # P1 Agent Foundation Summary
 
-> 状态：P1-1 至 P1-6 本地 Gate 已通过，等待 GPT 整体审阅。此文档在审阅确认前不宣称 P1 CLOSED。
+> 最终状态：`P1 Agent Foundation / STATUS: CLOSED / RESULT: PASS / BLOCKERS: 0`。GPT 总审阅已确认，恢复标签为 `v1.2.0-p1-agent-foundation`。
 
 ## 交付范围
 
@@ -11,8 +11,8 @@
 | P1-3 | 统一 Tool Registry、Schema、Envelope、受控 Context、Abort | CLOSED / PASS |
 | P1-4 | Main 中央 Permission Service、once/session/resource、audit、fail closed | CLOSED / PASS |
 | P1-5 | 4 read + 3 write Safe File Tools | CLOSED / PASS |
-| P1-6A | 4 read + explicit stage + staged-only commit Git Tools | Local Gate PASS |
-| P1-6B | npm-declared script + Node-only Controlled Execute | Local Gate PASS |
+| P1-6A | 4 read + explicit stage + staged-only commit Git Tools | CLOSED / PASS |
+| P1-6B | npm-declared script + Node-only Controlled Execute | CLOSED / PASS |
 
 ## 最终运行链路
 
@@ -65,6 +65,6 @@ Provider-neutral Action
 - File/Git/Execute 的最终 revalidate 与系统调用之间仍存在操作系统级微小竞态窗口；P1 已做到副作用前立即复核和保守失败。
 - 依赖树既有 audit 风险、旧 `js/` 兼容代码与外围存储收敛不属于 P1 Agent Foundation。
 
-## 封板条件
+## 封板结论
 
-只有在“Teemo助手升级”返回整个 P1 `PASS / BLOCKERS: 0`，且所有要求修正完成并通过回归后，才可创建最终 close commit 与 `v1.2.0-p1-agent-foundation` 标签。
+“Teemo助手升级”已在 hooks/filter/signing/fsmonitor 与 textconv 两轮安全复审后确认整个 P1 `PASS / BLOCKERS: 0`，并允许创建最终 close commit 与 `v1.2.0-p1-agent-foundation` 标签。P1 已结束，未进入 P2。

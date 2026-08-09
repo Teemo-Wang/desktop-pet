@@ -1,6 +1,6 @@
 # P1-6 Git + Controlled Execute
 
-> 当前状态：P1-6A Git Tools Gate 与 P1-6B Controlled Execute 本地 Gate 均已通过，正在等待整个 P1 总审阅。P1-6 是 P1 最后阶段，总审阅确认前不进入 P2。
+> 最终状态：P1-6A Git Tools 与 P1-6B Controlled Execute 均为 `CLOSED / PASS`；GPT 整个 P1 总审阅结论为 `BLOCKERS: 0`。P1 已结束，未进入 P2。
 
 ## P1-6A Git Tools
 
@@ -67,6 +67,8 @@ C:\Users\Teemo\Documents\Codex\2026-08-09\w\work\Teemo-P1-6A-git-smoke-final-202
 独立 profile/data 与临时 repo 输出 `TEEMO_GIT_TOOLS_ELECTRON_SMOKE_PASS`；验证两个 renderer 的 6 个 Definition 一致、中央 session grant、deny、explicit stage、commit staged only、abort/late allow。未读取或修改正式 authorized roots、settings、history、Cognition、Skills 或 Projects。
 
 最终 Safe Git Policy 补丁另在 `C:\Users\Teemo\Documents\Codex\2026-08-09\w\work\Teemo-P1-6-git-policy-smoke-20260809` 重新执行相同隔离 smoke，并再次输出 PASS marker。
+
+textconv 最终补丁在 `C:\Users\Teemo\Documents\Codex\2026-08-09\w\work\Teemo-P1-6-git-textconv-smoke-20260809` 再次执行隔离 smoke，并输出相同 PASS marker。
 
 完整应用另使用 `C:\Users\Teemo\Documents\Codex\2026-08-09\w\work\Teemo-P1-6A-app-smoke-20260809` 的隔离 profile/data 启动 10 秒，Main Git Service/IPC 与两套生产 Registry 初始化无新增错误；只有既有 CSP 警告和隔离环境缺少语雀配置的预期提示。
 

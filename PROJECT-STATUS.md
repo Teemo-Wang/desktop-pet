@@ -1,6 +1,6 @@
 # Teemo助理 — 项目进度与规划
 
-> 文档版本：v1.13 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.1.7（P1 全阶段本地 Gate 已通过，等待总审阅）**
+> 文档版本：v1.14 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.1.7（P1 Agent Foundation CLOSED / PASS）**
 
 ## 当前状态
 
@@ -8,8 +8,9 @@
 - Version：`v1.1.7`
 - Source：`D:\Teemo助手\Teemo机器人项目\Teemo-source`
 - P0：`CLOSED`
+- P1：`CLOSED / PASS / BLOCKERS: 0`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
-- Current Development：`P1-6A Git Tools + P1-6B Controlled Execute Gate PASS；等待 GPT 对整个 P1 总审阅`
+- Current Development：`P1 Agent Foundation 已封板；未进入 P2`
 - Current Branch：`Teemo/p1-agent-core`
 
 ## P0 阶段收尾（2026-08-09）
@@ -69,7 +70,7 @@
 - 单元/安全/并发回归及隔离 Electron 双 renderer、完整应用烟测均通过；详细记录见 `docs/P1-5-FILE-TOOLS.md`。
 - GPT 严格审阅确认：`P1-5 Safe File Tools STATUS: CLOSED / RESULT: PASS / BLOCKERS: 0`；实现提交为 `0211a40`，阶段恢复标签为 `v1.1.7-p1.5-file-tools`。
 
-## P1-6A 阶段（2026-08-09，Git Safety Gate PASS）
+## P1-6A 阶段（2026-08-09，CLOSED / PASS）
 
 - 新增 `git_status`、`git_diff`、`git_log`、`git_show` 四个 read Tool，以及 `git_stage_files`、`git_commit` 两个 write Tool。
 - repo 必须位于既有 authorized root；Main 生成可信 `git+file:///` resource，并在 Permission 后复核 repo/git-dir identity、stage 文件 hash 或 HEAD/staged tree。
@@ -78,14 +79,16 @@
 - stage 只处理明确文件；commit 不自动 add。正式 Definition 中 destructive Git 与 remote Git Tool 数量均为 0。
 - `test:git-tools` 包含 hooks/custom hooksPath/signing/filter/fsmonitor 恶意 marker 测试；P1-1 至 P1-5 回归与双 renderer 隔离 Git 烟测均 PASS。详细记录见 `docs/P1-6-GIT-EXECUTE.md`。
 
-## P1-6B 阶段（2026-08-09，Controlled Execute Gate PASS）
+## P1-6B 阶段（2026-08-09，CLOSED / PASS）
 
 - 新增 `run_npm_script` 与 Node-only `run_process` 两个 execute Tool；没有任意 shell、Git/cmd/PowerShell/Python executable 或网络服务入口。
 - cwd、package、Node script、Node/npm canonical identity 与内容 hash 由 Main 解析，生成含完整 operation/executable/hash query 的可信 `exec+file:///` Permission Resource。
 - Permission 后重新解析全部 execution snapshot；package/script/command/resource 任一变化都以 `EXECUTION_RESOURCE_CHANGED` fail closed，且不启动进程。
 - 进程固定 `shell:false`、stdin disabled、minimal env、secret-name filter、timeout、Abort、输出上限/清洗与 process-tree cleanup。
 - `test:execute`、P1 全量回归、双 renderer 隔离 Execute 烟测和完整应用隔离启动均 PASS；详细记录见 `docs/P1-6-GIT-EXECUTE.md`。
-- 当前尚未把 P1 标记 CLOSED，也未进入 P2；必须等待“Teemo助手升级”对整个 P1 总审阅并处理其建议。
+- GPT 总审阅最终确认：`P1 Agent Foundation STATUS: CLOSED / RESULT: PASS / BLOCKERS: 0`。
+- P1-6 实现提交为 `ecd7bda`、`9b8978d`；Git 间接执行安全补丁为 `1bbdf95`、`2e91f42`。最终恢复标签为 `v1.2.0-p1-agent-foundation`。
+- P1 到此结束；未进入 P2，后续阶段必须由新的明确规划启动。
 
 ### P0 已知风险
 
