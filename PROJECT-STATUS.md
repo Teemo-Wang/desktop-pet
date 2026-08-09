@@ -22,6 +22,7 @@
 - Cognition 以不可信 JSON data block 注入；role-like text 不获得指令权限。Memory Center 增加状态、有效可信度、最后确认和证据次数。
 - 四套 P2-4 专项测试、两套 Cognition Electron smoke 和 P1/P2-1/P2-2/P2-3 全量回归已通过，正式用户数据零触碰。详见 `docs/P2-4-COGNITION-INTELLIGENCE.md`。
 - 当前等待 GPT strict review；未标记 PASS/CLOSED，未创建 P2-4 recovery tag，未开发 P2-5 或 P3。
+- GPT 首轮 Gate 为 `FAIL / BLOCKERS: 3`；已修显式跨项目 scope 覆盖和 single Profile 无关注入，并统一 Management/Collector 文件锁；待本地 patch/test evidence 复审。
 
 ## P2-3 阶段（2026-08-09，CLOSED / PASS）
 

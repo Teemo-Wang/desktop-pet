@@ -14,6 +14,8 @@
     '这个', '那个', '这些', '那些', '这里', '现在', '最近', '目前', '已经', '还是', '可以', '需要',
     '喜欢', '偏好', '默认', '设计', '项目', '使用', '记住', '以后', '一直', '通常', '比较', '一些',
   ]);
+  const DESIGN_DOMAIN = /(?:设计|视觉|品牌|海报|banner|\bkv\b|\bui\b|\bux\b|\b3d\b|排版|字体|配色|色彩|材质|渲染|动效|图标|界面|logo|人物|卡通|简洁|科技)/i;
+  const PERSONAL_PROFILE_QUERY = /(?:(?:按照|根据).*(?:我|我的).*(?:喜欢|偏好|习惯|平时)|我平时喜欢|我的偏好|我通常喜欢|我以前喜欢)/;
 
   function normalizeText(value) {
     return String(value == null ? '' : value)
@@ -179,13 +181,18 @@
     queryTokens.forEach(token => { if (itemTokens.has(token)) overlap += 1; });
     const scopeBase = item.scope === 'project' ? 300 : item.scope === 'recent' ? 200 : 100;
     const genericFollowUp = queryTokens.size <= 2 && /(?:这个|那个|它|继续|刚才|上面|再|怎么|呢)/.test(normalizeText(query));
+    const domainMatch = DESIGN_DOMAIN.test(normalizeText(query)) && DESIGN_DOMAIN.test(normalizeText(item.content));
+    const personalProfileQuery = item.scope === 'global' && PERSONAL_PROFILE_QUERY.test(normalizeText(query));
     const recency = intelligence.freshness === 'fresh' ? 24 : intelligence.freshness === 'current' ? 12 : 0;
     const conflictPenalty = intelligence.conflict ? 80 : 0;
     return {
       score: scopeBase + overlap * 45 + intelligence.effectiveConfidence * 30 + recency
-        + (genericFollowUp && item.scope === 'recent' ? 18 : 0) - conflictPenalty,
+        + (genericFollowUp && item.scope === 'recent' ? 18 : 0) + (domainMatch ? 24 : 0)
+        + (personalProfileQuery ? 40 : 0) - conflictPenalty,
       matchCount: overlap,
       genericFollowUp,
+      domainMatch,
+      personalProfileQuery,
       queryTokenCount: queryTokens.size,
     };
   }
@@ -204,6 +211,8 @@
           relevanceScore: relevance.score,
           relevanceMatchCount: relevance.matchCount,
           genericFollowUp: relevance.genericFollowUp,
+          relevanceDomainMatch: relevance.domainMatch,
+          personalProfileQuery: relevance.personalProfileQuery,
           queryTokenCount: relevance.queryTokenCount,
         },
       };

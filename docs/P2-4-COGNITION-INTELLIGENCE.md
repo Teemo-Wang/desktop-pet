@@ -9,7 +9,7 @@
 
 P2-4 在既有 Cognition v2 上增加确定性 Intelligence 层，使上下文选择更相关、更及时、更可信，同时保持唯一事实源为 `Teemo-cognition.json`。顶层 `version` 仍为 `2`，没有第二套 Cognition 数据库，也没有启动时或读取时迁移。
 
-旧 v2 文件可以原样读取。freshness、effective confidence、conflict、promotion eligibility、relevance 和 UI state 都在运行时派生，不写回历史条目。新证据或用户操作发生写入时，可向对应 Observation/Knowledge 增加向后兼容的 `evidenceDays` 最小日期数组，用于跨自然日晋升保护；缺失该字段的旧条目使用 `createdAt`、`lastObservedAt`、`updatedAt` 回退，不会因读取而改写。
+旧 v2 文件可以原样读取。freshness、effective confidence、conflict、promotion eligibility、relevance 和 UI state 都在运行时派生，不写回历史条目。新证据或用户操作发生写入时，可向对应 Observation/Knowledge 增加向后兼容的 `evidenceDays` 最小日期数组，用于跨自然日晋升保护；日期格式为 UTC `YYYY-MM-DD`、去重排序并最多保留最近 64 天。缺失该字段的旧条目使用 `createdAt`、`lastObservedAt`、`updatedAt` 回退，不会因读取而改写。
 
 ## 2. Intelligence Architecture
 
@@ -86,13 +86,13 @@ Profile 始终 `stable`，不做时间衰减；Project 只按 projectId 隔离�
 当前用户明确指令 > Current Project > Relevant Recent > Relevant Profile
 ```
 
-每层内部使用 keyword overlap、effective confidence、freshness 和 updated time 排序。generic follow-up 可结合最近六条对话恢复相关关键词，但 Skill 正文不作为偏好事实参与 query。无 active project 时不读取任何 Project Cognition；Project A 永不召回 Project B。普通无关问题不会塞入大量设计 Profile；仅为兼容 P2-2，在系统只有一条 Profile 时允许单条保守兜底。
+每层内部使用 keyword overlap、design domain、personal-profile query、effective confidence、freshness 和 updated time 排序。generic follow-up 可结合最近六条对话恢复相关关键词，但 Skill 正文不作为偏好事实参与 query。无 active project 时不读取任何 Project Cognition；Project A 永不召回 Project B。普通无关问题不会因为 Profile 数量少而无条件注入；Profile 只有在当前请求达到设计域/关键词相关阈值、用户明确询问自身偏好，或已有相关对话支持 generic follow-up 时才进入 Context。
 
 Cognition 以 `<teemo_cognition_data>` 包裹的 JSON data rows 注入，并明确声明为不可信用户派生数据。`System:`、`assistant:`、`developer:`、命令和代码只保留为字符串，不改变 message role，不获得系统、工具、权限或安全规则的权力。Context 超预算时按完整 data row 跳过，不产生破损结构。
 
 ## 8. Concurrency、Enabled 与失败降级
 
-Collector 一轮把 correction、Observation、Recent/Project、promotion 合并为一次锁内持久化和一次 revision 增量。锁内重新读取并检查 expectedRevision；冲突时重新读取、重算并最多 retry 1 次。第二次仍冲突返回非致命 `COGNITION_CONCURRENT_CHANGE`，不会无限重试或重复 evidence。
+Collector 一轮把 correction、Observation、Recent/Project、promotion 合并为一次锁内持久化和一次 revision 增量。六个 P2-1 Management 写 API 与 Collector 使用同一文件锁；锁内重新读取并检查 expectedRevision。Collector 冲突时重新读取、重算并最多 retry 1 次；第二次仍冲突返回非致命 `COGNITION_CONCURRENT_CHANGE`，不会无限重试或重复 evidence。
 
 P2-1 management API 和 stale expectedRevision 的 `COGNITION_CHANGED` 行为保持。跨 renderer 下一次 Builder/Collector/Refresh 仍 latest-read 同一事实源。
 
@@ -150,3 +150,14 @@ P2-4 不新增聊天日志、行为追踪、Embedding Store、chain-of-thought�
 - 文件锁使用 30 秒 stale 回收；异常退出不会永久阻塞下一次 Collector。
 
 当前未实现 P2-5 Skill Specification/Router，也未实现 P3 Inspiration Connector、Embedding、Vector DB、Cloud Sync、Multi-Agent、GUI Automation 或 Provider Native Tool Calling。等待 GPT P2-4 strict review；未创建 P2-4 recovery tag。
+
+## 14. GPT 首轮审阅修复
+
+首轮 Gate 为 `STATUS: FAIL / BLOCKERS: 3`。本轮仅处理 P2-4 blocker：
+
+- 显式跨项目信号（如“这不只适用于当前项目，以后所有项目……”）现在优先于 active project 默认归属进入 Profile；“这个项目以后默认……”仍保持 Project，并有正反测试。
+- 删除 single Profile 的无条件无关请求 fallback；日期、数学、程序等无关 send/stream 不注入，明确 personal-profile query、相关设计请求或已有相关 generic follow-up 才注入。
+- 导出本地 implementation patch 与带实际命令/退出码的测试结果，供无需 remote push 的源码复审。
+- Management 六个写 API 与 Collector 统一参与同一文件锁，避免 UI/Collector 临界区交叉覆盖；保留 optimistic revision 与 `COGNITION_CHANGED`。
+
+首轮要求的 review bundle 与 blocker fix commit 完成后再提交复审；当前仍未标记 PASS/CLOSED。

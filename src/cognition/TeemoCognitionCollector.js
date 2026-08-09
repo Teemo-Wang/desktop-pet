@@ -70,7 +70,8 @@
       const isTemporary = TEMPORARY.test(text);
       const isExplicitProjectGlobal = EXPLICIT_PROJECT_GLOBAL.test(text);
       let scope = 'recent';
-      if (projectId && (PROJECT.test(text) || /只适用于|仅适用于/.test(text))) scope = 'project';
+      if (isExplicitProjectGlobal && !isTemporary) scope = 'global';
+      else if (projectId && (PROJECT.test(text) || /只适用于|仅适用于/.test(text))) scope = 'project';
       else if (projectId && PROJECT_DOMAIN.test(text) && !isExplicitProjectGlobal) scope = 'project';
       else if ((isLongTerm || isExplicitProjectGlobal) && !isTemporary) scope = 'global';
       else if (RECENT.test(text) || isTemporary || SIGNAL.test(text)) scope = 'recent';

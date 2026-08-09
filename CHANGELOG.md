@@ -8,6 +8,8 @@
 - “Teemo 对我的了解”增加稳定/近期/逐渐陈旧/已陈旧/有冲突/待确认、有效可信度、最后确认和证据次数，不新增导航或统计面板。
 - 新增四套 P2-4 专项测试；P1/P2-1/P2-2/P2-3 全量回归、两套 Cognition Electron smoke、语法与 diff 检查通过，版本仍为 1.2.1。
 - 当前等待 GPT strict review；未创建 P2-4 recovery tag，未开发 P2-5/P3。
+- GPT 首轮审阅后补齐 active project 中“以后所有项目”显式跨项目路由，并删除 single Profile 对无关请求的无条件 fallback；新增正反、敏感题材与 send/stream 测试。
+- P2-1 Management 写 API 与 Collector 统一使用同一文件锁，避免两个 renderer/UI 与后台采集交叉覆盖；`evidenceDays` 采用 UTC 日期去重并限制最近 64 天。
 
 ## P2-3 - 2026-08-09（CLOSED / PASS）
 

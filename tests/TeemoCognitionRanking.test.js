@@ -74,6 +74,18 @@ function main() {
     const unrelated = builder.build({ messages: [{ role: 'user', content: '今天星期几？' }] });
     assert.equal(unrelated.systemMessage, null, 'unrelated ordinary questions should not inject design Cognition');
 
+    const singleDir = path.join(dir, 'single');
+    const singleService = new TeemoCognitionService({ dataDir: singleDir, clock: () => now });
+    const singleSnapshot = singleService.getManagementSnapshot();
+    singleService.manualCreate({ content: '长期偏好成人向视觉题材', scope: 'global' }, { expectedRevision: singleSnapshot.revision });
+    const singleBuilder = new TeemoContextBuilder({ cognitionService: singleService });
+    assert.equal(singleBuilder.build({ messages: [{ role: 'user', content: '今天星期几？' }] }).systemMessage, null);
+    assert.equal(singleBuilder.build({ messages: [{ role: 'user', content: '帮我写一段程序。' }] }).systemMessage, null);
+    assert.match(
+      singleBuilder.build({ messages: [{ role: 'user', content: '按照我平时喜欢的方向再来一版。' }] }).systemMessage.content,
+      /长期偏好成人向视觉题材/
+    );
+
     const followUp = builder.build({ messages: [
       { role: 'user', content: '上一版高反射金属材质太亮了' },
       { role: 'assistant', content: '可以降低反射强度。' },

@@ -28,8 +28,10 @@
 1. P2-4 任务书已由同一 GPT 对话确认：`TASKBOOK READY: YES / IMPLEMENTATION ALLOWED: YES`。
 2. 实现与自动测试完成；文档见 `docs/P2-4-COGNITION-INTELLIGENCE.md`。
 3. 下一步创建 implementation commit：`Teemo: add P2-4 cognition intelligence`。
-4. 将 108 项实现报告发送到“Teemo助手升级”对话，等待严格审阅。
-5. 只有 `STATUS: PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES` 才能封板并创建 P2-4 recovery tag。
+4. GPT 首轮审阅：`STATUS: FAIL / BLOCKERS: 3 / CAN_CLOSE_AND_TAG: NO`。
+5. 已修 active-project 显式跨项目路由和 single-Profile 无关请求注入；补充正反、敏感题材、send/stream 与共享文件锁测试。
+6. 下一步创建 blocker fix commit，导出本地 patch/test-results 后提交 GPT 复审。
+7. 只有 `STATUS: PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES` 才能封板并创建 P2-4 recovery tag。
 
 ## 禁止扩展
 

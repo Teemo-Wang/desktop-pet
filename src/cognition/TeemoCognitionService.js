@@ -20,6 +20,7 @@
   const VALID_DOMAINS = new Set(['profile', 'recent', 'project']);
   const MAX_COGNITION_ITEM_CHARS = 420;
   const MAX_MANUAL_INPUT_CHARS = 12000;
+  const MANAGEMENT_LOCK_HELD = Symbol('TeemoCognitionManagementLockHeld');
 
   function makeId(prefix) {
     return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
@@ -241,16 +242,16 @@
       const rank = items => this.intelligence.rank(items, query, { now, allItems: allKnowledge });
       const relevant = item => !query.trim()
         || Number(item.intelligence && item.intelligence.relevanceMatchCount) > 0
-        || Boolean(item.intelligence && item.intelligence.genericFollowUp);
+        || Boolean(item.intelligence && item.intelligence.genericFollowUp)
+        || Boolean(item.intelligence && item.intelligence.relevanceDomainMatch)
+        || Boolean(item.intelligence && item.intelligence.personalProfileQuery);
       const recent = rank(this._active(this.data.recentContext))
         .filter(relevant)
         .filter(item => item.intelligence.freshness !== 'stale');
       const rankedProfile = rank(this._active(this.data.profile));
       const relevantProfile = rankedProfile.filter(relevant);
       return clone({
-        profile: relevantProfile.length || !query.trim()
-          ? relevantProfile
-          : (rankedProfile.length === 1 ? rankedProfile : []),
+        profile: relevantProfile,
         recentContext: recent,
         projectContext: options.projectId ? rank(this._active(this.data.projectContexts[String(options.projectId)] || [])) : [],
       });
@@ -276,7 +277,7 @@
         existing.evidenceDays = Array.from(new Set([
           ...this.intelligence.evidenceDays(existing),
           observedDay,
-        ].filter(Boolean))).sort();
+        ].filter(Boolean))).sort().slice(-64);
         existing.lastObservedAt = observedAt;
         existing.updatedAt = observedAt;
         existing.confidence = Math.max(existing.confidence || 0, Number(input.confidence) || 0);
@@ -507,6 +508,19 @@
       return null;
     }
 
+    _withManagementLock(callback) {
+      if (!this.storage || typeof this.storage.withFileLock !== 'function') return callback();
+      const locked = this.storage.withFileLock(this.fileName, callback);
+      if (locked.acquired) return locked.value;
+      this.reload();
+      return {
+        ok: false,
+        code: 'COGNITION_CHANGED',
+        message: '认知数据正在由其他窗口更新，请刷新后重试',
+        snapshot: this._managementSnapshotFromCurrent(),
+      };
+    }
+
     _scopeTarget(scope, projectId = null) {
       if (!VALID_SCOPES.has(scope)) return null;
       if (scope === 'global') return { domain: 'profile', projectId: null, collection: this.data.profile };
@@ -647,7 +661,7 @@
           observation.evidenceDays = Array.from(new Set([
             ...this.intelligence.evidenceDays(observation),
             this.intelligence.naturalDay(observedAt),
-          ].filter(Boolean))).sort();
+          ].filter(Boolean))).sort().slice(-64);
           observation.lastObservedAt = observedAt;
           observation.updatedAt = observedAt;
           observation.confidence = Math.max(Number(observation.confidence) || 0, Number(input.confidence) || 0);
@@ -714,6 +728,9 @@
     }
 
     setEnabled(enabled, options = {}) {
+      if (!options[MANAGEMENT_LOCK_HELD]) {
+        return this._withManagementLock(() => this.setEnabled(enabled, { ...options, [MANAGEMENT_LOCK_HELD]: true }));
+      }
       const conflict = this._prepareManagementMutation(options.expectedRevision);
       if (conflict) return conflict;
       this.data.enabled = enabled !== false;
@@ -722,6 +739,9 @@
     }
 
     manualCreate(input = {}, options = {}) {
+      if (!options[MANAGEMENT_LOCK_HELD]) {
+        return this._withManagementLock(() => this.manualCreate(input, { ...options, [MANAGEMENT_LOCK_HELD]: true }));
+      }
       const conflict = this._prepareManagementMutation(options.expectedRevision);
       if (conflict) return conflict;
       const content = normalizeContent(input.content);
@@ -756,6 +776,9 @@
     }
 
     manualCreateBatch(input = {}, options = {}) {
+      if (!options[MANAGEMENT_LOCK_HELD]) {
+        return this._withManagementLock(() => this.manualCreateBatch(input, { ...options, [MANAGEMENT_LOCK_HELD]: true }));
+      }
       const conflict = this._prepareManagementMutation(options.expectedRevision);
       if (conflict) return conflict;
       const rawContent = normalizeManualInput(input.content);
@@ -825,6 +848,9 @@
     }
 
     updateCognitionEntry(input = {}, options = {}) {
+      if (!options[MANAGEMENT_LOCK_HELD]) {
+        return this._withManagementLock(() => this.updateCognitionEntry(input, { ...options, [MANAGEMENT_LOCK_HELD]: true }));
+      }
       const conflict = this._prepareManagementMutation(options.expectedRevision);
       if (conflict) return conflict;
       const found = this._findKnowledge(input.domain, input.id, input.projectId);
@@ -854,6 +880,9 @@
     }
 
     supersedeCognitionEntry(input = {}, options = {}) {
+      if (!options[MANAGEMENT_LOCK_HELD]) {
+        return this._withManagementLock(() => this.supersedeCognitionEntry(input, { ...options, [MANAGEMENT_LOCK_HELD]: true }));
+      }
       const conflict = this._prepareManagementMutation(options.expectedRevision);
       if (conflict) return conflict;
       const found = this._findKnowledge(input.domain, input.id, input.projectId);
@@ -865,6 +894,9 @@
     }
 
     moveCognitionEntry(input = {}, options = {}) {
+      if (!options[MANAGEMENT_LOCK_HELD]) {
+        return this._withManagementLock(() => this.moveCognitionEntry(input, { ...options, [MANAGEMENT_LOCK_HELD]: true }));
+      }
       const conflict = this._prepareManagementMutation(options.expectedRevision);
       if (conflict) return conflict;
       const found = this._findKnowledge(input.domain, input.id, input.projectId);

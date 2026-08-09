@@ -152,7 +152,7 @@ async function main() {
     const plain = await runWith(core, ai, '1+1 等于几？');
     assert.equal(plain.ok, true);
     text = systemText(ai.calls.at(-1));
-    assert.ok(text.includes('Teemo Cognition 上下文'));
+    assert.ok(!text.includes('Teemo Cognition 上下文'));
     assert.ok(!text.includes('Teemo Creative Judgment'));
 
     let creativeState = creativeService.getManagementSnapshot().state;

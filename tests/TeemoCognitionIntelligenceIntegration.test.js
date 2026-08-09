@@ -48,6 +48,22 @@ async function main() {
     assert.equal(service.getProjectContext('project-active').some(item => /卡通人物/.test(item.content)), true);
     assert.equal(service.getProfile().some(item => /卡通人物/.test(item.content)), false, 'active project outranks non-cross-project long-term wording');
 
+    const crossProject = await collector.collectTurn({
+      userMessage: '这个不只适用于当前项目，以后所有项目我都更喜欢高反射金属材质。',
+      projectId: 'project-cross-scope',
+      sessionId: 'explicit-cross-project',
+    });
+    assert.equal(crossProject.scope, 'global');
+    assert.equal(service.getProfile().some(item => /以后所有项目/.test(item.content)), true);
+    assert.equal(service.getProjectContext('project-cross-scope').some(item => /以后所有项目/.test(item.content)), false);
+    const projectDefault = await collector.collectTurn({
+      userMessage: '这个项目以后默认都使用高反射金属材质。',
+      projectId: 'project-cross-scope',
+      sessionId: 'project-default-only',
+    });
+    assert.equal(projectDefault.scope, 'project');
+    assert.equal(service.getProjectContext('project-cross-scope').some(item => /这个项目以后默认/.test(item.content)), true);
+
     const manualState = service.getManagementSnapshot();
     const manualRecent = service.manualCreate({ content: '手动选择仅近期使用的偏好', scope: 'recent' }, { expectedRevision: manualState.revision });
     assert.equal(manualRecent.ok, true);
@@ -110,6 +126,18 @@ async function main() {
     assert.equal(exhausted.code, 'COGNITION_CONCURRENT_CHANGE');
     assert.equal(exhausted.retryCount, 1);
 
+    const competingManagement = new TeemoCognitionService({ dataDir: retryDir, clock: () => new Date(tick) });
+    const managementRevision = competingManagement.getState().revision;
+    const lockProbe = retryService.storage.withFileLock(retryService.fileName, () => (
+      competingManagement.manualCreate(
+        { content: '锁竞争期间不能覆盖 Collector', scope: 'recent' },
+        { expectedRevision: managementRevision }
+      )
+    ));
+    assert.equal(lockProbe.acquired, true);
+    assert.equal(lockProbe.value.code, 'COGNITION_CHANGED', 'Management mutation must share the Collector file lock');
+    assert.equal(new TeemoCognitionService({ dataDir: retryDir }).getRecentContext().some(item => /锁竞争/.test(item.content)), false);
+
     const disabledSnapshot = retryService.getManagementSnapshot();
     retryService.setEnabled(false, { expectedRevision: disabledSnapshot.revision });
     const disabledRevision = retryService.getState().revision;
@@ -147,6 +175,28 @@ async function main() {
     });
     const cognitionMessage = messages => messages.find(item => item.role === 'system' && /Teemo Cognition 上下文/.test(String(item.content)));
     assert.deepEqual(cognitionMessage(sent[0]), cognitionMessage(streamed[0]), 'send and stream must receive identical Cognition Context');
+
+    const singleDir = fs.mkdtempSync(path.join(dir, 'single-profile-'));
+    const singleService = new TeemoCognitionService({ dataDir: singleDir, clock: () => new Date(tick) });
+    const singleSnapshot = singleService.getManagementSnapshot();
+    singleService.manualCreate({ content: '长期偏好成人向视觉题材', scope: 'global' }, { expectedRevision: singleSnapshot.revision });
+    const singleBuilder = new TeemoContextBuilder({ cognitionService: singleService });
+    const singleSend = { calls: [], async send(messages) { this.calls.push(messages); return 'ok'; } };
+    const singleStream = { calls: [], async stream(messages, onChunk) { this.calls.push(messages); onChunk('ok', 'ok'); return 'ok'; } };
+    await new TeemoAgentCore({ aiService: singleSend, contextBuilder: singleBuilder }).run({
+      messages: [{ role: 'user', content: '今天星期几？' }],
+      disableActionContract: true,
+      skipCognitionCollection: true,
+    });
+    await new TeemoAgentCore({ aiService: singleStream, contextBuilder: singleBuilder }).runStream({
+      messages: [{ role: 'user', content: '帮我写一段普通程序。' }],
+      disableActionContract: true,
+      skipCognitionCollection: true,
+    });
+    assert.equal(cognitionMessage(singleSend.calls[0]), undefined);
+    assert.equal(cognitionMessage(singleStream.calls[0]), undefined, 'single sensitive-topic Profile must not leak into unrelated send/stream');
+    const personalBundle = singleBuilder.build({ messages: [{ role: 'user', content: '按照我平时喜欢的方向再来一版。' }] });
+    assert.match(personalBundle.systemMessage.content, /长期偏好成人向视觉题材/);
 
     const failingAI = { calls: [], async send(messages) { this.calls.push(messages); return 'normal chat continues'; } };
     const failingResult = await new TeemoAgentCore({
