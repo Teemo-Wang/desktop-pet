@@ -243,7 +243,6 @@
       const relevant = item => !query.trim()
         || Number(item.intelligence && item.intelligence.relevanceMatchCount) > 0
         || Boolean(item.intelligence && item.intelligence.genericFollowUp)
-        || Boolean(item.intelligence && item.intelligence.relevanceDomainMatch)
         || Boolean(item.intelligence && item.intelligence.personalProfileQuery);
       const recent = rank(this._active(this.data.recentContext))
         .filter(relevant)
@@ -618,22 +617,29 @@
         const projectId = scope === 'project' ? String(input.projectId || '').trim() : null;
         if (scope === 'project' && !projectId) return { ok: false, skipped: 'missing_project', revision: currentRevision };
 
+        let ambiguousCorrection = false;
         if (input.isCorrection) {
           const anchorKey = fingerprint(input.correctionAnchor);
           if (anchorKey && anchorKey.length >= 2) {
             const scopes = Array.isArray(input.correctionScopes) && input.correctionScopes.length
               ? input.correctionScopes
               : ['global', 'recent', 'project'];
-            this.data.observations.forEach(item => {
-              if (!item || item.status === 'superseded' || !scopes.includes(item.scope)) return;
-              if (projectId && item.scope === 'project' && item.projectId !== projectId) return;
-              if (!item.fingerprint.includes(anchorKey) && !anchorKey.includes(item.fingerprint)) return;
+            const candidates = this.data.observations.filter(item => (
+              item
+              && item.status !== 'superseded'
+              && scopes.includes(item.scope)
+              && (!projectId || item.scope !== 'project' || item.projectId === projectId)
+              && (item.fingerprint.includes(anchorKey) || anchorKey.includes(item.fingerprint))
+            ));
+            ambiguousCorrection = candidates.length > 1;
+            if (candidates.length === 1) {
+              const item = candidates[0];
               item.status = 'superseded';
               item.supersededBy = null;
               item.supersededReason = 'collector_correction';
               item.updatedAt = nowIso(this.clock);
               this._markKnowledgeSuperseded(item.id, null);
-            });
+            }
           } else if (scope === 'project' && input.allowSingleSessionMigration && input.sourceSessionId) {
             const candidates = this._active(this.data.observations)
               .filter(item => item.scope !== 'project' && item.sourceSessionId === String(input.sourceSessionId))
@@ -714,6 +720,7 @@
           observation: clone(observation),
           promoted,
           scope,
+          ambiguousCorrection: Boolean(input.isCorrection && ambiguousCorrection),
           revision: Math.max(0, Number(this.data.revision) || 0),
         };
       };

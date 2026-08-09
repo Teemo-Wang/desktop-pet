@@ -78,12 +78,20 @@ function main() {
     const singleService = new TeemoCognitionService({ dataDir: singleDir, clock: () => now });
     const singleSnapshot = singleService.getManagementSnapshot();
     singleService.manualCreate({ content: '长期偏好成人向视觉题材', scope: 'global' }, { expectedRevision: singleSnapshot.revision });
+    const pixelSnapshot = singleService.getManagementSnapshot();
+    singleService.manualCreate({ content: '长期偏好复古像素海报', scope: 'global' }, { expectedRevision: pixelSnapshot.revision });
     const singleBuilder = new TeemoContextBuilder({ cognitionService: singleService });
     assert.equal(singleBuilder.build({ messages: [{ role: 'user', content: '今天星期几？' }] }).systemMessage, null);
     assert.equal(singleBuilder.build({ messages: [{ role: 'user', content: '帮我写一段程序。' }] }).systemMessage, null);
+    assert.equal(singleBuilder.build({ messages: [{ role: 'user', content: '帮我设计一个儿童教育 App UI。' }] }).systemMessage, null);
+    assert.equal(singleBuilder.build({ messages: [{ role: 'user', content: '优化金融后台 UI。' }] }).systemMessage, null);
     assert.match(
       singleBuilder.build({ messages: [{ role: 'user', content: '按照我平时喜欢的方向再来一版。' }] }).systemMessage.content,
       /长期偏好成人向视觉题材/
+    );
+    assert.match(
+      builder.build({ messages: [{ role: 'user', content: '这个金属银行卡再优化一下。' }] }).systemMessage.content,
+      /长期偏好高反射金属材质/
     );
 
     const followUp = builder.build({ messages: [

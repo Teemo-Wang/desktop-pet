@@ -33,6 +33,14 @@
 6. 下一步创建 blocker fix commit，导出本地 patch/test-results 后提交 GPT 复审。
 7. 只有 `STATUS: PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES` 才能封板并创建 P2-4 recovery tag。
 
+## GPT 第二轮源码复审修复
+
+- 第二轮：`STATUS: FAIL / BLOCKERS: 3 / CAN_CLOSE_AND_TAG: NO`；首轮证据、跨项目路由和 single Profile fallback blocker 已解除。
+- 已阻止 Manual Recent lineage 自动晋升，保留后续明确 Global 表达路径。
+- 已将 anchored correction 收紧为唯一候选才 supersede，一对多保持 active 并待确认。
+- 已取消 broad design-domain 的独立准入资格，补充敏感题材/儿童 UI、像素/金融 UI 负向和相关/个人偏好正向 send/stream 测试。
+- 下一步完整回归、提交第二轮 blocker fix、更新 review bundle 并复审。
+
 ## 禁止扩展
 
 当前不得提前开发 P2-5 Skill Specification/Router 或 P3 Inspiration；不得增加 Embedding、Vector DB、LLM Collector、Cloud Sync、Multi-Agent、GUI Automation 或 Provider Native Tool Calling。GPT FAIL 时只修 P2-4 blocker。

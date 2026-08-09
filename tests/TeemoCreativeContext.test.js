@@ -158,7 +158,7 @@ async function main() {
     let creativeState = creativeService.getManagementSnapshot().state;
     const creativeOff = creativeService.setEnabled(false, { expectedRevision: creativeState.revision });
     assert.equal(creativeOff.ok, true);
-    await runWith(core, ai, '帮我评价这个品牌设计');
+    await runWith(core, ai, '帮我评价这个简洁科技感设计');
     text = systemText(ai.calls.at(-1));
     assert.ok(text.includes('Teemo Cognition 上下文'));
     assert.ok(!text.includes('Teemo Creative Judgment'));
@@ -220,7 +220,7 @@ async function main() {
       contextBuilder: cognitionBuilder,
       creativeContextBuilder: { build() { throw new Error('creative failed'); } },
     });
-    const degraded = await runWith(failingCore, ai, '评价这个设计');
+    const degraded = await runWith(failingCore, ai, '评价这个简洁科技感设计');
     assert.equal(degraded.ok, true);
     assert.equal(degraded.run.creativeError.code, 'CREATIVE_CONTEXT_BUILD_FAILED');
     assert.ok(systemText(ai.calls.at(-1)).includes('Teemo Cognition 上下文'));

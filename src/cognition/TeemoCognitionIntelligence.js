@@ -16,6 +16,14 @@
   ]);
   const DESIGN_DOMAIN = /(?:设计|视觉|品牌|海报|banner|\bkv\b|\bui\b|\bux\b|\b3d\b|排版|字体|配色|色彩|材质|渲染|动效|图标|界面|logo|人物|卡通|简洁|科技)/i;
   const PERSONAL_PROFILE_QUERY = /(?:(?:按照|根据).*(?:我|我的).*(?:喜欢|偏好|习惯|平时)|我平时喜欢|我的偏好|我通常喜欢|我以前喜欢)/;
+  const RELEVANCE_CONCEPTS = [
+    ['minimal', /(?:简洁|简单|极简|简约)/i],
+    ['metal', /(?:金属|高反射|镀铬)/i],
+    ['pixel', /(?:像素|pixel)/i],
+    ['adult', /(?:成人向|nsfw)/i],
+    ['child', /(?:儿童|少儿|教育)/i],
+    ['finance', /(?:金融|银行|银行卡)/i],
+  ];
 
   function normalizeText(value) {
     return String(value == null ? '' : value)
@@ -106,6 +114,11 @@
     return 'low';
   }
 
+  function relevanceConcepts(value) {
+    const text = normalizeText(value);
+    return new Set(RELEVANCE_CONCEPTS.filter(([, pattern]) => pattern.test(text)).map(([name]) => name));
+  }
+
   function derive(item = {}, options = {}) {
     const now = options.now || new Date();
     const freshnessValue = freshness(item, now);
@@ -114,6 +127,7 @@
     const days = evidenceDays(item);
     const evidenceCount = Math.max(1, Number(item.evidenceCount) || 1);
     const pending = item.scope === 'recent' && (evidenceCount < 3 || days.length < 2);
+    const manualRecent = item.scope === 'recent' && /^user_manual(?:_|$)/.test(String(item.source || ''));
     const factor = FRESHNESS_FACTORS[freshnessValue.state] || 1;
     const effectiveConfidence = Math.max(0, Math.min(1,
       (Number(item.confidence) || 0) * factor * (conflict ? 0.5 : 1)
@@ -124,7 +138,8 @@
       && evidenceCount >= 3
       && days.length >= 2
       && freshnessValue.state !== 'stale'
-      && !conflict;
+      && !conflict
+      && !manualRecent;
     const state = conflict
       ? 'conflict'
       : item.scope === 'global'
@@ -144,6 +159,7 @@
       confidenceLabel: confidenceLabel(effectiveConfidence),
       conflict,
       pending,
+      manualRecent,
       promotionEligible,
       state,
       lastConfirmedAt: item.lastObservedAt || item.updatedAt || item.createdAt || null,
@@ -179,6 +195,10 @@
     const itemTokens = tokens(item.content);
     let overlap = 0;
     queryTokens.forEach(token => { if (itemTokens.has(token)) overlap += 1; });
+    const queryConcepts = relevanceConcepts(query);
+    const itemConcepts = relevanceConcepts(item.content);
+    let conceptOverlap = 0;
+    queryConcepts.forEach(concept => { if (itemConcepts.has(concept)) conceptOverlap += 1; });
     const scopeBase = item.scope === 'project' ? 300 : item.scope === 'recent' ? 200 : 100;
     const genericFollowUp = queryTokens.size <= 2 && /(?:这个|那个|它|继续|刚才|上面|再|怎么|呢)/.test(normalizeText(query));
     const domainMatch = DESIGN_DOMAIN.test(normalizeText(query)) && DESIGN_DOMAIN.test(normalizeText(item.content));
@@ -186,10 +206,11 @@
     const recency = intelligence.freshness === 'fresh' ? 24 : intelligence.freshness === 'current' ? 12 : 0;
     const conflictPenalty = intelligence.conflict ? 80 : 0;
     return {
-      score: scopeBase + overlap * 45 + intelligence.effectiveConfidence * 30 + recency
+      score: scopeBase + overlap * 45 + conceptOverlap * 40 + intelligence.effectiveConfidence * 30 + recency
         + (genericFollowUp && item.scope === 'recent' ? 18 : 0) + (domainMatch ? 24 : 0)
         + (personalProfileQuery ? 40 : 0) - conflictPenalty,
-      matchCount: overlap,
+      matchCount: overlap + conceptOverlap,
+      conceptMatchCount: conceptOverlap,
       genericFollowUp,
       domainMatch,
       personalProfileQuery,

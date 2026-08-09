@@ -161,3 +161,12 @@ P2-4 不新增聊天日志、行为追踪、Embedding Store、chain-of-thought�
 - Management 六个写 API 与 Collector 统一参与同一文件锁，避免 UI/Collector 临界区交叉覆盖；保留 optimistic revision 与 `COGNITION_CHANGED`。
 
 首轮要求的 review bundle 与 blocker fix commit 完成后再提交复审；当前仍未标记 PASS/CLOSED。
+
+第二轮源码复审 Gate 仍为 `STATUS: FAIL / BLOCKERS: 3`，本轮继续只修 P2-4：
+
+- `promotionEligible` 明确排除 `user_manual`、`user_manual_edit`、`user_manual_scope` 的 Recent lineage；后台同文证据可以增加，但不能改变用户手动选择的 Recent scope。后续明确长期/跨项目表达仍可建立新的 Global cognition。
+- correction 先收集 anchor candidates：仅 1 个时 supersede，0 个不处理，大于 1 个保持全部 active，并让 correction 本身以 pending/ambiguous 状态等待用户确认。
+- broad design-domain 只作为 ranking boost，不再单独获得 relevance admission；准入要求实际 keyword/concept overlap、明确 personal-profile query 或带真实相关对话的 generic follow-up。
+- 补充成人向 Profile vs 儿童教育 UI、像素海报 Profile vs 金融后台 UI 的负向 send/stream 测试，以及金属内容相关和 personal-profile query 正向测试。
+
+当前等待第二轮 blocker fix commit 与更新后的完整 review bundle 复审。

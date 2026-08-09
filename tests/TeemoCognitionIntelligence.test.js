@@ -56,6 +56,17 @@ function main() {
   const stale = Intelligence.derive(entry({ lastObservedAt: '2026-04-01T00:00:00.000Z' }), { now });
   assert.equal(stale.promotionEligible, false);
   assert.equal(stale.state, 'stale');
+  const manualRecent = Intelligence.derive(entry({ source: 'user_manual' }), { now });
+  assert.equal(manualRecent.manualRecent, true);
+  assert.equal(manualRecent.promotionEligible, false);
+
+  const broadDomainOnly = Intelligence.relevanceDetails(
+    entry({ scope: 'global', content: '长期偏好成人向视觉题材' }),
+    '帮我设计一个儿童教育 App UI。',
+    { now }
+  );
+  assert.equal(broadDomainOnly.domainMatch, true);
+  assert.equal(broadDomainOnly.matchCount, 0, 'broad design-domain membership is ranking-only, not admission evidence');
 
   const positive = entry({ content: '我喜欢蓝色', evidenceCount: 2 });
   const negative = entry({ content: '我不喜欢蓝色', evidenceCount: 2 });

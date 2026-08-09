@@ -10,6 +10,8 @@
 - 当前等待 GPT strict review；未创建 P2-4 recovery tag，未开发 P2-5/P3。
 - GPT 首轮审阅后补齐 active project 中“以后所有项目”显式跨项目路由，并删除 single Profile 对无关请求的无条件 fallback；新增正反、敏感题材与 send/stream 测试。
 - P2-1 Management 写 API 与 Collector 统一使用同一文件锁，避免两个 renderer/UI 与后台采集交叉覆盖；`evidenceDays` 采用 UTC 日期去重并限制最近 64 天。
+- GPT 第二轮源码复审后阻止 Manual Recent lineage 自动晋升；correction 仅唯一 anchor candidate 自动 supersede，一对多保持待确认。
+- broad design-domain 仅保留 ranking boost，不再单独准入 Profile/Recent；新增敏感设计题材跨普通设计任务的数据最小化负向测试和相关/个人偏好正向 send/stream 测试。
 
 ## P2-3 - 2026-08-09（CLOSED / PASS）
 

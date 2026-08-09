@@ -69,6 +69,30 @@ async function main() {
     assert.equal(manualRecent.ok, true);
     assert.equal(service.getProfile().some(item => /手动选择仅近期/.test(item.content)), false);
 
+    const manualRecentDir = fs.mkdtempSync(path.join(dir, 'manual-recent-'));
+    let manualTick = Date.parse('2026-08-09T08:00:00.000Z');
+    const manualRecentService = new TeemoCognitionService({ dataDir: manualRecentDir, clock: () => new Date(manualTick) });
+    const manualStart = manualRecentService.getManagementSnapshot();
+    manualRecentService.manualCreate(
+      { content: '我喜欢高反射金属材质', scope: 'recent' },
+      { expectedRevision: manualStart.revision }
+    );
+    const manualCollector = new TeemoCognitionCollector({ cognitionService: manualRecentService });
+    await manualCollector.collectTurn({ userMessage: '我喜欢高反射金属材质', sessionId: 'manual-repeat-1' });
+    manualTick += 24 * 60 * 60 * 1000;
+    await manualCollector.collectTurn({ userMessage: '我喜欢高反射金属材质', sessionId: 'manual-repeat-2' });
+    const manualEvidence = manualRecentService.listObservations().find(item => item.content === '我喜欢高反射金属材质');
+    assert.equal(manualEvidence.source, 'user_manual');
+    assert.equal(manualEvidence.evidenceCount, 3);
+    assert.equal(manualRecentService.getRecentContext().some(item => item.content === '我喜欢高反射金属材质'), true);
+    assert.equal(manualRecentService.getProfile().some(item => item.content === '我喜欢高反射金属材质'), false, 'Manual Recent lineage must never auto-promote');
+    const manualExplicitGlobal = await manualCollector.collectTurn({
+      userMessage: '以后所有项目我都喜欢高反射金属材质。',
+      sessionId: 'manual-explicit-global',
+    });
+    assert.equal(manualExplicitGlobal.scope, 'global');
+    assert.equal(manualRecentService.getProfile().some(item => /以后所有项目/.test(item.content)), true);
+
     const projectSameA = service.manualCreate({ content: '同文项目认知', scope: 'project', projectId: 'same-A' }, { expectedRevision: manualRecent.snapshot.revision });
     const projectSameB = service.manualCreate({ content: '同文项目认知', scope: 'project', projectId: 'same-B' }, { expectedRevision: projectSameA.snapshot.revision });
     assert.equal(projectSameB.ok, true, 'projectId is part of exact identity');
@@ -102,6 +126,27 @@ async function main() {
     const ambiguous = await collector.collectTurn({ userMessage: '之前那个不对。', sessionId: 'ambiguous' });
     assert.equal(ambiguous.ok, true);
     assert.equal(service.listObservations().filter(item => ambiguousIds.includes(item.id)).length, 2, 'ambiguous correction preserves candidates');
+
+    const anchoredDir = fs.mkdtempSync(path.join(dir, 'anchored-correction-'));
+    const anchoredService = new TeemoCognitionService({ dataDir: anchoredDir, clock: () => new Date(tick) });
+    const anchoredCollector = new TeemoCognitionCollector({ cognitionService: anchoredService });
+    await anchoredCollector.collectTurn({ userMessage: '我喜欢高反射金属材质。', sessionId: 'anchor-a' });
+    await anchoredCollector.collectTurn({ userMessage: '我喜欢高反射金属字体。', sessionId: 'anchor-b' });
+    const anchoredAmbiguous = await anchoredCollector.collectTurn({
+      userMessage: '之前说高反射金属那条不再适用。',
+      sessionId: 'anchor-correction',
+    });
+    assert.equal(anchoredAmbiguous.ambiguousCorrection, true);
+    assert.equal(anchoredService.listObservations().filter(item => /我喜欢高反射金属/.test(item.content)).length, 2, 'one-to-many anchor must preserve all candidates');
+    const pendingCorrection = anchoredService.getManagementSnapshot().recentContext.find(item => /之前说高反射金属/.test(item.content));
+    assert.equal(pendingCorrection.intelligence.state, 'pending');
+    await anchoredCollector.collectTurn({ userMessage: '我喜欢强烈渐变材质。', sessionId: 'unique-anchor' });
+    const uniqueCorrection = await anchoredCollector.collectTurn({
+      userMessage: '之前说强烈渐变材质那条不再适用，现在更喜欢克制色彩。',
+      sessionId: 'unique-anchor',
+    });
+    assert.equal(uniqueCorrection.ambiguousCorrection, false);
+    assert.equal(anchoredService.listObservations().some(item => /我喜欢强烈渐变材质/.test(item.content)), false, 'unique anchor still supersedes normally');
 
     const retryDir = fs.mkdtempSync(path.join(dir, 'retry-'));
     const retryService = new TeemoCognitionService({ dataDir: retryDir, clock: () => new Date(tick) });
@@ -184,17 +229,17 @@ async function main() {
     const singleSend = { calls: [], async send(messages) { this.calls.push(messages); return 'ok'; } };
     const singleStream = { calls: [], async stream(messages, onChunk) { this.calls.push(messages); onChunk('ok', 'ok'); return 'ok'; } };
     await new TeemoAgentCore({ aiService: singleSend, contextBuilder: singleBuilder }).run({
-      messages: [{ role: 'user', content: '今天星期几？' }],
+      messages: [{ role: 'user', content: '帮我设计一个儿童教育 App UI。' }],
       disableActionContract: true,
       skipCognitionCollection: true,
     });
     await new TeemoAgentCore({ aiService: singleStream, contextBuilder: singleBuilder }).runStream({
-      messages: [{ role: 'user', content: '帮我写一段普通程序。' }],
+      messages: [{ role: 'user', content: '优化一个普通金融后台 UI。' }],
       disableActionContract: true,
       skipCognitionCollection: true,
     });
     assert.equal(cognitionMessage(singleSend.calls[0]), undefined);
-    assert.equal(cognitionMessage(singleStream.calls[0]), undefined, 'single sensitive-topic Profile must not leak into unrelated send/stream');
+    assert.equal(cognitionMessage(singleStream.calls[0]), undefined, 'single sensitive-topic Profile must not leak into unrelated design send/stream');
     const personalBundle = singleBuilder.build({ messages: [{ role: 'user', content: '按照我平时喜欢的方向再来一版。' }] });
     assert.match(personalBundle.systemMessage.content, /长期偏好成人向视觉题材/);
 
