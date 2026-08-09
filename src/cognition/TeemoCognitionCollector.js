@@ -56,6 +56,11 @@
     async collectTurn(input = {}) {
       const service = input.cognitionService || this.cognitionService;
       if (!service) return { ok: false, skipped: 'disabled' };
+      // 两个 renderer 共享同一个本地 Cognition 文件；每轮采集前读取最新状态。
+      if (typeof service.reload === 'function') service.reload();
+      if (typeof service.isEnabled === 'function' && !service.isEnabled()) {
+        return { ok: true, skipped: 'disabled' };
+      }
       const text = extractText(input.userMessage).trim();
       if (!text || !SIGNAL.test(text)) return { ok: true, skipped: 'no_signal' };
       if (TeemoCognitionService.isSensitiveText(text)) return { ok: true, skipped: 'sensitive' };

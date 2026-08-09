@@ -3,30 +3,30 @@
 ## 当前阶段
 
 - Product：Teemo助理
-- Branch：`Teemo/p1-agent-core`
-- Phase：P1 Agent Foundation 封板
-- State：`CLOSED / PASS / BLOCKERS: 0`
+- Branch：`Teemo/p2-personal-intelligence`
+- Phase：P2-1 Cognition UI / Memory Center
+- State：`IMPLEMENTED / WAITING REVIEW`
 - App Version：`v1.2.0`
-- Recovery Tag：`v1.2.0-p1-agent-foundation`
-- Guardrail：P1 已结束；没有自动进入 P2
+- P1 Recovery Tag：`v1.2.0-p1-agent-foundation`
+- Guardrail：等待 GPT 审阅；不得提前进入 P2-2
 
-## 已完成
+## 本阶段已实现
 
-- P1-1 Agent Core
-- P1-2 Teemo Cognition + Context Builder
-- P1-3 Unified Tool Registry
-- P1-4 Central Permission Layer
-- P1-5 Safe File Tools
-- P1-6A Safe Git Tools
-- P1-6B Controlled Execute
+- 「Teemo 对我的了解」一级页面
+- Profile / Recent / Project / inactive 查看与过滤
+- Observation 依据
+- 手动新增、纠正/修改、不再适用、scope migration
+- Cognition enabled 开关
+- sensitive filtering、revision conflict 和跨窗口 reload
+- `test:cognition-management` 与隔离 Electron UI smoke
 
-## 封板结果
+## 下一步
 
-1. P1-1 至 P1-6 全部完成并通过阶段回归。
-2. GPT 总审阅确认 `STATUS: CLOSED / RESULT: PASS / BLOCKERS: 0`。
-3. Git/Execute 的 hooks、filters、signing、fsmonitor、textconv、TOCTOU、owner/replay 与 process-tree 安全证据已归档。
-4. 后续工作必须作为新的明确阶段规划启动，不在本任务继续扩展。
+1. 完成 P1 全量回归、构建与最终 diff 检查。
+2. 提交 `Teemo: add P2-1 cognition center`。
+3. 向 GPT「Teemo助手升级」提交严格审阅材料。
+4. 只修正 P2-1 审阅问题，等待封板结论。
 
 ## 禁止扩展
 
-本任务不增加 P2 能力，不加入任意 shell、destructive/remote Git、delete、网络 Tool、provider-native tool calling、长期 Memory 新能力或新的 UI 产品功能。
+本任务不开发 P2-2 Agent Creative Profile、P2-3 Creative Director、P2-4 智能 Collector，也不增加桌面自动化、Embedding、Vector DB、RAG 或 hard delete。

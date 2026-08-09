@@ -1,6 +1,6 @@
 # Teemo助理 — 项目进度与规划
 
-> 文档版本：v1.15 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.2.0（P1 Agent Foundation CLOSED / PASS）**
+> 文档版本：v1.16 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.2.0（P2 Personal Intelligence IN PROGRESS）**
 
 ## 当前状态
 
@@ -10,8 +10,17 @@
 - P0：`CLOSED`
 - P1：`CLOSED / PASS / BLOCKERS: 0`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
-- Current Development：`P1 Agent Foundation 已封板；未进入 P2`
-- Current Branch：`Teemo/p1-agent-core`
+- Current Development：`P2-1 Cognition UI / Memory Center IMPLEMENTED / WAITING REVIEW`
+- Current Branch：`Teemo/p2-personal-intelligence`
+
+## P2-1 阶段（2026-08-09，IMPLEMENTED / WAITING REVIEW）
+
+- 独立聊天侧栏新增「Teemo 对我的了解」一级入口，展示长期、近期、项目和不再适用认知。
+- 新增手动认知、纠正/修改、作用域迁移、不再适用、Observation 依据、搜索过滤和 Cognition 开关。
+- Cognition Service 增加 version 2 `enabled` / `revision` 和结构化管理 API；写入仍只通过 TeemoStorageService。
+- 管理 mutation 使用 latest-read + optimistic revision，Context Builder/Collector 每轮 reload，保证下一次跨窗口请求使用最新状态。
+- 新增 `test:cognition-management` 与隔离 Electron `test:cognition-ui-smoke`；正式用户数据未用于测试。
+- 详细记录见 `docs/P2-1-COGNITION-UI.md`；等待 GPT 严格审阅，不创建 CLOSED tag，不进入 P2-2。
 
 ## P0 阶段收尾（2026-08-09）
 

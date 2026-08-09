@@ -26,6 +26,11 @@
           <button type="button" class="teemo-history-new-folder" id="newFolderButton" title="新建分组">＋分组</button>
         </div>
         <div class="teemo-history" id="historyList"></div>
+        <button class="teemo-sidebar-memory" id="memoryButton" title="查看 Teemo 对你的了解">
+          <span class="teemo-sidebar-memory-icon">◆</span>
+          <div><strong>Teemo 对我的了解</strong><span>认知与记忆</span></div>
+          <span class="teemo-settings-chevron">›</span>
+        </button>
         <button class="teemo-sidebar-foot" id="settingsButton" title="打开设置">
           <img src="../icon/Teemo-app.png" alt="">
           <div><strong>Teemo</strong><span id="modelLabel">私人助理</span></div>
@@ -81,6 +86,37 @@
               </div>
             </div>
           </div>
+        </div>
+      </main>
+
+      <main class="teemo-settings-page teemo-memory-page" id="memoryView" hidden>
+        <div class="teemo-settings-head teemo-memory-head">
+          <button id="memoryBackButton" class="teemo-back-button">← 返回聊天</button>
+          <div class="teemo-memory-head-copy"><h1>Teemo 对我的了解</h1><p>查看、纠正和管理 Teemo 在对话中形成的认知</p></div>
+          <div class="teemo-memory-head-actions">
+            <label class="teemo-memory-switch"><input id="memoryEnabled" type="checkbox" checked><span>启用个性化认知</span></label>
+            <button class="teemo-secondary-button" id="memoryRefreshButton" type="button">刷新</button>
+            <button class="teemo-primary-button" id="memoryAddButton" type="button">添加认知</button>
+          </div>
+        </div>
+        <div class="teemo-memory-content">
+          <section class="teemo-memory-privacy">
+            <div><strong>认知属于 Teemo助理，而不是当前模型</strong><p>数据保存在本机，切换 GPT、Grok 或 DeepSeek 后仍然共享。回答时，当前相关认知会随本次请求发送给所使用的模型 API。</p></div>
+            <span id="memorySensitiveCount"></span>
+          </section>
+          <div class="teemo-memory-toolbar">
+            <div class="teemo-memory-filters" id="memoryFilterTabs">
+              <button class="active" type="button" data-memory-filter="all">全部</button>
+              <button type="button" data-memory-filter="global">长期</button>
+              <button type="button" data-memory-filter="recent">最近</button>
+              <button type="button" data-memory-filter="project">项目</button>
+              <button type="button" data-memory-filter="inactive">不再适用</button>
+            </div>
+            <select id="memoryProjectFilter" aria-label="筛选项目"><option value="">全部项目</option></select>
+            <input id="memorySearch" type="search" placeholder="搜索认知…" aria-label="搜索认知">
+          </div>
+          <div class="teemo-memory-status" id="memoryStatus" aria-live="polite"></div>
+          <div class="teemo-memory-list" id="memoryList"></div>
         </div>
       </main>
 
@@ -294,6 +330,30 @@
     </div>
   </div>
 
+  <div class="teemo-modal-backdrop" id="memoryEditorModal" hidden>
+    <div class="teemo-modal teemo-memory-editor">
+      <h2 id="memoryEditorTitle">添加一条认知</h2>
+      <p class="teemo-modal-tip" id="memoryEditorTip"></p>
+      <label><span>认知内容</span><textarea id="memoryEditorContent" maxlength="1000" placeholder="例如：设计方案默认优先考虑简洁、商业化和可落地。"></textarea></label>
+      <div class="teemo-memory-editor-grid">
+        <label><span>类型</span><select id="memoryEditorCategory"><option value="preference">设计偏好</option><option value="workflow">工作习惯</option><option value="goal">长期目标</option><option value="constraint">要求与限制</option><option value="correction">用户纠正</option></select></label>
+        <label><span>作用范围</span><select id="memoryEditorScope"><option value="global">长期认知</option><option value="recent">近期认知</option><option value="project">项目认知</option></select></label>
+        <label class="teemo-memory-editor-project" id="memoryEditorProjectRow" hidden><span>所属项目</span><select id="memoryEditorProject"><option value="">请选择项目</option></select></label>
+      </div>
+      <p class="teemo-memory-editor-error" id="memoryEditorError" aria-live="polite"></p>
+      <div><button class="teemo-secondary-button" id="memoryEditorCancelButton" type="button">取消</button><button class="teemo-primary-button" id="memoryEditorSaveButton" type="button">保存</button></div>
+    </div>
+  </div>
+
+  <div class="teemo-modal-backdrop" id="memoryEvidenceModal" hidden>
+    <div class="teemo-modal teemo-memory-evidence-modal">
+      <h2 id="memoryEvidenceTitle">为什么这么认为？</h2>
+      <p class="teemo-modal-tip">只展示 Cognition 已保存的 Observation，不会反查或复制完整聊天历史。</p>
+      <div class="teemo-evidence-list" id="memoryEvidenceList"></div>
+      <div><button class="teemo-primary-button" id="memoryEvidenceCloseButton" type="button">关闭</button></div>
+    </div>
+  </div>
+
   <script src="../src/services/TeemoStorageService.js"></script>
   <script src="../src/services/TeemoFileService.js"></script>
   <script src="../src/stores/settings.js"></script>
@@ -321,6 +381,8 @@
   <script src="../src/services/rule-capture.js"></script>
   <script src="../src/services/Teemo-message-sanitize.js"></script>
   <script src="../src/services/chat-history.js"></script>
+  <script src="../src/services/projects.js"></script>
+  <script src="../src/cognition/TeemoCognitionCenter.js"></script>
   <script src="../src/utils/markdown.js"></script>
   <script src="Teemo-chat-window.js"></script>
 </body>

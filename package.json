@@ -9,6 +9,8 @@
     "verify:release-version": "node scripts/TeemoVerifyReleaseVersion.js",
     "test:agent-core": "node tests/TeemoAgentCore.test.js",
     "test:cognition": "node tests/TeemoCognition.test.js",
+    "test:cognition-management": "node tests/TeemoCognitionManagement.test.js",
+    "test:cognition-ui-smoke": "electron tests/TeemoCognitionCenterElectronSmoke.js",
     "test:tools": "node tests/TeemoToolRegistry.test.js",
     "test:permissions": "node tests/TeemoPermissionService.test.js",
     "test:file-tools": "node tests/TeemoFileTools.test.js",

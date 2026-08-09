@@ -60,6 +60,7 @@
   window.comfyUIService = comfyui;
   const audioAnalysis = new window.TeemoAudioAnalysisService(store);
   const fileService = new window.TeemoFileService();
+  const projectService = window.ProjectService ? new window.ProjectService() : null;
 
   const els = {
     history: document.getElementById('historyList'),
@@ -101,8 +102,11 @@
     confirmCancel: document.getElementById('confirmCancelButton'),
     settingsButton: document.getElementById('settingsButton'),
     settingsBack: document.getElementById('settingsBackButton'),
+    memoryButton: document.getElementById('memoryButton'),
+    memoryBack: document.getElementById('memoryBackButton'),
     chatView: document.getElementById('chatView'),
     settingsView: document.getElementById('settingsView'),
+    memoryView: document.getElementById('memoryView'),
     chatFontSize: document.getElementById('chatFontSize'),
     chatFontSizeValue: document.getElementById('chatFontSizeValue'),
     chatFontPreview: document.getElementById('chatFontPreview'),
@@ -1500,11 +1504,43 @@
   function showSettings() {
     populateSettings();
     els.chatView.hidden = true;
+    if (els.memoryView) els.memoryView.hidden = true;
     els.settingsView.hidden = false;
   }
 
   function hideSettings() {
     refreshModelConfig();
+    els.settingsView.hidden = true;
+    if (els.memoryView) els.memoryView.hidden = true;
+    els.chatView.hidden = false;
+    renderAll();
+    els.input.focus();
+  }
+
+  let cognitionCenter = null;
+
+  function ensureCognitionCenter() {
+    if (!cognitionCenter && window.TeemoCognitionCenter && cognitionService) {
+      cognitionCenter = new window.TeemoCognitionCenter({
+        service: cognitionService,
+        projects: projectService,
+        confirm: askConfirm,
+        onBack: hideMemory,
+      });
+    }
+    return cognitionCenter;
+  }
+
+  function showMemory() {
+    els.chatView.hidden = true;
+    els.settingsView.hidden = true;
+    if (els.memoryView) els.memoryView.hidden = false;
+    const center = ensureCognitionCenter();
+    if (center) center.show();
+  }
+
+  function hideMemory() {
+    if (els.memoryView) els.memoryView.hidden = true;
     els.settingsView.hidden = true;
     els.chatView.hidden = false;
     renderAll();
@@ -2783,6 +2819,7 @@
   });
   els.settingsButton.addEventListener('click', showSettings);
   els.settingsBack.addEventListener('click', hideSettings);
+  if (els.memoryButton) els.memoryButton.addEventListener('click', showMemory);
   if (els.addLocalAccess) els.addLocalAccess.addEventListener('click', authorizeLocalFolder);
   if (els.checkUpdate) {
     els.checkUpdate.addEventListener('click', async () => {

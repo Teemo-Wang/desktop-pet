@@ -73,6 +73,9 @@
 
     build(options = {}) {
       const service = options.cognitionService || this.cognitionService;
+      // Memory Center 可能在另一个 renderer 修改数据；下一次请求总是使用磁盘最新版本。
+      if (service && typeof service.reload === 'function') service.reload();
+      const cognitionEnabled = !service || typeof service.isEnabled !== 'function' || service.isEnabled();
       const messages = Array.isArray(options.messages) ? options.messages : [];
       const projectId = options.projectId ? String(options.projectId) : null;
       const maxChars = Number.isInteger(options.maxChars) && options.maxChars >= 800 ? options.maxChars : this.maxChars;
@@ -83,9 +86,9 @@
         skill: Math.floor(maxChars * 0.14),
         conversation: Math.floor(maxChars * 0.18),
       };
-      const profile = service ? takeWithin(service.getProfile(), sectionBudget.profile, item => item.content) : [];
-      const recent = service ? takeWithin(service.getRecentContext(), sectionBudget.recent, item => item.content) : [];
-      const projectKnowledge = service && projectId
+      const profile = service && cognitionEnabled ? takeWithin(service.getProfile(), sectionBudget.profile, item => item.content) : [];
+      const recent = service && cognitionEnabled ? takeWithin(service.getRecentContext(), sectionBudget.recent, item => item.content) : [];
+      const projectKnowledge = service && cognitionEnabled && projectId
         ? takeWithin(service.getProjectContext(projectId), sectionBudget.project, item => item.content)
         : [];
       const metadata = projectMetadata(options.projectContext);
@@ -97,6 +100,7 @@
         knowledge: projectKnowledge,
       };
       const bundle = {
+        cognitionEnabled,
         profile,
         recentContext: recent,
         projectContext: project,
