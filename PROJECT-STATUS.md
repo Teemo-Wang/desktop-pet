@@ -1,6 +1,6 @@
 # Teemo助理 — 项目进度与规划
 
-> 文档版本：v1.8 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.1.7（P1-4 审阅中）**
+> 文档版本：v1.9 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.1.7（P1-4 已封板）**
 
 ## 当前状态
 
@@ -9,7 +9,7 @@
 - Source：`D:\Teemo助手\Teemo机器人项目\Teemo-source`
 - P0：`CLOSED`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
-- Current Development：`P1-4 Permission Layer implementation complete / awaiting GPT review`
+- Current Development：`P1-4 Permission Layer CLOSED / PASS；下一阶段 P1-5 Safe File Tools`
 - Current Branch：`Teemo/p1-agent-core`
 
 ## P0 阶段收尾（2026-08-09）
@@ -50,13 +50,14 @@
 - GPT 严格审阅确认：`P1-3 Tool Registry STATUS: CLOSED / RESULT: PASS / BLOCKERS: 0`。
 - 详细记录见 `docs/P1-3-TOOL-REGISTRY.md`；阶段实现提交为 `5bed161`，恢复标签为 `v1.1.7-p1.3-tool-registry`。
 
-## P1-4 阶段（2026-08-09，审阅中）
+## P1-4 阶段（2026-08-09，CLOSED / PASS）
 
 - Main Process 新增唯一 `TeemoPermissionService`，两个 renderer 通过带 owner 绑定的 IPC Client 共享 grants、pending request 和 audit。
 - 建立 none/read/write/execute 风险等级与 allow/prompt/deny Decision Contract；支持 once、session、测试 URI resource scope。
 - Registry 在 handler 前 fail closed；deny、timeout、abort、服务异常或缺失 metadata 均保证 handler 不执行。
 - 新增最小权限确认 UI，但生产 Registry 仍只有 permission=none 的两个安全 builtin，不会增加真实系统权限。
-- 详细记录见 `docs/P1-4-PERMISSION-LAYER.md`；当前等待 GPT 审阅，尚未创建 P1-4 CLOSED 标签。
+- GPT 严格审阅确认：`P1-4 Permission Layer STATUS: CLOSED / RESULT: PASS / BLOCKERS: 0`。
+- 详细记录见 `docs/P1-4-PERMISSION-LAYER.md`；阶段实现提交为 `625cd1f`，恢复标签为 `v1.1.7-p1.4-permission-layer`。
 
 ### P0 已知风险
 

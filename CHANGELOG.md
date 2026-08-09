@@ -2,13 +2,15 @@
 
 ## v1.1.7 - 2026-08-09
 
-### P1-4 Permission Layer（等待 GPT 审阅）
+### P1-4 Permission Layer（CLOSED / PASS）
 
 - 新增 Main Process 中央 `TeemoPermissionService`、renderer IPC Client 和最小权限确认 UI。
 - 建立 none/read/write/execute 风险等级、allow/prompt/deny Decision、once/session/resource scope、timeout、abort、fail closed 和内存 audit。
 - Registry 在 handler 前统一授权；两个 renderer 的 Registry 实例共享同一 Main 权限事实源，且 pending 响应绑定发起 `webContents`。
 - `echo` 与 `get_agent_runtime_info` 显式保持 permission=none；没有新增真实 File/Git/Shell/Network/ComfyUI Tool。
 - 增加 `test:permissions` 与双 renderer Electron IPC 集成烟测；四套自动测试和完整应用双隔离烟测均通过。
+- GPT 严格审阅确认 `BLOCKERS: 0`；阶段实现提交为 `625cd1f`，恢复标签为 `v1.1.7-p1.4-permission-layer`。
+- P1-5 硬约束：模型路径必须先经可信 FileService canonicalization/authorized-root 校验生成 permission resource，并在授权后、实际 I/O 前再次校验以防 TOCTOU。
 
 ### P1-3 Tool Registry（CLOSED / PASS）
 

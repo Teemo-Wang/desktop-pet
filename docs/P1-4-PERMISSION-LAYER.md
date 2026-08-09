@@ -1,6 +1,6 @@
 # P1-4 Permission Layer
 
-> 阶段状态：实现与隔离验证完成，等待 GPT 严格审阅；尚未创建 CLOSED 标签。
+> 阶段状态：`CLOSED / PASS` ｜ GPT 审阅：`BLOCKERS: 0` ｜ 实现提交：`625cd1f` ｜ 恢复标签：`v1.1.7-p1.4-permission-layer`
 
 ## 目标与边界
 
@@ -165,3 +165,15 @@ Electron IPC 集成烟测使用 `C:\Users\Teemo\Documents\Codex\2026-08-09\w\wor
 - resource 只支持测试 URI；P1-5 需要接入 TeemoFileService 的 canonical path 和 root containment，不能复制简化匹配。
 - Tool Call 完成后才完整写入 run.toolCalls；实时审计 UI 可在后续增加 lifecycle event。
 - Permission UI 是最小确认对话框，没有权限管理中心、批量授权或持久化设置。
+- P1-5 必须让可信 FileService 先 canonicalize 模型参数并检查 authorized root，再生成 Permission Resource；用户授权后、实际 I/O 前必须第二次 canonicalize/containment，防止路径、symlink 或 junction 在等待期间变化。
+
+## GPT 封板结论
+
+GPT 重点审阅了中央事实源、跨 renderer 一致性、IPC owner 绑定、fail closed、Abort/late allow、resource scope 和敏感数据边界，确认这些关键安全约束均已闭环，没有仍属于 P1-4 的阻塞项。
+
+```text
+P1-4 Permission Layer
+STATUS: CLOSED
+RESULT: PASS
+BLOCKERS: 0
+```
