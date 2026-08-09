@@ -4,6 +4,7 @@
 > 产品：Windows Electron 桌面 AI 助手
 > 当前源码：`D:\Teemo助手\Teemo机器人项目\Teemo-source`
 > 更新日期：2026-08-09
+> 阶段状态：`P2 Personal Intelligence CLOSED / PASS / BLOCKERS: 0`
 
 ## 1. 产品定位
 
@@ -33,13 +34,15 @@ npm install
 npm start
 ```
 
-正式构建：
+正式构建（Windows PowerShell 使用 `npm.cmd`）：
 
 ```powershell
-npm run dist:win
+npm.cmd run dist:win
 ```
 
 构建产物位于 `dist\`，不要把 `dist` 当作源码继续修改。
+
+正式版启动后会自动检查 GitHub Release。新版本会在后台下载，下载完成后静默安装并强制重启；不再等待“稍后”确认。发布前必须先通过 `npm.cmd run verify:release-version`。
 
 ## 3. 首次配置
 
@@ -84,16 +87,48 @@ P1 文件能力支持授权目录内的安全读取、搜索、文本创建、�
 
 - 内置技能用于设计规范、文案、配色、命名、评审等场景。
 - 可在技能中心上传或编辑 Markdown 技能模板。
-- 对话中提及技能名称时，系统会尝试自动匹配并注入相关规则。
+- P2-5 已加入确定性的 Skill Router、Manifest、Composition 和 Session continuity；最多组合 3 个 Skill，且每个 role 最多 1 个。
+- 对话中提及技能名称、别名或明确任务信号时，系统会尝试匹配并注入相关规则；不确定时保持普通聊天，不强行命中。
+- 对 Skill 的提问、解释、比较和明确否定会抑制该 Skill，防止“怎么用”“这次不用”等表达被误当作调用。
+- Skill UI 可查看和覆盖 Routing Metadata，并可显式重建损坏或过期的路由信息；重建不修改 Raw Skill 原文。
 - 用户个人技能数据保存在本机，不要提交到公开 Git 仓库。
 
-## 8. 项目与待办
+## 8. P2 Personal Intelligence
+
+P2-1 至 P2-5 已全部完成并通过最终验收：
+
+| 阶段 | 能力 | 状态 |
+|---|---|---|
+| P2-1 | Cognition Center：查看、搜索、手动添加、纠正、迁移和停用 Teemo 对用户的了解 | `CLOSED / PASS` |
+| P2-2 | Agent Creative Profile：独立于用户偏好的专业设计判断 | `CLOSED / PASS` |
+| P2-3 | Creative Director / Challenge Mode：常规/挑战模式及轻度、标准、强度较高三档 | `CLOSED / PASS` |
+| P2-4 | Cognition Intelligence：证据、冲突、时效、可信度和保守晋升 | `CLOSED / PASS` |
+| P2-5 | Skill Intelligence：确定性路由、组合、连续性、抑制与修复 | `CLOSED / PASS` |
+
+### 使用原则
+
+- Context 顺序固定为 `Skill -> Cognition -> Creative -> Challenge -> Current User`。
+- 当前用户明确要求始终高于 Project、Skill 和 Creative/Challenge 建议。
+- Cognition、Creative Profile、Challenge Session、Raw Skill 和 Skill Registry 是独立事实源，不互相覆盖。
+- Challenge 是 session-local、runtime-only；新会话、新窗口和应用重启后恢复常规判断。
+- Cognition 与 Creative 可分别关闭；关闭后停止对应注入，不删除已有数据。
+- 所有 P2 测试使用隔离 profile，未读取或修改正式用户数据。
+
+### P2 最终验收
+
+- 22 组 Node regression：PASS。
+- 9 组 Electron smoke：PASS。
+- 32 条 Skill benchmark：PASS。
+- 50 个 P2 变更 JavaScript 文件语法检查：PASS。
+- GPT Final Acceptance：`PASS / BLOCKERS: 0 / CAN_CLOSE_P2: YES`。
+
+## 9. 项目与待办
 
 - 项目支持创建、查看和维护项目状态。
 - 待办支持新增、完成、取消、优先级、截止时间及提醒。
 - 可将聊天内容转成待办，再在待办面板中确认和调整。
 
-## 9. ComfyUI
+## 10. ComfyUI
 
 1. 先启动本机 ComfyUI 服务。
 2. 在 Teemo 设置中填写 ComfyUI 地址，默认可使用 `http://127.0.0.1:8188`。
@@ -101,7 +136,7 @@ P1 文件能力支持授权目录内的安全读取、搜索、文本创建、�
 4. 缺失节点应先记录节点名称，再从对应项目或 ComfyUI Manager 安装；不要随意替换节点导致工作流语义改变。
 5. 运行前检查输入图片、模型、显存和输出目录；运行后核对结果图片是否生成。
 
-## 10. 本地数据与安全
+## 11. 本地数据与安全
 
 用户数据可能位于以下目录：
 
@@ -113,7 +148,7 @@ C:\Users\Teemo\AppData\Roaming\teemo-assistant
 
 这些目录包含设置、聊天历史、技能、项目、待办和工作统计等数据。升级、重装和测试时不得清空、覆盖或删除它们；需要测试时使用隔离 profile、临时目录或备份副本。
 
-## 11. 常见故障处理
+## 12. 常见故障处理
 
 | 现象 | 处理 |
 |---|---|
@@ -125,17 +160,19 @@ C:\Users\Teemo\AppData\Roaming\teemo-assistant
 | 生图失败 | 核对生图 Key、地址和模型是否属于同一服务，并确认模型支持当前模式 |
 | 设置未保存 | 检查应用是否有写入权限，不要直接删除用户数据文件 |
 
-## 12. 开发与交接规则
+## 13. 开发与交接规则
 
 - 唯一开发源码是 `Teemo-source`，禁止修改安装目录、`dist`、`app.asar` 或解包产物。
 - 开发前先阅读根目录 `AGENTS.md`，检查分支、工作区状态和相关调用关系。
-- 当前 P0 基线：提交 `219b92a`，标签 `v1.1.6-p0-closed`；P1 封板标签：`v1.2.0-p1-agent-foundation`；P2-1 封板标签：`v1.2.0-p2.1-cognition-ui`；当前分支：`Teemo/p2-personal-intelligence`。
+- 当前 P0 基线：`219b92a` / `v1.1.6-p0-closed`；P1：`v1.2.0-p1-agent-foundation`。
+- P2 恢复标签依次为 `v1.2.0-p2.1-cognition-ui`、`v1.2.1-p2.2-creative-profile`、`v1.2.1-p2.3-challenge-mode`、`v1.2.1-p2.4-cognition-intelligence`、`v1.2.1-p2.5-skill-intelligence`。
+- P2 关闭提交为 `28bd459`；自动更新策略提交为 `801850b`；当前分支为 `Teemo/p2-personal-intelligence`，在正式启动 P3 前必须先建立独立 P3 规划与阶段边界。
 - 底层能力优先通过 `AIService`、`TeemoStorageService`、`TeemoFileService` 调用。
 - 修改后至少执行语法检查、受影响功能测试、应用启动检查和 `git diff/status` 检查。
 - 新增文件、节点或需要重命名的项目资产优先使用 `Teemo` 前缀；用户明确指定的文件名除外。
 
-## 13. 当前版本边界
+## 14. 当前版本边界
 
-已具备：多模型 AI、流式聊天、技能系统、项目/待办、P1 Agent Core、Cognition、统一 Tool Registry/Permission、安全文件/Git/受控执行工具、PDF/DOCX 读取、图片/视频处理、ComfyUI 接入、Windows 安装包和 Teemo 图标。
+已具备：多模型 AI、流式聊天、技能系统、项目/待办、P1 Agent Core、统一 Tool Registry/Permission、安全文件/Git/受控执行工具、完整 P2 Personal Intelligence、PDF/DOCX 读取、图片/视频处理、ComfyUI 接入、Windows 安装包、自动更新和 Teemo 图标。
 
-暂不属于当前版本：任意 Shell、文件删除、destructive/remote Git、Provider 原生 Tool Calling 产品化、P2 新能力。
+尚未实现且必须由独立阶段规划启动：P3 Personal Inspiration Intelligence、素材来源连接器、Local Inspiration Index、Semantic Search、Embedding、Vector DB、Image Search，以及任何扩展权限边界的自动化能力。任意 Shell、文件删除、destructive/remote Git 和未审阅的外部写操作仍不提供。
