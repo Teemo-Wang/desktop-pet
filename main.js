@@ -11,8 +11,13 @@ const registerTeemoGitToolIpc = require('./src/tools/git/TeemoGitToolIpc');
 const TeemoExecuteService = require('./src/services/TeemoExecuteService');
 const registerTeemoExecuteToolIpc = require('./src/tools/execute/TeemoExecuteToolIpc');
 const TeemoInspirationSourceService = require('./src/inspiration/TeemoInspirationSourceService');
+const TeemoInspirationService = require('./src/inspiration/TeemoInspirationService');
 const TeemoLocalFolderService = require('./src/inspiration/TeemoLocalFolderService');
 const registerTeemoLocalFolderIpc = require('./src/inspiration/TeemoLocalFolderIpc');
+const TeemoInspirationIndexStorage = require('./src/inspiration/TeemoInspirationIndexStorage');
+const TeemoLocalFolderIndexScanner = require('./src/inspiration/TeemoLocalFolderIndexScanner');
+const TeemoInspirationIndexService = require('./src/inspiration/TeemoInspirationIndexService');
+const registerTeemoInspirationIndexIpc = require('./src/inspiration/TeemoInspirationIndexIpc');
 const dingtalkBridge = require('./dingtalk-bridge');
 const materialBridge = require('./material-bridge');
 
@@ -56,14 +61,31 @@ const teemoInspirationSourceService = new TeemoInspirationSourceService({
   fileService,
   rootsProvider: loadLocalAccessRoots,
 });
+const teemoInspirationStateService = new TeemoInspirationService();
 const teemoLocalFolderService = new TeemoLocalFolderService({
   fileService,
   sourceService: teemoInspirationSourceService,
   rootsProvider: loadLocalAccessRoots,
 });
+const teemoInspirationIndexStorage = new TeemoInspirationIndexStorage();
+const teemoLocalFolderIndexScanner = new TeemoLocalFolderIndexScanner({
+  fileService,
+  sourceService: teemoInspirationSourceService,
+  rootsProvider: loadLocalAccessRoots,
+});
+const teemoInspirationIndexService = new TeemoInspirationIndexService({
+  storage: teemoInspirationIndexStorage,
+  scanner: teemoLocalFolderIndexScanner,
+});
+registerTeemoInspirationIndexIpc(ipcMain, {
+  indexService: teemoInspirationIndexService,
+  permissionService: teemoPermissionService,
+  inspirationStateService: teemoInspirationStateService,
+});
 registerTeemoLocalFolderIpc(ipcMain, {
   sourceService: teemoInspirationSourceService,
   localFolderService: teemoLocalFolderService,
+  indexService: teemoInspirationIndexService,
   permissionService: teemoPermissionService,
   fileService,
   rootsProvider: loadLocalAccessRoots,

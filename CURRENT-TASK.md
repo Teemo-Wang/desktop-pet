@@ -4,8 +4,8 @@
 
 - Product：Teemo助理
 - Branch：`Teemo/p3-personal-inspiration`
-- Phase：P3-2 Local Folder Connector
-- State：`CLOSED / PASS / BLOCKERS: 0`
+- Phase：P3-3 Visual Metadata Index
+- State：`IMPLEMENTED / WAITING REVIEW`
 - Installed App Version：`v1.2.1`
 - Development App Version：`v1.3.0`
 - P3 Baseline：`cd29e6f` / `v1.2.1-p3-baseline`
@@ -16,25 +16,26 @@
 - P2-4 Recovery Tag：`v1.2.1-p2.4-cognition-intelligence`
 - P2-5 Recovery Tag：`v1.2.1-p2.5-skill-intelligence`
 - P3-1 Recovery Tag：`v1.3.0-p3.1-inspiration-foundation`
+- P3-2 Recovery Tag：`v1.3.0-p3.2-local-folder-connector`
 
-## P3-2 已实现
+## P3-3 已实现
 
-- 新增 Local Folder Source Registry、Main read-only Service、Connector、Renderer IPC Client 和“我的灵感”来源浏览 UI。
-- Source Registry 只保存 Source 配置，不是 filesystem authorization；唯一授权事实源仍为 P1 authorized roots。
-- 每次读取还要求 source-specific P1 Permission：`inspiration://local-folder/<sourceId>`，并在 Main 消费一次性 execution authorization。
-- 只支持单层、按需、受限的 list/metadata/PNG-JPEG-WEBP-GIF preview；不建立 Metadata Index、Embedding、Search 或 Agent Context。
-- traversal、absolute/UNC/device、symlink/junction、超深、超量、错误 signature、超大 preview 和 TOCTOU replacement 均 fail closed。
-- 三组 P3-2 专项、P3-1 与 P1/P2 全量回归通过；所有 fixture 使用 temp profile/source/roots，正式数据与真实个人素材零触碰。
+- 新增独立 manifest + source-sharded revisioned JSONL Metadata Index、bounded recursive Scanner、Index Service、Main IPC 和 Renderer Client/UI。
+- 只读取 Local Folder 内 PNG/JPEG/WEBP/GIF 的最多 1 MiB header；不完整 decode、不计算素材 content hash、不修改 Source。
+- Source identity 复用 P3 sourceId；itemId 使用 sourceId + normalized relative path；rename 为 remove + add。
+- Build/Refresh/Rebuild 使用 `inspiration://local-folder/<sourceId>` read Permission 和一次性 `inspiration_metadata_index` execution authorization。
+- 支持增量 metadata reuse、进度、取消、timeout、stale writer、显式 corruption rebuild、授权撤销隐藏和 Source removal cleanup。
+- 没有 Search、Embedding、Vector、Image Search、Eagle、NAS、Web、Watcher 或 Agent Context；P3-4 未开始。
 
 ## 当前送审证据
 
-1. P3-2 实现与三组专项测试已完成；文档见 `docs/Teemo-P3-2-LOCAL-FOLDER.md`。
-2. P3-1 三组、P1/P2 22 组 Node、10 组既有 Electron、32-case benchmark、自动更新、语法、diff、版本与敏感信息检查全部通过。
-3. Electron synthetic UI 截图为 2079 x 1256，SHA256 `59853cced44a7a363906e2979477b814bf39fb0a1ef9c91098274bda0d5c86df`，无真实路径、凭据或正式素材。
-4. implementation commit 为 `c668f0ac10f28b6c21c4e93472dcbbfe284abfd5`，提交后工作树 clean。
-5. GPT Strict Review 已确认 `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-3`。
-6. P3-2 获准关闭并创建 `v1.3.0-p3.2-local-folder-connector`；remote push 未执行，正式 v1.2.1 不安装 P3 开发版。
+1. P3-3 实现与三组专项测试已完成；文档见 `docs/Teemo-P3-3-VISUAL-METADATA-INDEX.md`。
+2. P3-3/P3-2/P3-1 各 2 Node + 1 Electron、P1/P2 22/22 Node、9/9 既有 Electron、32/32 benchmark、auto-update、版本、syntax、diff 与 sensitive scan 全部通过。
+3. Electron synthetic UI 截图为 2199 x 1316，SHA256 `0c05187d0039e5f43604c54fc93bde5525706db107be884281a57d75def42ba7`，无真实路径、凭据或正式素材。
+4. 全部文件将由唯一 implementation commit `Teemo: add P3-3 visual metadata index` 固化；实际 hash 在最终 Evidence 中报告。
+5. P3-3 仍等待 GPT Strict Review；不得创建 close commit/tag，不得进入 P3-4。
+6. remote push 未执行，正式 v1.2.1 不安装或重启 P3 开发版。
 
 ## 禁止扩展
 
-P3-2 已关闭。当前只允许向 GPT 获取 P3-3 Metadata Index 独立 Taskbook；任务书明确 READY 前不得实现。仍禁止提前实现 Watcher、Eagle、NAS、Figma、网页平台、Semantic Search、Embedding、Vector DB、Image Similarity、Inspiration Context、Taste Signals、Cloud Sync、Multi-Agent 或 GUI Automation。
+P3-3 只能保持 `IMPLEMENTED / WAITING REVIEW`。GPT 明确 PASS 前禁止 close/tag 和 P3-4；仍禁止 Watcher、Eagle、NAS、Figma、网页平台、Search、Embedding、Vector DB、Image Similarity、Inspiration Context、Taste Signals、Cloud Sync、Multi-Agent 或 GUI Automation。

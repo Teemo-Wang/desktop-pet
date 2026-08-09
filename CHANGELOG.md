@@ -1,5 +1,14 @@
 # Changelog
 
+## P3-3 Visual Metadata Index - 2026-08-09（IMPLEMENTED / WAITING REVIEW）
+
+- 新增 manifest + source-sharded revisioned JSONL Metadata Index、bounded Local Folder Scanner、Index Service、Main IPC、Renderer Client 和 metadata list UI。
+- 支持 user-triggered Build/Refresh/Rebuild、增量 metadata reuse、进度/取消、timeout、stable pagination、Source remove cleanup 和显式 corruption recovery。
+- PNG/JPEG/WEBP/GIF 只读取最多 1 MiB header以确认 MIME/dimensions；不完整 decode、不计算 source content hash、不修改 Source。
+- 继续复用 P1 authorized roots 与 `inspiration://local-folder/<sourceId>` read Permission；撤权后隐藏已有 metadata。
+- P3 三阶段专项、22/22 P1/P2 Node、9/9 既有 Electron、32/32 benchmark、auto-update、语法、diff 与版本检查全部通过；等待 GPT Strict Review。
+- 未实现 Search、Embedding、Vector、Image Search、Eagle、NAS、Web、Watcher 或 Inspiration Agent Context；P3-4 未开始。
+
 ## P3-2 Local Folder Connector - 2026-08-09（CLOSED / PASS）
 
 - 新增独立 Local Folder Source Registry、只读 Main Process Connector/Service/IPC 和“我的灵感”来源浏览 UI。

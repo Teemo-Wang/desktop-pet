@@ -8,6 +8,7 @@
     constructor(options = {}) {
       this.service = options.service || null;
       this.sourceClient = options.sourceClient || null;
+      this.indexClient = options.indexClient || null;
       this.onBack = typeof options.onBack === 'function' ? options.onBack : () => {};
       const get = id => document.getElementById(id);
       this.els = {
@@ -19,6 +20,15 @@
         sourceCount: get('TeemoInspirationSourceCount'),
         sourceList: get('TeemoInspirationSourceList'),
         addFolder: get('TeemoInspirationAddFolderButton'),
+        indexReset: get('TeemoInspirationIndexResetButton'),
+        indexPanel: get('TeemoInspirationIndexPanel'),
+        indexTitle: get('TeemoInspirationIndexTitle'),
+        indexSummary: get('TeemoInspirationIndexSummary'),
+        indexList: get('TeemoInspirationIndexList'),
+        indexClose: get('TeemoInspirationIndexClose'),
+        indexPrevious: get('TeemoInspirationIndexPrevious'),
+        indexNext: get('TeemoInspirationIndexNext'),
+        indexPage: get('TeemoInspirationIndexPage'),
         browser: get('TeemoInspirationBrowser'),
         browserTitle: get('TeemoInspirationBrowserTitle'),
         browserPath: get('TeemoInspirationBrowserPath'),
@@ -30,6 +40,11 @@
       this.busy = false;
       this.activeSourceId = null;
       this.activeDirectory = '';
+      this.activeIndexSourceId = null;
+      this.activeIndexOffset = 0;
+      this.activeIndexSnapshot = null;
+      this.activeIndexOperation = null;
+      this.indexProgress = null;
       this._bind();
     }
 
@@ -38,6 +53,10 @@
       if (this.els.refresh) this.els.refresh.addEventListener('click', () => this.refresh('状态已刷新'));
       if (this.els.enabled) this.els.enabled.addEventListener('change', () => this._setEnabled(this.els.enabled.checked));
       if (this.els.addFolder) this.els.addFolder.addEventListener('click', () => this._addFolder());
+      if (this.els.indexReset) this.els.indexReset.addEventListener('click', () => this._resetCorruptIndex());
+      if (this.els.indexClose) this.els.indexClose.addEventListener('click', () => this._closeIndex());
+      if (this.els.indexPrevious) this.els.indexPrevious.addEventListener('click', () => this._changeIndexPage(-1));
+      if (this.els.indexNext) this.els.indexNext.addEventListener('click', () => this._changeIndexPage(1));
       if (this.els.browserBack) this.els.browserBack.addEventListener('click', () => this._browseParent());
     }
 
@@ -63,6 +82,7 @@
           sources: Array.isArray(sourceSnapshot.sources) ? sourceSnapshot.sources : [],
           sourceRevision: Number(sourceSnapshot.revision) || 0,
           sourceStateError: sourceSnapshot.stateError || null,
+          indexState: sourceSnapshot.indexState || null,
           localFolderAvailable,
         };
         this.render();
@@ -82,6 +102,8 @@
       const unreadable = Boolean(state.stateError);
       const enabled = !unreadable && state.enabled === true;
       const sources = Array.isArray(this.snapshot.sources) ? this.snapshot.sources : [];
+      const indexUnreadable = (this.snapshot.indexState && this.snapshot.indexState.status === 'INDEX_UNREADABLE')
+        || sources.some(source => source.index && source.index.status === 'INDEX_UNREADABLE');
       if (this.els.enabled) {
         this.els.enabled.checked = enabled;
         this.els.enabled.disabled = unreadable || this.busy;
@@ -91,6 +113,10 @@
         this.els.addFolder.hidden = !this.snapshot.localFolderAvailable;
         this.els.addFolder.disabled = this.busy || !enabled || Boolean(this.snapshot.sourceStateError);
       }
+      if (this.els.indexReset) {
+        this.els.indexReset.hidden = !indexUnreadable;
+        this.els.indexReset.disabled = this.busy || !enabled;
+      }
       if (this.els.stateLabel) {
         this.els.stateLabel.textContent = unreadable ? '安全停用' : enabled ? '基础能力已启用' : '当前停用';
         this.els.stateLabel.dataset.state = unreadable ? 'error' : enabled ? 'enabled' : 'disabled';
@@ -98,16 +124,7 @@
       if (this.els.sourceCount) this.els.sourceCount.textContent = String(sources.length);
       if (this.els.sourceList) {
         this.els.sourceList.innerHTML = sources.length
-          ? sources.map(source => `<div class="teemo-inspiration-source" data-source-id="${this._escape(source.sourceId)}">
-              <div><strong>${this._escape(source.displayName)}</strong><span>本地文件夹 · ${this._escape(source.folderName || '')}</span></div>
-              <div class="teemo-inspiration-source-actions">
-                <em data-state="${this._escape(source.status)}">${this._sourceStatusLabel(source.status)}</em>
-                ${source.status === 'AUTHORIZATION_REQUIRED'
-                  ? `<button type="button" class="teemo-secondary-button" data-source-reauthorize ${this.busy || !enabled ? 'disabled' : ''}>重新授权</button>`
-                  : `<button type="button" class="teemo-secondary-button" data-source-browse ${this.busy || !enabled ? 'disabled' : ''}>浏览</button>`}
-                <button type="button" class="teemo-secondary-button teemo-danger-button" data-source-remove ${this.busy ? 'disabled' : ''}>移除</button>
-              </div>
-            </div>`).join('')
+          ? sources.map(source => this._sourceMarkup(source, enabled)).join('')
           : this.snapshot.localFolderAvailable
             ? '<div class="teemo-inspiration-empty"><strong>还没有本地灵感来源</strong><p>启用灵感能力后，可从上方添加一个明确授权的本地文件夹。</p></div>'
             : '<div class="teemo-inspiration-empty"><strong>当前没有已连接的素材来源</strong><p>本阶段只建立安全基础，尚未连接本地或在线素材来源。</p></div>';
@@ -117,6 +134,69 @@
         const activeSource = sources.find(source => source.sourceId === this.activeSourceId);
         if (!enabled || !activeSource || activeSource.status !== 'CONFIGURED') this._closeBrowser();
       }
+      if (this.activeIndexSourceId) {
+        const activeSource = sources.find(source => source.sourceId === this.activeIndexSourceId);
+        if (!enabled || !activeSource || activeSource.status !== 'CONFIGURED') this._closeIndex();
+      }
+    }
+
+    _sourceMarkup(source, enabled) {
+      const scanning = this.activeIndexOperation && this.activeIndexOperation.sourceId === source.sourceId;
+      const index = scanning
+        ? { status: 'SCANNING', progress: this.indexProgress || {} }
+        : (source.index || { status: 'NOT_INDEXED', itemCount: 0 });
+      const disabled = this.busy || !enabled;
+      let indexActions = '';
+      if (source.status === 'CONFIGURED' && this.indexClient) {
+        if (scanning) {
+          indexActions = '<button type="button" class="teemo-secondary-button" data-source-index-cancel>取消</button>';
+        } else if (index.status === 'READY') {
+          indexActions = `<button type="button" class="teemo-secondary-button" data-source-index-view ${disabled ? 'disabled' : ''}>查看索引</button>
+            <button type="button" class="teemo-secondary-button" data-source-index="refresh" ${disabled ? 'disabled' : ''}>刷新索引</button>
+            <button type="button" class="teemo-secondary-button" data-source-index="rebuild" ${disabled ? 'disabled' : ''}>重建索引</button>`;
+        } else if (index.status === 'CORRUPT') {
+          indexActions = `<button type="button" class="teemo-secondary-button" data-source-index="rebuild" ${disabled ? 'disabled' : ''}>重建索引</button>`;
+        } else if (index.status !== 'INDEX_UNREADABLE') {
+          indexActions = `<button type="button" class="teemo-secondary-button" data-source-index="build" ${disabled ? 'disabled' : ''}>建立索引</button>`;
+        }
+      }
+      const sourceAction = source.status === 'AUTHORIZATION_REQUIRED'
+        ? `<button type="button" class="teemo-secondary-button" data-source-reauthorize ${disabled ? 'disabled' : ''}>重新授权</button>`
+        : `<button type="button" class="teemo-secondary-button" data-source-browse ${disabled ? 'disabled' : ''}>浏览</button>`;
+      return `<div class="teemo-inspiration-source" data-source-id="${this._escape(source.sourceId)}">
+        <div class="teemo-inspiration-source-copy">
+          <strong>${this._escape(source.displayName)}</strong>
+          <span>本地文件夹 · ${this._escape(source.folderName || '')}</span>
+          <small data-index-state="${this._escape(index.status)}">${this._escape(this._indexStatusText(index, source.status))}</small>
+        </div>
+        <div class="teemo-inspiration-source-actions">
+          <em data-state="${this._escape(source.status)}">${this._sourceStatusLabel(source.status)}</em>
+          ${indexActions}
+          ${sourceAction}
+          <button type="button" class="teemo-secondary-button teemo-danger-button" data-source-remove ${this.busy ? 'disabled' : ''}>移除</button>
+        </div>
+      </div>`;
+    }
+
+    _indexStatusText(index, sourceStatus) {
+      if (sourceStatus === 'AUTHORIZATION_REQUIRED') return '重新授权后可查看上次索引';
+      if (!index) return '尚未建立素材索引';
+      if (index.status === 'SCANNING') {
+        const progress = index.progress || {};
+        return `正在索引 · 已检查 ${Number(progress.entriesInspected) || 0} · 已索引 ${Number(progress.indexed) || 0}`;
+      }
+      if (index.status === 'READY') {
+        const time = index.lastSuccessfulScanAt ? this._formatTime(index.lastSuccessfulScanAt) : '时间未知';
+        return `已索引 ${Number(index.itemCount) || 0} 项 · 上次索引 ${time}`;
+      }
+      const labels = {
+        CORRUPT: '索引已损坏，需要重建',
+        INDEX_UNREADABLE: '灵感索引状态无法读取',
+        SOURCE_MISSING: '来源当前不可用',
+        AUTHORIZATION_REQUIRED: '需要重新授权',
+        LIMIT_EXCEEDED: '上次索引超过安全限制',
+      };
+      return labels[index.status] || '尚未建立素材索引';
     }
 
     _bindSourceActions() {
@@ -126,9 +206,15 @@
         const browse = row.querySelector('[data-source-browse]');
         const remove = row.querySelector('[data-source-remove]');
         const reauthorize = row.querySelector('[data-source-reauthorize]');
+        const indexAction = row.querySelector('[data-source-index]');
+        const indexView = row.querySelector('[data-source-index-view]');
+        const indexCancel = row.querySelector('[data-source-index-cancel]');
         if (browse) browse.addEventListener('click', () => this._openSource(sourceId));
         if (remove) remove.addEventListener('click', () => this._removeSource(sourceId));
         if (reauthorize) reauthorize.addEventListener('click', () => this._reauthorize(sourceId));
+        if (indexAction) indexAction.addEventListener('click', () => this._runIndex(sourceId, indexAction.dataset.sourceIndex));
+        if (indexView) indexView.addEventListener('click', () => this._openIndex(sourceId, 0));
+        if (indexCancel) indexCancel.addEventListener('click', () => this._cancelIndex());
       });
     }
 
@@ -183,9 +269,12 @@
       this.busy = true;
       this.render();
       try {
-        await this.sourceClient.removeSource(sourceId, { expectedRevision: this.snapshot.sourceRevision });
+        const removal = await this.sourceClient.removeSource(sourceId, { expectedRevision: this.snapshot.sourceRevision });
         if (this.activeSourceId === sourceId) this._closeBrowser();
-        await this.refresh('已移除灵感来源，原文件保持不变');
+        if (this.activeIndexSourceId === sourceId) this._closeIndex();
+        await this.refresh(removal && removal.indexCleanupWarning
+          ? '来源已移除且原文件保持不变；派生索引将在下次刷新时重试清理'
+          : '已移除灵感来源，原文件保持不变');
       } catch (error) {
         await this.refresh();
         this._setStatus(error && error.message ? error.message : '移除灵感来源失败', true);
@@ -205,6 +294,143 @@
       } catch (error) {
         await this.refresh();
         this._setStatus(error && error.message ? error.message : '重新授权失败', true);
+      } finally {
+        this.busy = false;
+        this.render();
+      }
+    }
+
+    async _runIndex(sourceId, mode) {
+      if (this.busy || !this.indexClient) return;
+      if (mode === 'rebuild' && typeof window !== 'undefined' && typeof window.confirm === 'function'
+        && !window.confirm('重建只会替换 Teemo 的本地素材索引，不会修改或删除原文件。')) return;
+      this.busy = true;
+      this.indexProgress = { entriesInspected: 0, indexed: 0 };
+      let lastRender = 0;
+      const operation = this.indexClient.startScan(sourceId, mode, {
+        sessionId: 'inspiration-center',
+        onProgress: progress => {
+          this.indexProgress = progress;
+          if (Date.now() - lastRender >= 100) {
+            lastRender = Date.now();
+            this.render();
+          }
+        },
+      });
+      this.activeIndexOperation = { ...operation, sourceId, mode };
+      this.render();
+      try {
+        await operation.promise;
+        this.activeIndexOperation = null;
+        this.indexProgress = null;
+        this.busy = false;
+        await this.refresh(mode === 'build' ? '素材索引已建立' : mode === 'rebuild' ? '素材索引已重建' : '素材索引已刷新');
+        await this._openIndex(sourceId, 0);
+      } catch (error) {
+        this.activeIndexOperation = null;
+        this.indexProgress = null;
+        this.busy = false;
+        await this.refresh();
+        this._setStatus(error && error.message ? error.message : '素材索引未能完成，旧索引保持不变', true);
+      } finally {
+        this.activeIndexOperation = null;
+        this.indexProgress = null;
+        this.busy = false;
+        this.render();
+      }
+    }
+
+    async _cancelIndex() {
+      if (!this.activeIndexOperation) return;
+      try {
+        await this.activeIndexOperation.cancel();
+        this._setStatus('正在取消索引...');
+      } catch (_) {
+        this._setStatus('取消请求未能送达', true);
+      }
+    }
+
+    async _openIndex(sourceId, offset = 0) {
+      if (!this.indexClient || this.activeIndexOperation) return;
+      try {
+        const snapshot = await this.indexClient.getSource(sourceId, { offset, limit: 100 });
+        if (snapshot.status !== 'READY') {
+          const messages = {
+            AUTHORIZATION_REQUIRED: '重新授权后才可查看上次索引',
+            CORRUPT: '该素材来源的索引已损坏，需要重建',
+            INDEX_UNREADABLE: '灵感索引状态无法读取，已安全停用',
+            NOT_INDEXED: '该灵感来源尚未建立索引',
+          };
+          throw new Error(messages[snapshot.status] || '素材索引暂不可用');
+        }
+        this.activeIndexSourceId = sourceId;
+        this.activeIndexOffset = Number(snapshot.offset) || 0;
+        this.activeIndexSnapshot = snapshot;
+        this._renderIndexSnapshot();
+        if (this.els.indexPanel) this.els.indexPanel.hidden = false;
+        this._setStatus('');
+      } catch (error) {
+        this._closeIndex();
+        this._setStatus(error && error.message ? error.message : '读取素材索引失败', true);
+      }
+    }
+
+    _renderIndexSnapshot() {
+      const snapshot = this.activeIndexSnapshot;
+      if (!snapshot || snapshot.status !== 'READY') return;
+      const source = (this.snapshot.sources || []).find(item => item.sourceId === this.activeIndexSourceId);
+      if (this.els.indexTitle) this.els.indexTitle.textContent = source ? `${source.displayName} · 素材索引` : '素材索引';
+      if (this.els.indexSummary) {
+        this.els.indexSummary.textContent = `${snapshot.total} 项 · 上次索引 ${this._formatTime(snapshot.entry.lastSuccessfulScanAt)}`;
+      }
+      const items = Array.isArray(snapshot.items) ? snapshot.items : [];
+      if (this.els.indexList) {
+        this.els.indexList.innerHTML = items.length ? items.map(item => `<div class="teemo-inspiration-index-item">
+          <div><strong>${this._escape(item.name)}</strong><span>${this._escape(item.relativePath)}</span></div>
+          <dl>
+            <div><dt>类型</dt><dd>${this._escape(item.mime)}</dd></div>
+            <div><dt>尺寸</dt><dd>${item.width} × ${item.height}</dd></div>
+            <div><dt>大小</dt><dd>${this._formatBytes(item.sizeBytes)}</dd></div>
+            <div><dt>修改</dt><dd>${this._formatNsTime(item.mtimeNs)}</dd></div>
+          </dl>
+        </div>`).join('') : '<div class="teemo-inspiration-empty"><strong>当前索引没有支持的视觉素材</strong></div>';
+      }
+      const limit = Math.max(1, Number(snapshot.limit) || 100);
+      const pages = Math.max(1, Math.ceil((Number(snapshot.total) || 0) / limit));
+      const page = Math.floor(this.activeIndexOffset / limit) + 1;
+      if (this.els.indexPage) this.els.indexPage.textContent = `${page} / ${pages}`;
+      if (this.els.indexPrevious) this.els.indexPrevious.disabled = this.activeIndexOffset <= 0;
+      if (this.els.indexNext) this.els.indexNext.disabled = !snapshot.hasMore;
+    }
+
+    _changeIndexPage(direction) {
+      if (!this.activeIndexSnapshot || !this.activeIndexSourceId) return;
+      const limit = Math.max(1, Number(this.activeIndexSnapshot.limit) || 100);
+      const next = Math.max(0, this.activeIndexOffset + (direction * limit));
+      if (direction > 0 && !this.activeIndexSnapshot.hasMore) return;
+      this._openIndex(this.activeIndexSourceId, next);
+    }
+
+    _closeIndex() {
+      this.activeIndexSourceId = null;
+      this.activeIndexOffset = 0;
+      this.activeIndexSnapshot = null;
+      if (this.els.indexPanel) this.els.indexPanel.hidden = true;
+      if (this.els.indexList) this.els.indexList.innerHTML = '';
+    }
+
+    async _resetCorruptIndex() {
+      if (this.busy || !this.indexClient) return;
+      if (typeof window !== 'undefined' && typeof window.confirm === 'function'
+        && !window.confirm('这只会重置 Teemo 的派生索引数据。来源记录、授权和原文件都不会改变。')) return;
+      this.busy = true;
+      this.render();
+      try {
+        await this.indexClient.resetCorruptIndex();
+        this._closeIndex();
+        await this.refresh('灵感索引数据已重置，可按来源重新建立');
+      } catch (error) {
+        this._setStatus(error && error.message ? error.message : '重置灵感索引失败', true);
       } finally {
         this.busy = false;
         this.render();
@@ -306,6 +532,21 @@
       if (bytes < 1024) return `${bytes} B`;
       if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
       return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    _formatTime(value) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '时间未知';
+      return date.toLocaleString('zh-CN', { hour12: false });
+    }
+
+    _formatNsTime(value) {
+      try {
+        const milliseconds = Number(BigInt(String(value || '0')) / 1000000n);
+        return this._formatTime(milliseconds);
+      } catch (_) {
+        return '时间未知';
+      }
     }
 
     _setEnabled(enabled) {

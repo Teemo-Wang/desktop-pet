@@ -53,6 +53,34 @@
       throw Contracts.inspirationError('permissionDenied', 'Permission Service 接口无效');
     }
 
+    async authorizeIndexScan(sourceId, context = {}) {
+      const id = Contracts.safeText(sourceId, 120);
+      if (!id) throw Contracts.inspirationError('requestInvalid', '灵感索引请求无效');
+      if (context.signal && context.signal.aborted) throw Contracts.inspirationError('aborted', '索引已取消');
+      const request = {
+        toolCallId: Contracts.safeText(context.toolCallId, 120) || makeId(),
+        runId: Contracts.safeText(context.runId, 120) || null,
+        sessionId: Contracts.safeText(context.sessionId, 120) || null,
+        toolName: 'inspiration_metadata_index',
+        permission: 'read',
+        resource: `inspiration://local-folder/${encodeURIComponent(id)}`,
+        requiresExecutionAuthorization: true,
+        reason: `建立本地灵感素材索引：${id}`,
+      };
+      const permission = await this._authorize(request, context);
+      if (!permission || permission.decision !== 'allow') {
+        const code = permission && permission.decision === 'prompt' ? 'permissionRequired' : 'permissionDenied';
+        throw Contracts.inspirationError(code, '灵感索引读取未获授权');
+      }
+      if (context.signal && context.signal.aborted) throw Contracts.inspirationError('aborted', '索引已取消');
+      return {
+        toolCallId: request.toolCallId,
+        runId: request.runId,
+        sessionId: request.sessionId,
+        resource: request.resource,
+      };
+    }
+
     async execute(connectorId, operation, request = {}, context = {}) {
       const id = Contracts.safeText(connectorId, 100);
       const capability = Contracts.safeText(operation, 60);

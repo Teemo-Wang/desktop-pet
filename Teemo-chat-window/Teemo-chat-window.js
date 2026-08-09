@@ -59,12 +59,16 @@
   const inspirationAccessGuard = window.TeemoInspirationAccessGuard && inspirationRegistry
     ? new window.TeemoInspirationAccessGuard({ registry: inspirationRegistry, permissionService: permissionClient })
     : null;
+  const inspirationIndexClient = window.TeemoInspirationIndexClient && inspirationAccessGuard
+    ? new window.TeemoInspirationIndexClient({ ipcRenderer, accessGuard: inspirationAccessGuard })
+    : null;
   const inspirationService = window.TeemoInspirationService
     ? new window.TeemoInspirationService({ registry: inspirationRegistry, accessGuard: inspirationAccessGuard })
     : null;
   window.teemoInspirationRegistry = inspirationRegistry;
   window.teemoInspirationService = inspirationService;
   window.teemoLocalFolderClient = localFolderClient;
+  window.teemoInspirationIndexClient = inspirationIndexClient;
   const fileClient = window.TeemoFileClient ? new window.TeemoFileClient({ ipcRenderer }) : null;
   const gitClient = window.TeemoGitClient ? new window.TeemoGitClient({ ipcRenderer }) : null;
   const executeClient = window.TeemoExecuteClient ? new window.TeemoExecuteClient({ ipcRenderer }) : null;
@@ -1733,6 +1737,7 @@
       inspirationCenter = new window.TeemoInspirationCenter({
         service: inspirationService,
         sourceClient: localFolderClient,
+        indexClient: inspirationIndexClient,
         onBack: hideInspiration,
       });
     }

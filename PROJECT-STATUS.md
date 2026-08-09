@@ -1,6 +1,6 @@
 # Teemo助理 — 项目进度与规划
 
-> 文档版本：v1.28 ｜ 更新日期：2026-08-09 ｜ 当前开发版本：**v1.3.0（P3-2 CLOSED / PASS）**
+> 文档版本：v1.29 ｜ 更新日期：2026-08-09 ｜ 当前开发版本：**v1.3.0（P3-3 IMPLEMENTED / WAITING REVIEW）**
 
 ## 当前状态
 
@@ -14,10 +14,23 @@
 - P3：`IN PROGRESS`
 - P3-1：`CLOSED / PASS / BLOCKERS: 0`
 - P3-2：`CLOSED / PASS / BLOCKERS: 0`
+- P3-3：`IMPLEMENTED / WAITING REVIEW`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
 - P3 Baseline：`cd29e6f` / `v1.2.1-p3-baseline`
-- Current Development：`P3-3 METADATA INDEX PLANNING`
+- Current Development：`P3-3 VISUAL METADATA INDEX`
 - Current Branch：`Teemo/p3-personal-inspiration`
+
+## P3-3 阶段（2026-08-09，IMPLEMENTED / WAITING REVIEW）
+
+- 新增 `Manifest + source-sharded revisioned JSONL` 视觉 Metadata Index；derived index 与 P3 global state、Source Registry 和 P2 事实源分离。
+- 只索引已配置且仍位于 P1 authorized roots 的 PNG/JPEG/WEBP/GIF；1 MiB bounded header parser 提取 signature/MIME/dimensions，不完整 decode、不计算 source content hash。
+- itemId 由 sourceId + Windows case-insensitive normalized relative path确定；metadata fingerprint 与 shard SHA-256 分工明确；rename 为 remove + add。
+- 支持 user-triggered Build/Refresh/Rebuild、增量 metadata reuse、进度、取消、120 秒 timeout、每页 <=100 metadata list 和显式 corruption recovery。
+- 扫描受 source-specific Permission 与一次性 Main execution authorization保护；撤销 P1 root 后隐藏已有 metadata，Source remove 后 index 立即不可访问且安全清理。
+- depth/directories/dirents/items/file/header/shard/disk/global concurrency 均有硬边界；symlink/junction 不跟随，目录边界与 commit 前复核 Source/P1/revision。
+- P3-3/P3-2/P3-1 各 2 组 Node + 1 组 Electron、22/22 P1/P2 Node、9/9 既有 Electron、32/32 benchmark、auto-update、语法、diff 与版本检查全部通过；状态仍不得提前写 PASS/CLOSED。
+- 未实现 Search、Embedding、Vector、Image Search、Eagle、NAS、Web Source、Watcher 或 Inspiration Agent Context；P3-4 未开始。
+- 详情见 `docs/Teemo-P3-3-VISUAL-METADATA-INDEX.md`。
 
 ## P3-2 阶段（2026-08-09，CLOSED / PASS）
 

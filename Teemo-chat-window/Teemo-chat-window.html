@@ -218,9 +218,24 @@
           <section class="teemo-inspiration-sources" aria-labelledby="TeemoInspirationSourcesTitle">
             <header>
               <div><span>Sources</span><h2 id="TeemoInspirationSourcesTitle">素材来源</h2></div>
-              <button class="teemo-secondary-button" id="TeemoInspirationAddFolderButton" type="button">添加本地文件夹</button>
+              <div class="teemo-inspiration-source-header-actions">
+                <button class="teemo-secondary-button" id="TeemoInspirationIndexResetButton" type="button" hidden>重建索引数据</button>
+                <button class="teemo-secondary-button" id="TeemoInspirationAddFolderButton" type="button">添加本地文件夹</button>
+              </div>
             </header>
             <div id="TeemoInspirationSourceList"></div>
+          </section>
+          <section class="teemo-inspiration-index-panel" id="TeemoInspirationIndexPanel" hidden>
+            <header>
+              <div><span>Metadata Index</span><h2 id="TeemoInspirationIndexTitle">素材索引</h2><p id="TeemoInspirationIndexSummary"></p></div>
+              <button class="teemo-secondary-button" id="TeemoInspirationIndexClose" type="button">关闭</button>
+            </header>
+            <div class="teemo-inspiration-index-list" id="TeemoInspirationIndexList"></div>
+            <footer>
+              <button class="teemo-secondary-button" id="TeemoInspirationIndexPrevious" type="button">上一页</button>
+              <span id="TeemoInspirationIndexPage">1 / 1</span>
+              <button class="teemo-secondary-button" id="TeemoInspirationIndexNext" type="button">下一页</button>
+            </footer>
           </section>
           <section class="teemo-inspiration-browser" id="TeemoInspirationBrowser" hidden>
             <header>
@@ -479,6 +494,7 @@
   <script src="../src/inspiration/TeemoInspirationAccessGuard.js"></script>
   <script src="../src/inspiration/TeemoInspirationService.js"></script>
   <script src="../src/inspiration/TeemoLocalFolderClient.js"></script>
+  <script src="../src/inspiration/TeemoInspirationIndexClient.js"></script>
   <script src="../src/inspiration/TeemoLocalFolderConnector.js"></script>
   <script src="../src/skills/TeemoSkillSpecification.js"></script>
   <script src="../src/skills/TeemoSkillValidator.js"></script>

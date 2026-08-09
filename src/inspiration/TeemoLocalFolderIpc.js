@@ -9,6 +9,7 @@ function publicError(error) {
 function registerTeemoLocalFolderIpc(ipcMain, options = {}) {
   const sourceService = options.sourceService;
   const localFolderService = options.localFolderService;
+  const indexService = options.indexService || null;
   const permissionService = options.permissionService;
   const rootsProvider = typeof options.rootsProvider === 'function' ? options.rootsProvider : () => [];
   const saveRoots = typeof options.saveRoots === 'function' ? options.saveRoots : () => {};
@@ -29,19 +30,32 @@ function registerTeemoLocalFolderIpc(ipcMain, options = {}) {
   function publicSnapshot() {
     const snapshot = sourceService.reload();
     if (snapshot.stateError) return snapshot;
+    const cleanup = indexService
+      ? indexService.cleanupRemovedSources(snapshot.sources.map(source => source.sourceId))
+      : { failed: [] };
     const roots = rootsProvider().map(root => path.resolve(root));
     return {
       schemaVersion: snapshot.schemaVersion,
       revision: snapshot.revision,
-      sources: snapshot.sources.map(source => ({
-        sourceId: source.sourceId,
-        kind: source.kind,
-        displayName: source.displayName,
-        folderName: path.basename(source.rootPath),
-        status: roots.some(root => fileService.isPathWithinRoot(root, source.rootPath)) ? 'CONFIGURED' : 'AUTHORIZATION_REQUIRED',
-        createdAt: source.createdAt,
-        updatedAt: source.updatedAt,
-      })),
+      indexCleanupWarning: cleanup.failed.length > 0,
+      indexState: indexService ? indexService.getManifestStatus() : null,
+      sources: snapshot.sources.map(source => {
+        const configured = roots.some(root => fileService.isPathWithinRoot(root, source.rootPath));
+        return {
+          sourceId: source.sourceId,
+          kind: source.kind,
+          displayName: source.displayName,
+          folderName: path.basename(source.rootPath),
+          status: configured ? 'CONFIGURED' : 'AUTHORIZATION_REQUIRED',
+          index: indexService
+            ? (configured ? indexService.getSourceStatus(source.sourceId) : {
+              status: 'AUTHORIZATION_REQUIRED', itemCount: 0, lastSuccessfulScanAt: null,
+            })
+            : null,
+          createdAt: source.createdAt,
+          updatedAt: source.updatedAt,
+        };
+      }),
     };
   }
 
@@ -72,7 +86,13 @@ function registerTeemoLocalFolderIpc(ipcMain, options = {}) {
   ipcMain.handle(channels.removeSource, (_event, payload = {}) => {
     try {
       sourceService.removeSource(payload.sourceId, { expectedRevision: payload.expectedRevision });
-      return { ok: true, snapshot: publicSnapshot() };
+      let indexCleanupFailed = false;
+      if (indexService) {
+        try { indexService.removeSourceIndex(payload.sourceId); }
+        catch (_) { indexCleanupFailed = true; }
+      }
+      const snapshot = publicSnapshot();
+      return { ok: true, snapshot, indexCleanupFailed: indexCleanupFailed || snapshot.indexCleanupWarning };
     } catch (error) {
       return { ok: false, error: publicError(error) };
     }

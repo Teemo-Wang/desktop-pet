@@ -60,6 +60,7 @@
         expectedRevision: options.expectedRevision,
       });
       if (!result || !result.ok) throw safeError(result && result.error);
+      if (result.indexCleanupFailed && result.snapshot) result.snapshot.indexCleanupWarning = true;
       return result.snapshot;
     }
 
