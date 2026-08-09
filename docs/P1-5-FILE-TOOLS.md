@@ -1,6 +1,6 @@
 # P1-5 Safe File Tools
 
-> 阶段状态：实现与本地验证完成，等待 GPT 审阅。分支：`Teemo/p1-agent-core`。
+> 阶段状态：`CLOSED / PASS` ｜ GPT 审阅：`BLOCKERS: 0` ｜ 实现提交：`0211a40` ｜ 恢复标签：`v1.1.7-p1.5-file-tools`
 
 ## 目标与边界
 
@@ -117,6 +117,17 @@ C:\Users\Teemo\Documents\Codex\2026-08-09\w\work\Teemo-P1-5-app-smoke-final-2026
 
 ## 回滚与剩余边界
 
-实现提交完成后可用该提交的父提交回到 P1-4 封板点 `dd1331f`；不要使用破坏性 reset 覆盖用户改动。P1-5 在 GPT 确认前不创建阶段 tag。
+P1-5 实现提交为 `0211a40`，阶段恢复标签为 `v1.1.7-p1.5-file-tools`。需要排查时可比较该标签与 P1-4 封板点 `dd1331f`；不要使用破坏性 reset 覆盖用户改动。
 
 剩余边界：Electron sandbox/contextIsolation、历史 UI 直读文件、持久权限管理中心、删除、Git、Shell/Execute 和 Provider 原生 Tool Calling 均不属于本阶段。
+
+## GPT 封板结论
+
+GPT 严格复核了双重授权、可信动态资源、权限前后路径验证、Windows 路径安全、TOCTOU、hash 并发、原子写、Main IPC 防旁路与正式数据隔离，确认没有仍属于 P1-5 的阻塞项：
+
+```text
+P1-5 Safe File Tools
+STATUS: CLOSED
+RESULT: PASS
+BLOCKERS: 0
+```
