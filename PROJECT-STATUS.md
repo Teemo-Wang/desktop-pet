@@ -10,18 +10,19 @@
 - P0：`CLOSED`
 - P1：`CLOSED / PASS / BLOCKERS: 0`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
-- Current Development：`P2-3 Creative Director / Challenge Mode IMPLEMENTED / WAITING REVIEW`
+- Current Development：`P2-3 CLOSED / PASS；NEXT P2-4 Cognition Intelligence`
 - Current Branch：`Teemo/p2-personal-intelligence`
 
-## P2-3 阶段（2026-08-09，IMPLEMENTED / WAITING REVIEW）
+## P2-3 阶段（2026-08-09，CLOSED / PASS）
 
 - 新增 session-local、runtime-only 的 balanced/challenge 行为层与 light/standard/strong 三档强度；新 session、新窗口和重启默认 balanced，不写磁盘。
 - 新增 deterministic 命令解析、one-shot challenge、session exit 与 one-shot suppression；普通“挑战”文本不切换状态。
 - Agent Core 在 Creative 之后最小接入 Challenge Overlay；mandatory 约束、证据和 Direction Diversity Policy 不受 optional 内容裁剪，失败独立降级。
 - “Teemo 的设计判断”页新增评审模式控制，聊天输入区新增快速状态按钮；Creative OFF/unreadable 时控件禁用并 fail closed。
-- 三套 P2-3 专项测试、隔离 Electron 双窗口/重启 smoke、P1/P2-1/P2-2 全量回归、版本与语法检查均已通过；GPT 严格审阅待完成。详见 `docs/P2-3-CREATIVE-DIRECTOR.md`。
-- GPT 首轮审阅指出缺失 sessionId 的共享 fallback、复合命令整条跳过 Cognition 及引用误触两个边界；已移除 fallback，并引入 control span/remaining content 与引用防误触，专项测试通过，等待全量回归与复审。
-- 未实现 P2-4、P2-5、P3、Creative Calibration、GUI 自动化或 Multi-Agent；当前不得标记 PASS/CLOSED。
+- 三套 P2-3 专项测试、隔离 Electron 双窗口/重启 smoke、P1/P2-1/P2-2 全量回归、版本与语法检查均已通过。详见 `docs/P2-3-CREATIVE-DIRECTOR.md`。
+- GPT 首轮审阅指出缺失 sessionId 的共享 fallback、复合命令整条跳过 Cognition 及引用误触两个边界；`f6bb0e2` 已移除 fallback，并引入 control span/remaining content 与引用防误触。
+- GPT 复审确认 `STATUS: PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P2-4`；实现提交 `5a0d472`、修复提交 `f6bb0e2`，恢复标签为 `v1.2.1-p2.3-challenge-mode`。
+- 未实现 P2-4、P2-5、P3、Creative Calibration、GUI 自动化或 Multi-Agent；P2-4 将在独立任务书下启动。
 
 ## P2-2 阶段（2026-08-09，CLOSED / PASS）
 

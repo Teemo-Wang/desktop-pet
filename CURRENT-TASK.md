@@ -5,12 +5,13 @@
 - Product：Teemo助理
 - Branch：`Teemo/p2-personal-intelligence`
 - Phase：P2-3 Creative Director / Challenge Mode
-- State：`IMPLEMENTED / WAITING REVIEW`
+- State：`CLOSED / PASS / BLOCKERS: 0`
 - App Version：`v1.2.1`
 - P1 Recovery Tag：`v1.2.0-p1-agent-foundation`
 - P2-1 Recovery Tag：`v1.2.0-p2.1-cognition-ui`
 - P2-2 Recovery Tag：`v1.2.1-p2.2-creative-profile`
-- Guardrail：P2-3 必须经 GPT 严格审阅后才可 PASS/CLOSED；不得在 implementation/close commit 混入 P2-4
+- P2-3 Recovery Tag：`v1.2.1-p2.3-challenge-mode`
+- Guardrail：P2-4 必须先取得 GPT 严格任务书；不得混入 P2-5/P3
 
 ## 封板后维护
 
@@ -28,18 +29,18 @@
 
 ## 当前验收进度
 
-1. P2-3 实现和三套专项隔离测试已完成。
-2. P1/P2-1/P2-2 全量回归、三套 Electron UI smoke、静态检查、版本检查和完整 diff 审核已通过。
-3. 待提交 `Teemo: add P2-3 challenge mode` 并发送 86 项报告到 GPT「Teemo助手升级」严格审阅。
-4. GPT 审阅前不创建 P2-3 recovery tag，不标记 PASS/CLOSED。
-5. 审阅通过并修复全部 blocker 后，按用户授权封板并进入 P2-4。
+1. 实现提交：`5a0d472 Teemo: add P2-3 challenge mode`。
+2. 首轮两个 blocker 已在 `f6bb0e2 Teemo: harden P2-3 session commands` 修复。
+3. P1/P2-1/P2-2 全量回归、三套 Electron UI smoke、静态检查、版本检查和完整 diff 审核已通过。
+4. GPT 复审：`STATUS: PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P2-4`。
+5. P2-3 已封板；下一步在同一 GPT 对话取得 P2-4 严格任务书后开始独立实现。
 
 ## GPT 首轮审阅修复
 
 - 首轮结果：`STATUS: FAIL / BLOCKERS: 2 / CAN_CLOSE_AND_TAG: NO`。
 - Blocker 1：移除缺失 sessionId 的 renderer 共享 fallback；未知 identity fail balanced，仅 one-shot 可 run-local；新增同 renderer Session A/B 与缺失 identity 测试。
 - Blocker 2：Command Parser 返回 control span/remaining content；纯命令零写入，混合消息剩余正文继续进入 Collector；引用/翻译/解释命令无副作用，send/stream 均覆盖。
-- 当前仍为 `IMPLEMENTED / WAITING REVIEW`，等待完整回归、修复提交与 GPT 复审。
+- GPT 复审确认两项 blocker 均已解除，P2-3 已获准封板。
 
 ## 禁止扩展
 
