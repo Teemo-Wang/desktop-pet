@@ -91,6 +91,54 @@ async function main() {
     assert.equal(result.error.code, 'AGENT_CANCELLED');
   }
 
+  for (const invalidAction of [
+    '{}',
+    JSON.stringify({ type: 'tool_request', arguments: {} }),
+    JSON.stringify({ type: 'tool_request', tool: 'echo', arguments: 'invalid' }),
+    JSON.stringify({ type: 'unknown_action', content: 'bad' }),
+    '```json\n{"type":"tool_request","tool":""}\n```',
+  ]) {
+    const ai = sequenceAI([invalidAction]);
+    const result = await new TeemoAgentCore({ aiService: ai }).run({ messages: [] });
+    assert.equal(result.ok, false, `invalid action should fail: ${invalidAction}`);
+    assert.equal(result.error.code, 'INVALID_ACTION');
+    assert.equal(result.run.toolCalls.length, 0);
+    assert.equal(result.run.status, 'failed');
+  }
+
+  {
+    const controllerA = new AbortController();
+    const aiA = sequenceAI([
+      JSON.stringify({ type: 'tool_request', tool: 'wait_for_abort', arguments: {} }),
+      JSON.stringify({ type: 'final_response', content: 'A should not finish' }),
+    ]);
+    const aiB = sequenceAI([
+      JSON.stringify({ type: 'tool_request', tool: 'echo', arguments: { text: 'B only' } }),
+      JSON.stringify({ type: 'final_response', content: 'B completed' }),
+    ]);
+    const core = new TeemoAgentCore({
+      tools: {
+        wait_for_abort: async (_args, context) => {
+          controllerA.abort();
+          return { runId: context.runId };
+        },
+      },
+    });
+    const [runA, runB] = await Promise.all([
+      core.run({ aiService: aiA, messages: [{ role: 'user', content: 'A' }], sessionId: 'session-A', signal: controllerA.signal }),
+      core.run({ aiService: aiB, messages: [{ role: 'user', content: 'B' }], sessionId: 'session-B' }),
+    ]);
+    assert.equal(runA.ok, false);
+    assert.equal(runA.error.code, 'AGENT_CANCELLED');
+    assert.equal(runA.run.sessionId, 'session-A');
+    assert.equal(runB.ok, true);
+    assert.equal(runB.content, 'B completed');
+    assert.equal(runB.run.sessionId, 'session-B');
+    assert.equal(runB.run.toolCalls[0].tool, 'echo');
+    assert.match(runB.run.messages.at(-1).content, /B only/);
+    assert.ok(!runB.run.messages.some(message => String(message.content).includes('A should not finish')));
+  }
+
   {
     const responses = [
       JSON.stringify({ type: 'tool_request', tool: 'echo', arguments: { text: 'streamed' } }),

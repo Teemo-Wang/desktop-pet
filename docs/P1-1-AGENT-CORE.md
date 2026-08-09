@@ -101,6 +101,12 @@ npm.cmd run test:agent-core
 
 结果：全部通过，输出 `TeemoAgentCore tests passed`。测试使用内存 Mock，没有写入正式用户数据。
 
+补充状态机验证：
+
+- 并发 Run 使用独立 `runId`、`sessionId`、messages、toolCalls 和 AbortSignal；测试中取消 Run A 不影响 Run B 继续完成，Run A 的数据不会混入 Run B。
+- Action 最小 schema 会拒绝缺失 `type`、未知 `type`、缺失/空 `tool`、非对象 `arguments` 和损坏的 JSON Action；拒绝时为 `INVALID_ACTION`，且没有 Tool 被执行。
+- 普通非 JSON 文本仍兼容归一为 `direct_response`。
+
 已使用隔离 profile `D:\Teemo助手\Teemo-p1-1-agent-core-smoke-profile` 启动 Electron 开发版 8 秒。应用持续运行，渲染进程成功加载 `TeemoAgentCore`；没有 Agent Core 初始化错误。隔离 profile 缺少本地语雀配置，因此日志显示语雀读取不可用，这是测试隔离造成的预期结果，不影响 Agent Core。本阶段没有修改正式用户数据。
 
 ## 9. 技术债与 P1-2 前检查

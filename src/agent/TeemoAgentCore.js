@@ -32,7 +32,16 @@
     for (const candidate of candidates) {
       try {
         const parsed = JSON.parse(candidate);
-        if (parsed && typeof parsed.type === 'string') return parsed;
+        // A complete JSON value is an attempted Agent Action. Never silently
+        // treat malformed Action JSON as prose, otherwise a broken schema can
+        // accidentally pass through the loop.
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          return { type: 'agent_error', code: 'INVALID_ACTION', message: 'Agent Action 必须是对象' };
+        }
+        if (typeof parsed.type !== 'string' || !parsed.type.trim()) {
+          return { type: 'agent_error', code: 'INVALID_ACTION', message: 'Agent Action 缺少有效 type' };
+        }
+        return parsed;
       } catch (_) { /* normal prose is a direct response */ }
     }
     return { type: 'direct_response', content: value };
@@ -40,13 +49,20 @@
 
   function normalizeAction(value) {
     const action = parseAction(value);
+    if (action.type === 'agent_error') return action;
     if (action.type === 'final_response') return { type: 'final_response', content: String(action.content ?? '') };
     if (action.type === 'direct_response') return { type: 'direct_response', content: String(action.content ?? '') };
     if (action.type === 'tool_request') {
+      if (typeof action.tool !== 'string' || !action.tool.trim()) {
+        return { type: 'agent_error', code: 'INVALID_ACTION', message: 'tool_request 缺少有效 tool' };
+      }
+      if (action.arguments != null && (typeof action.arguments !== 'object' || Array.isArray(action.arguments))) {
+        return { type: 'agent_error', code: 'INVALID_ACTION', message: 'tool_request.arguments 必须是对象' };
+      }
       return {
         type: 'tool_request',
-        tool: String(action.tool || ''),
-        arguments: action.arguments && typeof action.arguments === 'object' ? action.arguments : {},
+        tool: action.tool.trim(),
+        arguments: action.arguments || {},
       };
     }
     return { type: 'agent_error', code: 'INVALID_ACTION', message: `未知 Agent Action 类型：${action.type || '(空)'}` };
