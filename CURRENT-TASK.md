@@ -34,6 +34,13 @@
 4. GPT 审阅前不创建 P2-3 recovery tag，不标记 PASS/CLOSED。
 5. 审阅通过并修复全部 blocker 后，按用户授权封板并进入 P2-4。
 
+## GPT 首轮审阅修复
+
+- 首轮结果：`STATUS: FAIL / BLOCKERS: 2 / CAN_CLOSE_AND_TAG: NO`。
+- Blocker 1：移除缺失 sessionId 的 renderer 共享 fallback；未知 identity fail balanced，仅 one-shot 可 run-local；新增同 renderer Session A/B 与缺失 identity 测试。
+- Blocker 2：Command Parser 返回 control span/remaining content；纯命令零写入，混合消息剩余正文继续进入 Collector；引用/翻译/解释命令无副作用，send/stream 均覆盖。
+- 当前仍为 `IMPLEMENTED / WAITING REVIEW`，等待完整回归、修复提交与 GPT 复审。
+
 ## 禁止扩展
 
 P2-3 不开发 P2-4 Cognition Intelligence、P2-5 Skill Router 或 P3 Inspiration；不增加 Creative Calibration、桌面自动化、Provider Native Tool Calling、Embedding、Vector DB、素材库 Connector 或 Multi-Agent。

@@ -30,6 +30,14 @@ class CapturingStreamAI {
   }
 }
 
+class RecordingCollector {
+  constructor() { this.calls = []; }
+  async collectTurn(input) {
+    this.calls.push(JSON.parse(JSON.stringify(input)));
+    return { ok: true, skipped: null, promoted: false, scope: 'recent' };
+  }
+}
+
 function findContext(messages, marker) {
   return messages.find(message => String(message.content || '').includes(marker));
 }
@@ -101,6 +109,7 @@ async function main() {
       projectId: 'red',
       projectContext: { project: { designBrief: '品牌规定必须红色' } },
       skillContext: '品牌规范',
+      skipCognitionCollection: true,
     });
     assert.equal(send.ok, true);
     const messages = sendAI.calls.at(-1);
@@ -112,7 +121,6 @@ async function main() {
     assert.ok(skillIndex < cognitionIndex && cognitionIndex < creativeIndex && creativeIndex < challengeIndex && challengeIndex < userIndex);
     assert.ok(findContext(messages, 'Teemo Challenge Overlay'));
     assert.ok(send.run.challengeContext);
-    assert.equal(send.run.cognitionCollection.skipped, 'challenge_runtime_command');
     assert.equal(fs.readFileSync(cognitionFile, 'utf8'), cognitionBefore, 'send command must not change Cognition');
 
     const streamAI = new CapturingStreamAI();
@@ -120,16 +128,16 @@ async function main() {
       aiService: streamAI,
       messages: [{ role: 'user', content: '挑战一下这个品牌 KV' }],
       userMessage: '挑战一下这个品牌 KV', sessionId: 'a',
+      skipCognitionCollection: true,
     });
     assert.equal(streamed.ok, true);
     assert.deepEqual(findContext(streamAI.calls.at(-1), 'Teemo Challenge Overlay'), findContext(messages, 'Teemo Challenge Overlay'));
-    assert.equal(streamed.run.cognitionCollection.skipped, 'challenge_runtime_command');
     assert.equal(fs.readFileSync(cognitionFile, 'utf8'), cognitionBefore, 'stream command must not change Cognition');
 
     const providerB = new CapturingAI();
-    const providerResult = await core.run({ aiService: providerB, messages: [{ role: 'user', content: '挑战一下这个品牌 KV' }], userMessage: '挑战一下这个品牌 KV', sessionId: 'a' });
+    const providerResult = await core.run({ aiService: providerB, messages: [{ role: 'user', content: '挑战一下这个品牌 KV' }], userMessage: '挑战一下这个品牌 KV', sessionId: 'a', skipCognitionCollection: true });
     assert.deepEqual(findContext(providerB.calls.at(-1), 'Teemo Challenge Overlay'), findContext(streamAI.calls.at(-1), 'Teemo Challenge Overlay'));
-    assert.equal(providerResult.run.cognitionCollection.skipped, 'challenge_runtime_command');
+    assert.equal(providerResult.run.challengeCommand, 'one_shot_challenge');
     assert.equal(fs.readFileSync(cognitionFile, 'utf8'), cognitionBefore, 'provider command must not change Cognition');
 
     const implicitAI = new CapturingAI();
@@ -137,11 +145,68 @@ async function main() {
       aiService: implicitAI,
       messages: [{ role: 'user', content: '挑战一下这个品牌 KV' }],
       sessionId: 'implicit',
+      skipCognitionCollection: true,
     });
     assert.ok(findContext(implicitAI.calls.at(-1), 'Teemo Challenge Overlay'));
     assert.equal(implicit.run.challengeCommand, 'one_shot_challenge');
-    assert.equal(implicit.run.cognitionCollection.skipped, 'challenge_runtime_command');
     assert.equal(fs.readFileSync(cognitionFile, 'utf8'), cognitionBefore, 'implicit user message command must not change Cognition');
+
+    const pureControl = await core.run({
+      aiService: new CapturingAI(),
+      messages: [{ role: 'user', content: '开启挑战模式' }],
+      userMessage: '开启挑战模式',
+      sessionId: 'pure-control',
+    });
+    assert.equal(pureControl.run.cognitionCollection.skipped, 'challenge_runtime_command');
+    assert.equal(sessionState.getState('pure-control').mode, 'challenge');
+    const pureControlStream = await core.runStream({
+      aiService: new CapturingStreamAI(),
+      messages: [{ role: 'user', content: '退出挑战模式' }],
+      userMessage: '退出挑战模式',
+      sessionId: 'pure-control',
+    });
+    assert.equal(pureControlStream.run.cognitionCollection.skipped, 'challenge_runtime_command');
+    assert.equal(sessionState.getState('pure-control').mode, 'balanced');
+    assert.equal(fs.readFileSync(cognitionFile, 'utf8'), cognitionBefore, 'pure send/stream commands must not change Cognition');
+
+    const recordingCollector = new RecordingCollector();
+    const mixedCore = new TeemoAgentCore({
+      creativeContextBuilder: creativeBuilder,
+      challengeContextBuilder: challengeBuilder,
+      cognitionCollector: recordingCollector,
+    });
+    const mixedAI = new CapturingAI();
+    const mixedSend = await mixedCore.run({
+      aiService: mixedAI,
+      messages: [{ role: 'user', content: '开启挑战模式，我最近更喜欢高反射金属材质' }],
+      userMessage: '开启挑战模式，我最近更喜欢高反射金属材质',
+      sessionId: 'mixed',
+    });
+    await mixedSend.run.collectionPromise;
+    assert.equal(sessionState.getState('mixed').mode, 'challenge');
+    assert.equal(recordingCollector.calls.at(-1).userMessage, '我最近更喜欢高反射金属材质');
+
+    const mixedStreamAI = new CapturingStreamAI();
+    const mixedStream = await mixedCore.runStream({
+      aiService: mixedStreamAI,
+      messages: [{ role: 'user', content: '这次别挑战，我最近更喜欢人物设计比例成熟一些' }],
+      userMessage: '这次别挑战，我最近更喜欢人物设计比例成熟一些',
+      sessionId: 'mixed',
+    });
+    await mixedStream.run.collectionPromise;
+    assert.equal(mixedStream.run.challengeContext.resolution.effectiveMode, 'balanced');
+    assert.equal(sessionState.getState('mixed').mode, 'challenge');
+    assert.equal(recordingCollector.calls.at(-1).userMessage, '我最近更喜欢人物设计比例成熟一些');
+
+    const quoted = await mixedCore.run({
+      aiService: new CapturingAI(),
+      messages: [{ role: 'user', content: '把“开启挑战模式”翻译成英文' }],
+      userMessage: '把“开启挑战模式”翻译成英文',
+      sessionId: 'quoted',
+    });
+    await quoted.run.collectionPromise;
+    assert.equal(quoted.run.challengeCommand, 'none');
+    assert.equal(sessionState.getState('quoted').mode, 'balanced');
 
     // The remaining cases inspect context behavior only. Keep the real Cognition
     // builder, but remove collection so ordinary design turns cannot mutate the fixture.
@@ -150,6 +215,22 @@ async function main() {
       creativeContextBuilder: creativeBuilder,
       challengeContextBuilder: challengeBuilder,
     });
+
+    const missingIdentityAI = new CapturingAI();
+    await core.run({
+      aiService: missingIdentityAI,
+      messages: [{ role: 'user', content: '评价这个品牌设计' }],
+      userMessage: '评价这个品牌设计',
+    });
+    assert.ok(!findContext(missingIdentityAI.calls.at(-1), 'Teemo Challenge Overlay'));
+    const missingOneShotAI = new CapturingAI();
+    await core.run({
+      aiService: missingOneShotAI,
+      messages: [{ role: 'user', content: '挑战一下这个品牌设计' }],
+      userMessage: '挑战一下这个品牌设计',
+    });
+    assert.ok(findContext(missingOneShotAI.calls.at(-1), 'Teemo Challenge Overlay'));
+    assert.equal(sessionState.getState(null).mode, 'balanced');
 
     const ordinaryAI = new CapturingAI();
     await core.run({ aiService: ordinaryAI, messages: [{ role: 'user', content: '1+1 等于几？' }], userMessage: '1+1 等于几？', sessionId: 'a' });

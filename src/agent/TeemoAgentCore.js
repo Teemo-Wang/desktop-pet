@@ -107,6 +107,7 @@
         challengeContext: options.challengeContext || null,
         challengeError: options.challengeError || null,
         challengeCommand: options.challengeCommand || null,
+        challengeCommandMeta: options.challengeCommandMeta || null,
         cognitionCollection: null,
       };
       this.activeRuns.set(run.runId, run);
@@ -213,10 +214,12 @@
       let challengeContext = null;
       let challengeError = null;
       let challengeCommand = null;
+      let challengeCommandMeta = null;
       if (challengeBuilder && options.challenge !== false && typeof challengeBuilder.build === 'function') {
         if (typeof challengeBuilder.parseCommand === 'function') {
           try {
             const parsed = challengeBuilder.parseCommand({ messages: initialMessages, userMessage: options.userMessage });
+            challengeCommandMeta = parsed || null;
             challengeCommand = parsed && parsed.type ? parsed.type : null;
           } catch (_) { /* Builder failure remains isolated from normal chat. */ }
         }
@@ -233,7 +236,8 @@
           });
           if (challengeContext && challengeContext.error) challengeError = { ...challengeContext.error };
           if (challengeContext && challengeContext.resolution && challengeContext.resolution.command) {
-            challengeCommand = challengeContext.resolution.command.type || challengeCommand;
+            challengeCommandMeta = challengeContext.resolution.command;
+            challengeCommand = challengeCommandMeta.type || challengeCommand;
           }
           if (challengeContext && challengeContext.systemMessage && challengeContext.systemMessage.content) {
             let insertAt = useActionContract ? 1 : 0;
@@ -245,20 +249,16 @@
           challengeContext = null;
         }
       }
-      return { messages, initialMessages, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand };
+      return { messages, initialMessages, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta };
     }
 
     _scheduleCollection(options, run, initialMessages, content) {
       const collector = options.cognitionCollector || this.cognitionCollector;
       if (!collector || options.skipCognitionCollection || typeof collector.collectTurn !== 'function') return null;
-      const challengeCommand = run.challengeCommand || (run.challengeContext
+      const challengeCommandMeta = run.challengeCommandMeta || (run.challengeContext
         && run.challengeContext.resolution
-        && run.challengeContext.resolution.command
-        && run.challengeContext.resolution.command.type);
-      if (challengeCommand && challengeCommand !== 'none') {
-        run.cognitionCollection = { ok: true, skipped: 'challenge_runtime_command', promoted: false, scope: null };
-        return null;
-      }
+        && run.challengeContext.resolution.command) || null;
+      const challengeCommand = (challengeCommandMeta && challengeCommandMeta.type) || run.challengeCommand;
       let userMessage = options.userMessage;
       if (userMessage == null) {
         for (let index = initialMessages.length - 1; index >= 0; index -= 1) {
@@ -269,6 +269,16 @@
         }
       }
       if (userMessage == null) return null;
+      if (challengeCommand && challengeCommand !== 'none') {
+        const remaining = challengeCommandMeta && typeof challengeCommandMeta.remainingUserContent === 'string'
+          ? challengeCommandMeta.remainingUserContent.trim()
+          : '';
+        if (!remaining) {
+          run.cognitionCollection = { ok: true, skipped: 'challenge_runtime_command', promoted: false, scope: null };
+          return null;
+        }
+        userMessage = remaining;
+      }
       const promise = Promise.resolve().then(() => collector.collectTurn({
         userMessage,
         assistantMessage: content,
@@ -291,8 +301,8 @@
       const ai = options.aiService || this.aiService;
       if (!ai || typeof ai.stream !== 'function') throw new Error('Agent Core 缺少 AIService.stream');
       const prepared = await this._prepareMessages(options, !options.disableActionContract);
-      const { messages, initialMessages, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand } = prepared;
-      const run = this.createRun({ ...options, messages, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand });
+      const { messages, initialMessages, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta } = prepared;
+      const run = this.createRun({ ...options, messages, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta });
       const signal = options.signal;
       const maxSteps = Number.isInteger(options.maxSteps) && options.maxSteps > 0 ? options.maxSteps : this.maxSteps;
       const registry = options.toolRegistry || this.toolRegistry;
@@ -336,8 +346,8 @@
       const ai = options.aiService || this.aiService;
       if (!ai || typeof ai.send !== 'function') throw new Error('Agent Core 缺少 AIService');
       const prepared = await this._prepareMessages(options, !options.disableActionContract);
-      const { messages, initialMessages, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand } = prepared;
-      const run = this.createRun({ ...options, messages, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand });
+      const { messages, initialMessages, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta } = prepared;
+      const run = this.createRun({ ...options, messages, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta });
       const signal = options.signal;
       const maxSteps = Number.isInteger(options.maxSteps) && options.maxSteps > 0 ? options.maxSteps : this.maxSteps;
       const registry = options.toolRegistry || this.toolRegistry;

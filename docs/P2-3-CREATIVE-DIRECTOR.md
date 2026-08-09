@@ -13,7 +13,7 @@ P2-3 让 Teemo 在用户需要时，使用 P2-2 已有的专业判断主动指�
 
 ## 2. 模式与运行时状态
 
-仅有两种 mode：`balanced` 和 `challenge`。新 session、新窗口和应用重启始终为 balanced。Challenge 状态只保存在 renderer 内存中的 `TeemoCreativeDirectorSessionState` Map，按 `sessionId` 隔离，不写入聊天历史或任何 JSON。
+仅有两种 mode：`balanced` 和 `challenge`。新 session、新窗口和应用重启始终为 balanced。Challenge 状态只保存在 renderer 内存中的 `TeemoCreativeDirectorSessionState` Map，按稳定 `sessionId` 隔离，不写入聊天历史或任何 JSON。缺失 session identity 时不读写共享 renderer fallback：session activate/exit fail balanced，one-shot challenge 只允许当前 Run 生效。
 
 Runtime schema：`schemaVersion: 1`、`mode`、`intensity`、`source`、`updatedAt`。Intensity 仅有 `light`、`standard`、`strong`；非法 mode/intensity/source 被拒绝。
 
@@ -23,7 +23,7 @@ Runtime schema：`schemaVersion: 1`、`mode`、`intensity`、`source`、`updated
 
 ## 3. 命令与生命周期
 
-`TeemoCreativeDirectorPolicy` 使用 deterministic parser，不调用模型。解析优先级为 Exit > One-shot Suppression > Activate，避免“不要开启挑战模式”被误识别。
+`TeemoCreativeDirectorPolicy` 使用 deterministic parser，不调用模型。解析优先级为 Exit > One-shot Suppression > 明确否定 > Activate > One-shot，并返回 controlSpan、consumedText 与 remainingUserContent。纯控制语句不进入 Cognition；复合消息只移除控制片段，剩余实质内容继续走既有 Collector。引号内命令以及翻译、解释、引用、文档示例不产生状态副作用。
 
 - Session activate：“开启挑战模式”“接下来用挑战模式”等。
 - One-shot challenge：“挑战一下这个方案”“从反方向看看”等；仅当前 Run 生效。
@@ -64,7 +64,7 @@ Challenge Overlay 默认最多 900 字符，Creative + Challenge 正常总量不
 
 ## 6. Creative Dependency 与隔离
 
-Creative Profile disabled 或 `CREATIVE_PROFILE_STATE_UNREADABLE` 时，Challenge fail closed、session 回到 balanced、UI 控件禁用；普通聊天继续。Challenge 不修改 Creative Defaults、Creative State、Cognition、Project、Skill，不使用 Tool 或 Permission。开启、退出、one-shot challenge 与 one-shot suppression 等运行时控制语句在进入 Cognition Collector 前统一标记为 `challenge_runtime_command` 并跳过，避免 mode/intensity 指令被学习为用户偏好；普通内容仍沿用既有 Cognition 收集规则。
+Creative Profile disabled 或 `CREATIVE_PROFILE_STATE_UNREADABLE` 时，Challenge fail closed、session 回到 balanced、UI 控件禁用；普通聊天继续。Challenge 不修改 Creative Defaults、Creative State、Cognition、Project、Skill，不使用 Tool 或 Permission。纯开启/退出/one-shot/suppression 控制语句在进入 Cognition Collector 前标记为 `challenge_runtime_command` 并跳过；复合消息仅剥离控制 span，remainingUserContent 继续沿用既有 Cognition 收集规则。
 
 GPT、Grok、DeepSeek 等 Provider 在 Agent Core 上游接收同一 Overlay。Provider 切换不改变 Session State、Creative Profile 或 Cognition。
 
@@ -84,7 +84,7 @@ npm.cmd run test:challenge-context
 npm.cmd run test:creative-director-ui-smoke
 ```
 
-覆盖 default/session/restart/window isolation、三档强度、命令优先级、one-shot/suppress、误触发、Creative relevance、图片正反例、disabled/unreadable、预算、mandatory、Context 顺序、send/stream、Provider A/B、Builder failure、Cognition/Creative 字节隔离和 Direction Diversity Contract。
+覆盖 default/session/restart/window isolation、同 renderer Session A/B、缺失 identity、三档强度、命令优先级、one-shot/suppress、引用防误触、混合消息 control span、Creative relevance、图片正反例、disabled/unreadable、预算、mandatory、Context 顺序、send/stream、Provider A/B、Builder failure、Cognition/Creative 字节隔离和 Direction Diversity Contract。
 
 Electron smoke 使用独立 `userData` 与 `TEEMO_ASSISTANT_DATA_DIR`，验证默认常规、强挑战、双窗口隔离、重启、Creative OFF、session command、one-shot，以及没有 Challenge/Director 持久化文件。视觉截图检查页面非空、控制区清楚且未遮挡原有内容。
 
@@ -110,7 +110,7 @@ Electron smoke 使用独立 `userData` 与 `TEEMO_ASSISTANT_DATA_DIR`，验证�
 ## 11. Known Risks
 
 - 命令与 relevance 是保守确定性规则，未来应使用真实设计对话样本建立 precision/recall benchmark。
-- Window-local runtime 不建立 Event Bus；同一历史 session 在不同 renderer 中仍各自 balanced/challenge，符合当前隔离要求。
+- Window-local runtime 不建立 Event Bus；同一历史 session 在不同 renderer 中仍各自 balanced/challenge，符合当前隔离要求。同一 renderer 内始终使用当前会话稳定 id；未知 identity 不共享状态。
 - Context Contract 能约束模型行为，但 P2-3 不以真实 Provider 的语义输出作为稳定自动化断言。
 
 ## 12. 审阅状态

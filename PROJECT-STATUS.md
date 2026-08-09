@@ -20,6 +20,7 @@
 - Agent Core 在 Creative 之后最小接入 Challenge Overlay；mandatory 约束、证据和 Direction Diversity Policy 不受 optional 内容裁剪，失败独立降级。
 - “Teemo 的设计判断”页新增评审模式控制，聊天输入区新增快速状态按钮；Creative OFF/unreadable 时控件禁用并 fail closed。
 - 三套 P2-3 专项测试、隔离 Electron 双窗口/重启 smoke、P1/P2-1/P2-2 全量回归、版本与语法检查均已通过；GPT 严格审阅待完成。详见 `docs/P2-3-CREATIVE-DIRECTOR.md`。
+- GPT 首轮审阅指出缺失 sessionId 的共享 fallback、复合命令整条跳过 Cognition 及引用误触两个边界；已移除 fallback，并引入 control span/remaining content 与引用防误触，专项测试通过，等待全量回归与复审。
 - 未实现 P2-4、P2-5、P3、Creative Calibration、GUI 自动化或 Multi-Agent；当前不得标记 PASS/CLOSED。
 
 ## P2-2 阶段（2026-08-09，CLOSED / PASS）

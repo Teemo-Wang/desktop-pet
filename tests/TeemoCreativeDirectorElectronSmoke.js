@@ -52,10 +52,21 @@ app.whenReady().then(async () => {
       get('TeemoDirectorIntensity').querySelector('[data-director-intensity="strong"]').click();
       await wait(30);
       if (!/挑战模式 · 强/.test(get('TeemoDirectorStatus').textContent)) throw new Error('strong Challenge status missing');
+      const sessionA = document.querySelector('[data-session].active').dataset.session;
+      get('newChatButton').click();
+      await wait(30);
+      const sessionB = document.querySelector('[data-session].active').dataset.session;
+      if (sessionA === sessionB) throw new Error('new conversation did not create a distinct session');
+      if (get('TeemoChallengeQuickLabel').textContent !== '常规') throw new Error('same renderer Session B inherited Challenge');
+      if (window.teemoCreativeDirectorState.getState(sessionB).mode !== 'balanced') throw new Error('Session B state must be balanced');
+      if (window.teemoCreativeDirectorState.getState(sessionA).mode !== 'challenge') throw new Error('Session A Challenge state was lost');
+      document.querySelector('[data-session="' + sessionA + '"]').click();
+      await wait(30);
+      if (!/挑战 · 强/.test(get('TeemoChallengeQuickLabel').textContent)) throw new Error('Session A strong state did not restore');
       get('TeemoCreativeBackButton').click();
       if (!/挑战 · 强/.test(get('TeemoChallengeQuickLabel').textContent)) throw new Error('quick Challenge status missing');
       get('TeemoCreativeButton').click();
-      return get('TeemoChallengeQuickLabel').textContent;
+      return { label: get('TeemoChallengeQuickLabel').textContent, sessionA, sessionB };
     })()`);
 
     const screenshotPath = process.env.TEEMO_DIRECTOR_SMOKE_SCREENSHOT;

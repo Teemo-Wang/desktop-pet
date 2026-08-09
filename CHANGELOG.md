@@ -6,7 +6,9 @@
 - 新增确定性 session/one-shot/exit/suppress 命令解析，以及最多 900 字符的 Provider-neutral Challenge Overlay。
 - Challenge mandatory policy 固定用户/项目/Skill 优先级、证据边界和 Direction Diversity Contract；Creative disabled/unreadable 或 Builder 失败时安全降级。
 - 扩展“Teemo 的设计判断”页面和聊天快速状态按钮；双窗口、重启、Creative OFF 和 one-shot 隔离 smoke 通过。
-- Challenge 运行时控制语句在 Cognition Collector 前明确跳过，避免 mode/intensity 指令污染个人认知；普通内容的既有收集规则不变。
+- 纯 Challenge 运行时控制语句在 Cognition Collector 前明确跳过，避免 mode/intensity 指令污染个人认知；普通内容的既有收集规则不变。
+- GPT 首轮审阅后移除缺失 sessionId 的 renderer 共享状态 fallback；未知 identity fail balanced，one-shot 仅当前 Run 生效。
+- 命令解析新增 control span/remaining content：纯控制语句零写入，复合消息保留实质认知内容，引用/翻译/解释控制短语不改变状态；send/stream 与同 renderer Session A/B 均补充回归。
 - 新增 `test:creative-director`、`test:challenge-context`、`test:creative-director-ui-smoke`；完整回归、三个 Electron UI smoke、版本与语法检查已通过，版本仍为 1.2.1，等待 GPT 审阅。
 
 ## v1.2.1 - 2026-08-09

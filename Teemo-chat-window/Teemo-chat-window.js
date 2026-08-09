@@ -1008,6 +1008,7 @@
   }
 
   function directorAvailability() {
+    if (!activeDirectorSessionId()) return { available: false, message: '请先创建或选择一个对话' };
     if (!creativeProfileService) return { available: false, message: 'Teemo 设计判断暂不可用' };
     try {
       const snapshot = creativeProfileService.getManagementSnapshot();

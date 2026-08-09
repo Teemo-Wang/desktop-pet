@@ -25,24 +25,30 @@
       this.sessions = new Map();
     }
 
-    _key(sessionId) { return String(sessionId || '__renderer__'); }
+    _key(sessionId) {
+      if (sessionId == null || String(sessionId).trim() === '') return null;
+      return String(sessionId);
+    }
 
     _default() {
       return { schemaVersion: 1, mode: 'balanced', intensity: 'standard', source: 'default', updatedAt: null };
     }
 
     getState(sessionId) {
-      return clone(this.sessions.get(this._key(sessionId)) || this._default());
+      const key = this._key(sessionId);
+      return clone((key && this.sessions.get(key)) || this._default());
     }
 
     setMode(sessionId, mode, options = {}) {
+      const key = this._key(sessionId);
+      if (!key) return { ok: false, code: 'MISSING_CHALLENGE_SESSION_ID', state: this._default() };
       if (!Policy.MODES.has(mode)) return { ok: false, code: 'INVALID_CHALLENGE_MODE', state: this.getState(sessionId) };
       const intensity = options.intensity || this.getState(sessionId).intensity || 'standard';
       const source = options.source || 'ui';
       if (!Policy.INTENSITIES.has(intensity)) return { ok: false, code: 'INVALID_CHALLENGE_INTENSITY', state: this.getState(sessionId) };
       if (!Policy.SOURCES.has(source)) return { ok: false, code: 'INVALID_CHALLENGE_SOURCE', state: this.getState(sessionId) };
       const state = { schemaVersion: 1, mode, intensity, source, updatedAt: this.clock().toISOString() };
-      this.sessions.set(this._key(sessionId), state);
+      this.sessions.set(key, state);
       return { ok: true, state: clone(state) };
     }
 
@@ -52,7 +58,8 @@
     }
 
     clearSession(sessionId) {
-      this.sessions.delete(this._key(sessionId));
+      const key = this._key(sessionId);
+      if (key) this.sessions.delete(key);
       return this.getState(sessionId);
     }
 
@@ -62,6 +69,7 @@
 
     resolveRun(options = {}) {
       const sessionId = options.sessionId || null;
+      const hasSession = Boolean(this._key(sessionId));
       const command = this.parseCommand(options);
       let session = this.getState(sessionId);
       let effectiveMode = session.mode;
@@ -69,23 +77,28 @@
       let oneShot = false;
 
       if (command.type === 'session_exit') {
-        session = this.setMode(sessionId, 'balanced', { intensity: 'standard', source: 'explicit_command' }).state;
+        if (hasSession) session = this.setMode(sessionId, 'balanced', { intensity: 'standard', source: 'explicit_command' }).state;
         effectiveMode = 'balanced';
         effectiveIntensity = 'standard';
       } else if (command.type === 'one_shot_suppress') {
         effectiveMode = 'balanced';
         oneShot = true;
       } else if (command.type === 'session_activate') {
-        session = this.setMode(sessionId, 'challenge', { intensity: command.intensity, source: 'explicit_command' }).state;
-        effectiveMode = 'challenge';
-        effectiveIntensity = session.intensity;
+        if (hasSession) {
+          session = this.setMode(sessionId, 'challenge', { intensity: command.intensity, source: 'explicit_command' }).state;
+          effectiveMode = 'challenge';
+          effectiveIntensity = session.intensity;
+        } else {
+          effectiveMode = 'balanced';
+          effectiveIntensity = 'standard';
+        }
       } else if (command.type === 'one_shot_challenge') {
         effectiveMode = 'challenge';
         effectiveIntensity = command.intensity || session.intensity || 'standard';
         oneShot = true;
       }
 
-      return { sessionId, session, command, effectiveMode, effectiveIntensity, oneShot };
+      return { sessionId, hasSession, session, command, effectiveMode, effectiveIntensity, oneShot };
     }
   }
 
