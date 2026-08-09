@@ -1,5 +1,9 @@
 # Changelog
 
+## Teemo Release Update Policy - 2026-08-09
+- 新版本在后台下载完成后直接静默安装并强制重启 Teemo 助理，不再等待“稍后”确认。
+- 新增 `test:auto-update`，锁定自动下载、退出时安装和下载完成后自动重启策略。
+
 ## P2 Personal Intelligence Final Acceptance - 2026-08-09（CLOSED / PASS）
 
 - P2-1 至 P2-5 全部关闭并保留独立 recovery tag；P1 与既有 P2 tag 均验证未移动。

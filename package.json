@@ -7,6 +7,7 @@
   "scripts": {
     "start": "electron .",
     "verify:release-version": "node scripts/TeemoVerifyReleaseVersion.js",
+    "test:auto-update": "node tests/TeemoAutoUpdatePolicy.test.js",
     "test:agent-core": "node tests/TeemoAgentCore.test.js",
     "test:cognition": "node tests/TeemoCognition.test.js",
     "test:cognition-management": "node tests/TeemoCognitionManagement.test.js",

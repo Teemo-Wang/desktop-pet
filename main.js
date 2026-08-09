@@ -207,7 +207,7 @@ try { autoUpdater = require('electron-updater').autoUpdater; } catch (e) { /* �
 
 /**
  * 检查并应用更新：从 GitHub Releases 拉取新版本，
- * 静默下载，下载完成后提示用户重启以应用（保证跟随发布者更新）。
+ * 静默下载，下载完成后自动安装并重启（保证跟随发布者更新）。
  */
 function setupAutoUpdate() {
   if (!autoUpdater || !app.isPackaged) return;
@@ -216,20 +216,13 @@ function setupAutoUpdate() {
   autoUpdater.on('update-available', (info) => {
     console.log('[update] 发现新版本:', info && info.version);
   });
-  autoUpdater.on('update-downloaded', async (info) => {
+  autoUpdater.on('update-downloaded', (info) => {
     console.log('[update] 新版本已下载:', info && info.version);
     try {
-      const { response } = await dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        buttons: ['立即重启更新', '稍后'],
-        defaultId: 0,
-        cancelId: 1,
-        title: '发现新版本',
-        message: `Teemo助理 ${info && info.version} 已下载完成`,
-        detail: '重启后即可使用最新版本（含最新的机器人规则与能力）。',
-      });
-      if (response === 0) autoUpdater.quitAndInstall();
-    } catch (e) { /* 忽略 */ }
+      autoUpdater.quitAndInstall(true, true);
+    } catch (e) {
+      console.warn('[update] 自动安装失败:', e && e.message);
+    }
   });
   autoUpdater.on('error', (err) => console.warn('[update] 检查更新失败:', err && err.message));
   // 启动后延迟检查，避免拖慢冷启动
