@@ -1,0 +1,22 @@
+const assert = require('assert');
+const SessionState = require('../src/skills/TeemoSkillSessionState');
+
+const state = new SessionState();
+const route = { selectedSkillIds: ['poster'], type: 'single_skill' };
+assert.equal(state.get('new'), null);
+assert.equal(state.set(null, route), null);
+assert.equal(state.get(null), null);
+state.set('a', route);
+assert.deepEqual(state.get('a').selectedSkillIds, ['poster']);
+assert.equal(state.get('b'), null);
+state.set('b', { selectedSkillIds: ['brand'] }, { explicit: true });
+assert.deepEqual(state.get('b').selectedSkillIds, ['brand']);
+assert.equal(state.get('b').explicit, true);
+state.clear('a');
+assert.equal(state.get('a'), null);
+assert.deepEqual(state.get('b').selectedSkillIds, ['brand']);
+state.clearAll();
+assert.equal(state.get('b'), null);
+const restarted = new SessionState();
+assert.equal(restarted.get('b'), null, 'runtime state must reset on restart');
+console.log('TeemoSkillSession.test: PASS');

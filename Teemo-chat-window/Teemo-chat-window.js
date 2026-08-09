@@ -63,6 +63,20 @@
   window.teemoGitClient = gitClient;
   window.teemoExecuteClient = executeClient;
   window.teemoToolRegistry = toolRegistry;
+  const skillManifestService = window.TeemoSkillManifestService ? new window.TeemoSkillManifestService({ skillService: skills }) : null;
+  const skillSessionState = window.TeemoSkillSessionState ? new window.TeemoSkillSessionState() : null;
+  const skillRouter = window.TeemoSkillRouter && skillManifestService ? new window.TeemoSkillRouter({
+    manifestService: skillManifestService,
+    sessionState: skillSessionState,
+    toolRegistry,
+  }) : null;
+  const skillComposer = window.TeemoSkillComposer && skillManifestService
+    ? new window.TeemoSkillComposer({ manifestService: skillManifestService })
+    : null;
+  window.skillManifestService = skillManifestService;
+  window.skillSessionState = skillSessionState;
+  window.skillRouter = skillRouter;
+  window.skillComposer = skillComposer;
   const agentCore = window.TeemoAgentCore ? new window.TeemoAgentCore({
     aiService: ai,
     contextBuilder,
@@ -70,6 +84,8 @@
     challengeContextBuilder,
     cognitionCollector,
     toolRegistry,
+    skillRouter,
+    skillComposer,
   }) : null;
   const ruleCapture = window.RuleCaptureService ? new window.RuleCaptureService(skills, ai) : null;
   const comfyui = new window.TeemoComfyUIService(store);
@@ -2034,6 +2050,29 @@
     </div>`;
   }
 
+  function routingEditorFields(manifest, revision) {
+    if (!manifest) return '';
+    const routing = manifest.routing;
+    return `<details class="teemo-skill-routing-editor" data-routing-skill="${escapeHtml(manifest.skillId)}" data-routing-revision="${revision}">
+      <summary>Routing Metadata · ${escapeHtml(routing.status)} · ${escapeHtml(routing.role)}</summary>
+      <div class="teemo-routing-grid">
+        <label><span>Auto Routing</span><select data-route-field="status"><option value="ready" ${routing.status === 'ready' ? 'selected' : ''}>Ready</option><option value="needs_review" ${routing.status === 'needs_review' ? 'selected' : ''}>Needs Review</option><option value="disabled" ${routing.status === 'disabled' ? 'selected' : ''}>Disabled</option></select></label>
+        <label><span>Role</span><select data-route-field="role">${['task', 'domain', 'brand', 'utility'].map(role => `<option value="${role}" ${routing.role === role ? 'selected' : ''}>${role}</option>`).join('')}</select></label>
+        <label class="teemo-form-wide"><span>Aliases</span><input data-route-field="aliases" value="${escapeHtml((routing.aliases || []).join(', '))}"></label>
+        <label class="teemo-form-wide"><span>Intents</span><textarea data-route-field="intents" rows="2">${escapeHtml((routing.intents || []).join('\n'))}</textarea></label>
+        <label class="teemo-form-wide"><span>Domains</span><input data-route-field="domains" value="${escapeHtml((routing.domains || []).join(', '))}"></label>
+        <label><span>Input Modality</span><input data-route-field="inputModalities" value="${escapeHtml((manifest.modalities.input || []).join(', '))}"></label>
+        <label><span>Sensitivity</span><select data-route-field="sensitivity">${['general', 'sensitive', 'adult', 'unknown'].map(value => `<option value="${value}" ${manifest.content.sensitivity === value ? 'selected' : ''}>${value}</option>`).join('')}</select></label>
+        <label class="teemo-form-wide"><span>Positive Examples</span><textarea data-route-field="positiveExamples" rows="2">${escapeHtml((routing.positiveExamples || []).join('\n'))}</textarea></label>
+        <label class="teemo-form-wide"><span>Negative Examples</span><textarea data-route-field="negativeExamples" rows="2">${escapeHtml((routing.negativeExamples || []).join('\n'))}</textarea></label>
+        <label class="teemo-form-wide"><span>Exclusions</span><textarea data-route-field="exclusions" rows="2">${escapeHtml((routing.exclusions || []).join('\n'))}</textarea></label>
+        <label class="teemo-routing-check"><input data-route-field="allowComposition" type="checkbox" ${routing.allowComposition ? 'checked' : ''}> 允许多 Skill 组合</label>
+        <label class="teemo-routing-check"><input data-route-field="continuity" type="checkbox" ${routing.continuity ? 'checked' : ''}> 允许同会话连续使用</label>
+        <div class="teemo-form-wide teemo-card-actions"><button class="teemo-secondary-button" data-route-reset type="button">重置 Routing Override</button><button class="teemo-primary-button" data-route-save type="button">保存 Routing Metadata</button></div>
+      </div>
+    </details>`;
+  }
+
   function bindSkillEditorEvents() {
     const addBtn = document.getElementById('addSkillButton');
     const cancelBtn = document.getElementById('cancelSkillEditButton');
@@ -2118,6 +2157,8 @@
     const existingUngrouped = els.skillList.querySelector('.teemo-skill-group-ungrouped');
     if (existingUngrouped) ungroupedSkillGroupOpen = existingUngrouped.open;
     const all = skills.getAll();
+    const registry = skillManifestService && skillManifestService.reload ? skillManifestService.reload() : { ok: false, skills: [] };
+    const manifests = new Map((registry.skills || []).map(item => [item.skillId, item]));
     const groups = typeof skills.getGroups === 'function' ? skills.getGroups() : [];
     const createBlock = creatingSkill
       ? `<div class="teemo-skill-item expanded creating">
@@ -2132,6 +2173,7 @@
     const groupOptions = groups.map(group => `<option value="${escapeHtml(group.id)}">${escapeHtml(group.name)}</option>`).join('');
     const skillRow = skill => {
       const expanded = !creatingSkill && selectedSkillId === skill.id;
+      const manifest = manifests.get(String(skill.id));
       const values = expanded
         ? {
           name: skill.name || '',
@@ -2144,7 +2186,7 @@
       return `<div class="teemo-skill-item ${expanded ? 'expanded' : ''}" data-skill-id="${escapeHtml(skill.id)}">
         <div class="teemo-skill-row ${expanded ? 'selected' : ''}" data-skill-edit="${escapeHtml(skill.id)}">
           <div class="teemo-skill-row-icon">${escapeHtml(skill.icon || '⭐')}</div>
-          <div class="teemo-skill-row-copy"><strong>${escapeHtml(skill.name)}</strong><span>${escapeHtml(skill.desc || (skill.id === 'skill1' ? '机器人当前回复规则' : '自定义 Skill'))}</span></div>
+          <div class="teemo-skill-row-copy"><strong>${escapeHtml(skill.name)}</strong><span>${escapeHtml(skill.desc || (skill.id === 'skill1' ? '机器人当前回复规则' : '自定义 Skill'))}</span>${manifest ? `<em>${manifest.routing.status === 'needs_review' ? '路由信息待完善' : `Auto Routing · ${manifest.routing.status}`} · ${manifest.routing.role}</em>` : ''}</div>
           <label class="teemo-skill-group-picker" title="移动到分组">
             <span>分组</span>
             <select data-skill-group="${escapeHtml(skill.id)}">
@@ -2156,7 +2198,7 @@
           <button class="teemo-skill-export" data-skill-export="${escapeHtml(skill.id)}" type="button" title="下载为可重新导入的 Markdown 文件">导出</button>
           ${skill.custom ? `<button class="teemo-skill-delete" data-skill-delete="${escapeHtml(skill.id)}" type="button">删除</button>` : ''}
         </div>
-        ${expanded ? skillEditorFields(values) : ''}
+        ${expanded ? routingEditorFields(manifest, registry.revision) + skillEditorFields(values) : ''}
       </div>`;
 
     };
@@ -2182,7 +2224,7 @@
     </details>`;
     const listHtml = (groups.length ? groupedHtml : '') + ungroupedHtml;
 
-    els.skillList.innerHTML = createBlock + listHtml;
+    els.skillList.innerHTML = (registry.ok === false ? '<div class="teemo-skill-routing-error">Skill 路由数据无法读取。自动路由已关闭，普通聊天不受影响。</div>' : '') + createBlock + listHtml;
 
     els.skillList.querySelectorAll('[data-skill-group-section]').forEach(section => {
       section.addEventListener('toggle', () => {
@@ -2365,6 +2407,46 @@
       });
     });
 
+    els.skillList.querySelectorAll('[data-route-save]').forEach(button => {
+      button.addEventListener('click', event => {
+        event.stopPropagation();
+        const editor = button.closest('[data-routing-skill]');
+        const readList = field => String(editor.querySelector(`[data-route-field="${field}"]`)?.value || '').split(/[\n,，]/).map(item => item.trim()).filter(Boolean);
+        try {
+          skillManifestService.updateRoutingOverride(editor.dataset.routingSkill, {
+            status: editor.querySelector('[data-route-field="status"]').value,
+            role: editor.querySelector('[data-route-field="role"]').value,
+            aliases: readList('aliases'), intents: readList('intents'), domains: readList('domains'),
+            inputModalities: readList('inputModalities'), sensitivity: editor.querySelector('[data-route-field="sensitivity"]').value,
+            positiveExamples: readList('positiveExamples'), negativeExamples: readList('negativeExamples'), exclusions: readList('exclusions'),
+            allowComposition: editor.querySelector('[data-route-field="allowComposition"]').checked,
+            continuity: editor.querySelector('[data-route-field="continuity"]').checked,
+          }, Number(editor.dataset.routingRevision));
+          renderSkills();
+          els.skillSaveStatus.style.color = '';
+          els.skillSaveStatus.textContent = 'Routing Metadata 已保存；Raw Skill 未修改';
+        } catch (error) {
+          els.skillSaveStatus.style.color = '#e58b8b';
+          els.skillSaveStatus.textContent = error.code === 'SKILL_REGISTRY_CHANGED' ? '另一窗口已修改，请重新载入后再保存' : `Routing 保存失败：${error.message || error}`;
+        }
+      });
+    });
+    els.skillList.querySelectorAll('[data-route-reset]').forEach(button => {
+      button.addEventListener('click', event => {
+        event.stopPropagation();
+        const editor = button.closest('[data-routing-skill]');
+        try {
+          skillManifestService.resetRoutingOverride(editor.dataset.routingSkill, Number(editor.dataset.routingRevision));
+          renderSkills();
+          els.skillSaveStatus.style.color = '';
+          els.skillSaveStatus.textContent = 'Routing Override 已重置；Raw Skill 未修改';
+        } catch (error) {
+          els.skillSaveStatus.style.color = '#e58b8b';
+          els.skillSaveStatus.textContent = error.code === 'SKILL_REGISTRY_CHANGED' ? '另一窗口已修改，请重新载入后再重置' : `Routing 重置失败：${error.message || error}`;
+        }
+      });
+    });
+
     if (creatingSkill || selectedSkillId) bindSkillEditorEvents();
   }
 
@@ -2508,11 +2590,27 @@
     return base + sections.join('');
   }
 
+  function attachmentModality(attachment) {
+    if (attachment && ['image', 'video', 'audio'].includes(attachment.kind)) return attachment.kind;
+    const extension = path.extname(String(attachment && attachment.name || '')).toLowerCase();
+    if (extension === '.pdf') return 'pdf';
+    if (['.xls', '.xlsx', '.csv', '.tsv'].includes(extension)) return 'spreadsheet';
+    if (['.ppt', '.pptx'].includes(extension)) return 'slides';
+    if (['.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.c', '.cpp', '.h', '.sql', '.sh', '.ps1'].includes(extension)) return 'code';
+    return attachment && attachment.kind === 'document' ? 'document' : 'unknown';
+  }
+
   async function buildComfyPrompt(userText) {
     if (comfyui.isBareImageCommand(userText)) return userText;
-    const relevant = skills.findRelevantSkill(userText);
+    let routedSkillContext = '';
+    try {
+      const active = history.getActive();
+      const route = skillRouter && skillRouter.route({ text: userText, modalities: ['text'], sessionId: active && active.id || null });
+      const composed = route && route.selectedSkillIds.length && skillComposer && skillComposer.compose(route);
+      routedSkillContext = composed && composed.systemMessage && composed.systemMessage.content || '';
+    } catch (_) { /* Skill routing is optional; image generation continues. */ }
     const rules = [
-      relevant && relevant.systemPrompt ? `【相关 Skill：${relevant.name}】\n${relevant.systemPrompt}` : '',
+      routedSkillContext,
       skills.getRules() || '',
     ].filter(Boolean).join('\n\n').slice(0, 2400);
     if (ai.useMock) return userText;
@@ -2559,6 +2657,28 @@
       return { display: stored, stored };
     }
     return { display: `${prefix}\n\n[图片]`, stored: `${prefix}\n\n[图片]` };
+  }
+
+  function renderSkillRouteIndicator(messageElement, route) {
+    if (!messageElement || !route) return;
+    const old = messageElement.querySelector('.teemo-skill-route-chip');
+    if (old) old.remove();
+    const selected = Array.isArray(route.selectedSkillIds) ? route.selectedSkillIds : [];
+    const ambiguous = Array.isArray(route.ambiguousCandidates) ? route.ambiguousCandidates : [];
+    if (!selected.length && !ambiguous.length) return;
+    const names = selected.map(id => {
+      const manifest = skillManifestService && skillManifestService.getSkillManifest(id);
+      return manifest ? manifest.name : id;
+    });
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'teemo-skill-route-chip';
+    chip.textContent = names.length ? `${names.length > 1 ? 'Skills' : 'Skill'} · ${names.join(' + ')}` : '未自动启用 Skill';
+    const reasons = (route.reasons || []).map(item => item && item.code || item).filter(Boolean);
+    chip.title = names.length
+      ? `命中原因：${reasons.join('、') || '明确选择'}；置信度：${route.confidence === 'high' ? '高' : '中'}`
+      : '存在多个相近候选，未自动启用 Skill';
+    messageElement.insertBefore(chip, messageElement.firstChild);
   }
 
   async function sendMessage() {
@@ -2695,35 +2815,6 @@
         apiMessages[lastUserIndex] = { role: 'user', content: requestText };
       }
 
-      // 用户提到某个 Skill 时自动注入。插到最后一条 user 前，避免超长 Skill 被网关从头部截掉。
-      if (typeof skills.reload === 'function') skills.reload();
-      const relevantSkill = skills.findRelevantSkill(text)
-        || skills.findRelevantSkill(requestText);
-      if (relevantSkill && relevantSkill.systemPrompt) {
-        const skillBlock = {
-          role: 'system',
-          content: [
-            `【强制应用已上传 Skill：${relevantSkill.name}】`,
-            '下面就是用户所说规则的完整原文（本地 Skill，不是让你编造）。',
-            '禁止回复“没有定义 / 请发原文 / 请发链接”。请严格按下列 Skill 完成本次回答：',
-            '',
-            String(relevantSkill.systemPrompt),
-          ].join('\n'),
-        };
-        let insertAt = apiMessages.length;
-        for (let i = apiMessages.length - 1; i >= 0; i--) {
-          if (apiMessages[i] && apiMessages[i].role === 'user') {
-            insertAt = i;
-            break;
-          }
-        }
-        apiMessages.splice(insertAt, 0, skillBlock);
-        setStatus(`已应用 Skill：${relevantSkill.name}`);
-        article.hidden = false;
-        body.classList.remove('teemo-thinking');
-        body.textContent = `已加载 Skill：${relevantSkill.name}，正在生成…`;
-      }
-
       // 用户明确要新增 Skill / 记住规则时，要求模型输出可落库格式。
       if (ruleCapture && (
         ruleCapture._wantsNewSkill(text)
@@ -2830,6 +2921,7 @@
             messages: apiMessages,
             sessionId: active.id || null,
             userMessage: text || displayText,
+            modalities: attachments.length ? [...new Set(attachments.map(attachmentModality))] : ['text'],
             signal: abortController.signal,
             disableActionContract: true,
             onChunk,
@@ -2839,6 +2931,7 @@
             throw new Error(agentResult.error.message);
           }
           completedChallengeContext = agentResult.run && agentResult.run.challengeContext;
+          renderSkillRouteIndicator(article, agentResult.run && agentResult.run.skillRouting);
           full = agentResult.content;
         } else {
           full = await ai.stream(apiMessages, onChunk, abortController.signal);

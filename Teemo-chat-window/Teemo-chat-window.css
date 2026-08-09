@@ -848,3 +848,32 @@ button { color: inherit; }
   .teemo-creative-domain-detail { grid-template-columns: 150px minmax(0,1fr); }
   .teemo-director-panel { grid-template-columns: 1fr; gap: 16px; }
 }
+.teemo-skill-route-chip {
+  display: block;
+  max-width: 100%;
+  margin: 0 0 6px;
+  padding: 4px 7px;
+  overflow: hidden;
+  border: 1px solid rgba(73, 144, 226, 0.32);
+  border-radius: 6px;
+  background: rgba(73, 144, 226, 0.1);
+  color: #8dbbff;
+  font: inherit;
+  font-size: 10px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: help;
+}
+.teemo-skill-row-copy em { display: block; margin-top: 3px; color: #7298c8; font-size: 9px; font-style: normal; }
+.teemo-skill-routing-error { margin: 0 0 10px; padding: 8px; border: 1px solid rgba(229, 139, 139, .28); border-radius: 6px; background: rgba(229, 139, 139, .08); color: #e58b8b; font-size: 10px; }
+.teemo-skill-routing-editor { margin: 0 12px 12px; padding: 9px; border: 1px solid rgba(73, 144, 226, .22); border-radius: 6px; background: rgba(73, 144, 226, .06); }
+.teemo-skill-routing-editor summary { color: #8dbbff; font-size: 10px; font-weight: 600; cursor: pointer; }
+.teemo-routing-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding-top: 9px; }
+.teemo-routing-grid label { min-width: 0; }
+.teemo-routing-grid label span { display: block; margin-bottom: 4px; color: #999; font-size: 9px; }
+.teemo-routing-grid input,
+.teemo-routing-grid select,
+.teemo-routing-grid textarea { box-sizing: border-box; width: 100%; border: 1px solid #3a3a3a; border-radius: 5px; background: #222; color: #eee; font: inherit; font-size: 10px; }
+.teemo-routing-grid .teemo-routing-check { display: flex; align-items: center; gap: 5px; color: #aaa; font-size: 9px; }
+.teemo-routing-grid .teemo-routing-check input { width: auto; }

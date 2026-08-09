@@ -1,6 +1,6 @@
 # Teemo助理 — 项目进度与规划
 
-> 文档版本：v1.21 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.2.1（P2 Personal Intelligence IN PROGRESS）**
+> 文档版本：v1.22 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.2.1（P2 Personal Intelligence IN PROGRESS）**
 
 ## 当前状态
 
@@ -10,10 +10,20 @@
 - P0：`CLOSED`
 - P1：`CLOSED / PASS / BLOCKERS: 0`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
-- Current Development：`P2-4 Cognition Intelligence IMPLEMENTED / WAITING REVIEW`
+- Current Development：`P2-5 Skill Intelligence IMPLEMENTED / WAITING REVIEW`
 - Current Branch：`Teemo/p2-personal-intelligence`
 
-## P2-4 阶段（2026-08-09，IMPLEMENTED / WAITING REVIEW）
+## P2-5 阶段（2026-08-09，IMPLEMENTED / WAITING REVIEW）
+
+- 建立 Teemo Skill Specification v1，Raw Skill 与 Internal Manifest 永久分离；导入 Markdown 原文保存在 `rawSource`，Registry 独立使用 `Teemo-skill-registry.json`。
+- 新增 deterministic、Provider-neutral Router、Composer、Validator、Importer、Manifest Service 和 runtime-only Session State；不使用 LLM、Embedding 或 Vector DB。
+- 不确定时正常 `NO_SKILL`；同 role 相近候选 ambiguous；Project 只增强；required tool 只读检查且 Router 不执行 Tool、不申请 Permission。
+- 自动组合最多 3 个且每 role 最多 1 个；Agent 实际顺序保持 Skill < Cognition < Creative < Challenge < Current User，失败独立降级且不 fail open。
+- 复用两个现有 Skill UI 增加 Routing Metadata override 和轻量聊天 Skill chip；override、重启和 Registry 读取均不修改 Raw Skill。
+- 8 组专项测试、32 条 benchmark、隔离 Electron smoke 已通过；完整 P1/P2 回归与 GPT strict review 待完成。详见 `docs/P2-5-SKILL-INTELLIGENCE.md`。
+- GPT PASS 前不创建 `v1.2.1-p2.5-skill-intelligence`；P2-5 PASS 后只进入 P2 Final Acceptance，不进入 P3。
+
+## P2-4 阶段（2026-08-09，CLOSED / PASS）
 
 - 新增独立、确定性、Provider-neutral 的 Cognition Intelligence 层；Cognition 顶层 schema 仍为 v2，旧文件无 read-time migration。
 - 新增 composite identity、exact dedup、evidence natural days、Recent freshness、effective confidence、明确冲突与 promotion eligibility。
@@ -21,7 +31,7 @@
 - Context 保持 5200 字符预算，按 Current Project > Relevant Recent > Relevant Profile 排序；stale Recent 默认排除，跨 project 严格隔离。
 - Cognition 以不可信 JSON data block 注入；role-like text 不获得指令权限。Memory Center 增加状态、有效可信度、最后确认和证据次数。
 - 四套 P2-4 专项测试、两套 Cognition Electron smoke 和 P1/P2-1/P2-2/P2-3 全量回归已通过，正式用户数据零触碰。详见 `docs/P2-4-COGNITION-INTELLIGENCE.md`。
-- 当前等待 GPT strict review；未标记 PASS/CLOSED，未创建 P2-4 recovery tag，未开发 P2-5 或 P3。
+- GPT 最终确认 `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P2-5`；恢复标签为 `v1.2.1-p2.4-cognition-intelligence`。
 - GPT 首轮 Gate 为 `FAIL / BLOCKERS: 3`；已修显式跨项目 scope 覆盖和 single Profile 无关注入，并统一 Management/Collector 文件锁；待本地 patch/test evidence 复审。
 - GPT 第二轮源码复审指出 Manual Recent promotion、anchor 一对多 correction 和 broad design-domain 准入 3 个 blocker；已按最小规则修复并补正反/send/stream 测试，待复审。
 

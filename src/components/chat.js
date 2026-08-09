@@ -583,12 +583,36 @@
           this.streamAbortCtrl = new AbortController();
           try {
             let acc = '';
-            await window.aiService.stream(apiMessages, (chunk, full) => {
+            const onMediaChunk = (chunk, full) => {
               if (placeholder.wrap.classList.contains('msg-typing')) placeholder.wrap.classList.remove('msg-typing');
               acc = full;
               placeholder.body.innerHTML = window.Markdown.render(full);
               this.msgs.scrollTop = this.msgs.scrollHeight;
-            }, this.streamAbortCtrl.signal);
+            };
+            const agentCore = window.agentCore;
+            if (agentCore && typeof agentCore.runStream === 'function') {
+              const project = typeof this.getProjectContext === 'function' ? this.getProjectContext() : null;
+              const modalities = [...new Set([
+                ...imageDataList.map(() => 'image'),
+                ...videoDataList.map(() => 'video'),
+              ])];
+              const result = await agentCore.runStream({
+                messages: apiMessages,
+                sessionId: active.id || null,
+                userMessage: t || (videoDataList.length ? '请分析这段视频' : '请分析这张图片'),
+                modalities,
+                projectId: project && project.projectId,
+                projectContext: project,
+                signal: this.streamAbortCtrl.signal,
+                disableActionContract: true,
+                onChunk: onMediaChunk,
+              });
+              if (!result.ok) throw new Error(result.error && result.error.message || 'Agent Core 处理失败');
+              acc = result.content || acc;
+              this._renderSkillRouteIndicator(placeholder.wrap, result.run && result.run.skillRouting);
+            } else {
+              await window.aiService.stream(apiMessages, onMediaChunk, this.streamAbortCtrl.signal);
+            }
             assistantMsg.content = acc || '⚠️ 模型无响应';
             this.history.updateLastMessage(assistantMsg.content);
             this.history.flush();
@@ -845,6 +869,28 @@
       return results;
     }
 
+    _renderSkillRouteIndicator(messageElement, route) {
+      if (!messageElement || !route) return;
+      const old = messageElement.querySelector('.teemo-skill-route-chip');
+      if (old) old.remove();
+      const selected = Array.isArray(route.selectedSkillIds) ? route.selectedSkillIds : [];
+      const ambiguous = Array.isArray(route.ambiguousCandidates) ? route.ambiguousCandidates : [];
+      if (!selected.length && !ambiguous.length) return;
+      const names = selected.map(id => {
+        const manifest = window.skillManifestService && window.skillManifestService.getSkillManifest(id);
+        return manifest ? manifest.name : id;
+      });
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'teemo-skill-route-chip';
+      chip.textContent = names.length ? `${names.length > 1 ? 'Skills' : 'Skill'} · ${names.join(' + ')}` : '未自动启用 Skill';
+      const reasons = (route.reasons || []).map(item => item && item.code || item).filter(Boolean);
+      chip.title = names.length
+        ? `命中原因：${reasons.join('、') || '明确选择'}；置信度：${route.confidence === 'high' ? '高' : '中'}`
+        : '存在多个相近候选，未自动启用 Skill';
+      messageElement.insertBefore(chip, messageElement.firstChild);
+    }
+
     /**
      * 发送给 AI 并流式渲染回复
      * @param {string} displayText - 用户气泡显示的文本
@@ -898,20 +944,6 @@
           if (lastUserIdx >= 0) apiMessages[lastUserIdx] = { role: 'user', content: finalPrompt };
         }
 
-        // 技能自动加载：命中用户点到的技能 → 注入其内容，让本次回答严格应用该技能
-        let _loadedSkill = null;
-        try {
-          _loadedSkill = window.skillService && window.skillService.findRelevantSkill && window.skillService.findRelevantSkill(finalPrompt);
-          if (_loadedSkill && _loadedSkill.systemPrompt) {
-            apiMessages.unshift({
-              role: 'system',
-              content: `【已加载技能：${_loadedSkill.name}】本次回答请严格应用以下技能的规范、方法与约束（优先级高于其它默认设定）：\n\n${_loadedSkill.systemPrompt}`,
-            });
-            console.warn('[chat.sendToAI] 已加载技能: ' + _loadedSkill.name);
-            try { placeholder.body.innerHTML = window.Markdown.render(`🎯 已应用技能「${_loadedSkill.name}」，生成中…`); } catch (e) {}
-          }
-        } catch (e) { /* 匹配失败不影响正常对话 */ }
-
         const captureSvc = window.ruleCaptureService;
         if (captureSvc && (
           captureSvc._wantsNewSkill(displayText)
@@ -958,6 +990,7 @@
             if (agentResult.error.cancelled) throw new DOMException('已停止生成', 'AbortError');
             throw new Error(agentResult.error.message);
           }
+          this._renderSkillRouteIndicator(placeholder.wrap, agentResult.run && agentResult.run.skillRouting);
           acc = agentResult.content || acc;
         } else {
           await window.aiService.stream(apiMessages, onChunk, this.streamAbortCtrl.signal);

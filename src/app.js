@@ -26,6 +26,15 @@
   window.TeemoFileTools.register(window.teemoToolRegistry, { fileClient: window.teemoFileClient });
   window.TeemoGitTools.register(window.teemoToolRegistry, { gitClient: window.teemoGitClient });
   window.TeemoExecuteTools.register(window.teemoToolRegistry, { executeClient: window.teemoExecuteClient });
+  const skillService = new window.SkillService();
+  window.skillManifestService = new window.TeemoSkillManifestService({ skillService });
+  window.skillSessionState = new window.TeemoSkillSessionState();
+  window.skillRouter = new window.TeemoSkillRouter({
+    manifestService: window.skillManifestService,
+    sessionState: window.skillSessionState,
+    toolRegistry: window.teemoToolRegistry,
+  });
+  window.skillComposer = new window.TeemoSkillComposer({ manifestService: window.skillManifestService });
   window.agentCore = new window.TeemoAgentCore({
     aiService: window.aiService,
     contextBuilder: window.contextBuilder,
@@ -33,6 +42,8 @@
     challengeContextBuilder: window.challengeContextBuilder,
     cognitionCollector: window.cognitionCollector,
     toolRegistry: window.teemoToolRegistry,
+    skillRouter: window.skillRouter,
+    skillComposer: window.skillComposer,
   });
   const dtService = new window.DingTalkService();
   const yqService = new window.YuqueService();
@@ -44,7 +55,6 @@
   const dtAI = new window.DingTalkAIService();
   const materialService = new window.MaterialService(store);
   window.materialService = materialService; // 供 material-card 拉取鉴权缩略图
-  const skillService = new window.SkillService();
   const ruleCaptureService = new window.RuleCaptureService(skillService, window.aiService);
   const projectService = new window.ProjectService();
   const visualGenService = new window.VisualGenService();

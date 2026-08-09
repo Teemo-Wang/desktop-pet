@@ -83,6 +83,8 @@
       this.creativeContextBuilder = options.creativeContextBuilder || null;
       this.challengeContextBuilder = options.challengeContextBuilder || null;
       this.cognitionCollector = options.cognitionCollector || null;
+      this.skillRouter = options.skillRouter || null;
+      this.skillComposer = options.skillComposer || null;
       this.maxSteps = Number.isInteger(options.maxSteps) && options.maxSteps > 0 ? options.maxSteps : 4;
       this.toolRegistry = options.toolRegistry || null;
       this.activeRuns = new Map();
@@ -108,6 +110,10 @@
         challengeError: options.challengeError || null,
         challengeCommand: options.challengeCommand || null,
         challengeCommandMeta: options.challengeCommandMeta || null,
+        skillRouting: options.skillRouting || null,
+        skillRoutingError: options.skillRoutingError || null,
+        skillContext: options.skillContext || null,
+        skillCompositionError: options.skillCompositionError || null,
         cognitionCollection: null,
       };
       this.activeRuns.set(run.runId, run);
@@ -160,6 +166,43 @@
       const messages = useActionContract
         ? [{ role: 'system', content: ACTION_CONTRACT }, ...initialMessages]
         : initialMessages;
+      const skillRouter = options.skillRouter || this.skillRouter;
+      const skillComposer = options.skillComposer || this.skillComposer;
+      let skillRouting = null;
+      let skillRoutingError = null;
+      let skillContext = null;
+      let skillCompositionError = null;
+      if (skillRouter && options.skillRouting !== false && typeof skillRouter.route === 'function') {
+        try {
+          skillRouting = await skillRouter.route({
+            text: options.userMessage,
+            messages: initialMessages,
+            modalities: options.modalities || ['text'],
+            projectId: options.projectId || null,
+            projectContext: options.projectContext || null,
+            sessionId: options.sessionId || null,
+            explicitSkillId: options.explicitSkillId || null,
+            toolRegistry: options.toolRegistry || this.toolRegistry,
+          });
+          if (skillRouting && skillRouting.error) skillRoutingError = { ...skillRouting.error };
+        } catch (error) {
+          skillRoutingError = { code: error.code || 'SKILL_ROUTING_FAILED', message: error.message || 'Skill routing failed' };
+          skillRouting = { type: 'no_skill', selectedSkillIds: [], confidence: 'low', reasons: [], excluded: [], continuityUsed: false, ambiguousCandidates: [] };
+        }
+      }
+      if (skillRouting && skillRouting.selectedSkillIds && skillRouting.selectedSkillIds.length && skillComposer && typeof skillComposer.compose === 'function') {
+        try {
+          skillContext = await skillComposer.compose(skillRouting, { maxChars: options.skillContextBudget });
+          if (skillContext && skillContext.systemMessage && skillContext.systemMessage.content) {
+            let insertAt = useActionContract ? 1 : 0;
+            while (insertAt < messages.length && messages[insertAt].role === 'system') insertAt += 1;
+            messages.splice(insertAt, 0, { ...skillContext.systemMessage });
+          }
+        } catch (error) {
+          skillCompositionError = { code: error.code || 'SKILL_COMPOSITION_FAILED', message: error.message || 'Skill composition failed' };
+          skillContext = null;
+        }
+      }
       const builder = options.contextBuilder || this.contextBuilder;
       let cognitionContext = null;
       let cognitionError = null;
@@ -169,7 +212,7 @@
             messages: initialMessages,
             projectId: options.projectId || null,
             projectContext: options.projectContext || null,
-            skillContext: options.skillContext || null,
+            skillContext: skillContext || options.skillContext || null,
             conversationContext: options.conversationContext || null,
             sessionId: options.sessionId || null,
             maxChars: options.contextBudget,
@@ -195,7 +238,7 @@
             userMessage: options.userMessage,
             projectId: options.projectId || null,
             projectContext: options.projectContext || null,
-            skillContext: options.skillContext || null,
+            skillContext: skillContext || options.skillContext || null,
             sessionId: options.sessionId || null,
             maxChars: options.creativeContextBudget,
           });
@@ -229,7 +272,7 @@
             userMessage: options.userMessage,
             projectId: options.projectId || null,
             projectContext: options.projectContext || null,
-            skillContext: options.skillContext || null,
+            skillContext: skillContext || options.skillContext || null,
             sessionId: options.sessionId || null,
             creativeContext,
             maxChars: options.challengeContextBudget,
@@ -249,7 +292,7 @@
           challengeContext = null;
         }
       }
-      return { messages, initialMessages, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta };
+      return { messages, initialMessages, skillRouting, skillRoutingError, skillContext, skillCompositionError, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta };
     }
 
     _scheduleCollection(options, run, initialMessages, content) {
@@ -301,8 +344,8 @@
       const ai = options.aiService || this.aiService;
       if (!ai || typeof ai.stream !== 'function') throw new Error('Agent Core 缺少 AIService.stream');
       const prepared = await this._prepareMessages(options, !options.disableActionContract);
-      const { messages, initialMessages, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta } = prepared;
-      const run = this.createRun({ ...options, messages, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta });
+      const { messages, initialMessages, skillRouting, skillRoutingError, skillContext, skillCompositionError, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta } = prepared;
+      const run = this.createRun({ ...options, messages, skillRouting, skillRoutingError, skillContext, skillCompositionError, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta });
       const signal = options.signal;
       const maxSteps = Number.isInteger(options.maxSteps) && options.maxSteps > 0 ? options.maxSteps : this.maxSteps;
       const registry = options.toolRegistry || this.toolRegistry;
@@ -346,8 +389,8 @@
       const ai = options.aiService || this.aiService;
       if (!ai || typeof ai.send !== 'function') throw new Error('Agent Core 缺少 AIService');
       const prepared = await this._prepareMessages(options, !options.disableActionContract);
-      const { messages, initialMessages, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta } = prepared;
-      const run = this.createRun({ ...options, messages, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta });
+      const { messages, initialMessages, skillRouting, skillRoutingError, skillContext, skillCompositionError, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta } = prepared;
+      const run = this.createRun({ ...options, messages, skillRouting, skillRoutingError, skillContext, skillCompositionError, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta });
       const signal = options.signal;
       const maxSteps = Number.isInteger(options.maxSteps) && options.maxSteps > 0 ? options.maxSteps : this.maxSteps;
       const registry = options.toolRegistry || this.toolRegistry;

@@ -12,6 +12,10 @@
       .replace(/>/g, '&gt;');
   }
 
+  function _attr(s) {
+    return _esc(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
   class SkillsComponent {
     constructor(panelEl, service) {
       this.panel = panelEl;
@@ -41,7 +45,11 @@
     }
 
     _renderList() {
+      const registry = window.skillManifestService && window.skillManifestService.reload
+        ? window.skillManifestService.reload()
+        : { ok: false, skills: [] };
       const skills = this.service.getAll();
+      const manifests = new Map((registry.skills || []).map(item => [item.skillId, item]));
       this.panel.innerHTML = `
         <div class="panel-head">
           <span class="panel-head-title"><img class="panel-head-icon" src="icon/skill.png" alt="">技能中心</span>
@@ -49,13 +57,18 @@
           <button class="btn-icon" onclick="document.dispatchEvent(new CustomEvent('panel-close-all'))">✕</button>
         </div>
         <div class="panel-body">
+          ${registry.ok === false ? `<div class="skill-routing-error">Skill 路由数据无法读取。自动路由已关闭，普通聊天不受影响。</div>` : ''}
           <div class="skill-grid">
-            ${skills.map(s => `
+            ${skills.map(s => {
+              const manifest = manifests.get(String(s.id));
+              const status = manifest && manifest.routing.status;
+              return `
               <div class="skill-card${s.custom ? ' skill-card-custom' : ''}" data-id="${s.id}">
                 <div class="skill-name">${s.name}</div>
                 <div class="skill-desc">${s.desc}</div>
+                ${manifest ? `<div class="skill-routing-summary">${status === 'ready' ? 'Auto Routing · Ready' : status === 'disabled' ? 'Auto Routing · Disabled' : '路由信息待完善'} · ${manifest.routing.role}</div>` : ''}
               </div>
-            `).join('')}
+            `; }).join('')}
           </div>
         </div>
         <div class="rz rz-t"></div><div class="rz rz-l"></div><div class="rz rz-tl"></div>
@@ -325,6 +338,9 @@
 
     _renderDetail() {
       const s = this.currentSkill;
+      const registry = window.skillManifestService && window.skillManifestService.reload ? window.skillManifestService.reload() : null;
+      const manifest = registry && registry.ok ? registry.skills.find(item => item.skillId === String(s.id)) : null;
+      const routing = manifest && manifest.routing;
       this.panel.innerHTML = `
         <div class="panel-head">
           <button class="btn-icon btn-back" id="skBack">‹</button>
@@ -336,6 +352,24 @@
           <button class="skill-run-btn" id="skExport" style="margin-bottom:10px;background:rgba(0,118,255,0.08);color:var(--brand);">⬇ 导出分享（SKILL.md）</button>
           ${s.id === 'skill1' ? `<button class="skill-run-btn" id="skEditRules" style="margin-bottom:10px;background:rgba(0,118,255,0.08);color:var(--brand);">✏️ 编辑规则</button>` : ''}
           ${s.custom ? `<button class="skill-run-btn" id="skEditCustomRules" style="margin-bottom:10px;background:rgba(0,118,255,0.08);color:var(--brand);">✏️ 查看/编辑内容</button>` : ''}
+          ${manifest ? `
+          <details class="skill-routing-editor">
+            <summary>Routing Metadata · ${routing.status} · ${routing.role}</summary>
+            <div class="skill-field"><label>Auto Routing</label><select id="skRouteStatus"><option value="ready" ${routing.status === 'ready' ? 'selected' : ''}>Ready</option><option value="needs_review" ${routing.status === 'needs_review' ? 'selected' : ''}>Needs Review</option><option value="disabled" ${routing.status === 'disabled' ? 'selected' : ''}>Disabled</option></select></div>
+            <div class="skill-field"><label>Role</label><select id="skRouteRole">${['task', 'domain', 'brand', 'utility'].map(role => `<option value="${role}" ${routing.role === role ? 'selected' : ''}>${role}</option>`).join('')}</select></div>
+            <div class="skill-field"><label>Aliases</label><input id="skRouteAliases" value="${_attr((routing.aliases || []).join(', '))}"></div>
+            <div class="skill-field"><label>Intents</label><textarea id="skRouteIntents" rows="3">${_esc((routing.intents || []).join('\n'))}</textarea></div>
+            <div class="skill-field"><label>Domains</label><input id="skRouteDomains" value="${_attr((routing.domains || []).join(', '))}"></div>
+            <div class="skill-field"><label>Input Modality</label><input id="skRouteModalities" value="${_attr((manifest.modalities.input || []).join(', '))}"></div>
+            <div class="skill-field"><label>Sensitivity</label><select id="skRouteSensitivity">${['general', 'sensitive', 'adult', 'unknown'].map(value => `<option value="${value}" ${manifest.content.sensitivity === value ? 'selected' : ''}>${value}</option>`).join('')}</select></div>
+            <div class="skill-field"><label>Positive Examples</label><textarea id="skRoutePositive" rows="3">${_esc((routing.positiveExamples || []).join('\n'))}</textarea></div>
+            <div class="skill-field"><label>Negative Examples</label><textarea id="skRouteNegative" rows="3">${_esc((routing.negativeExamples || []).join('\n'))}</textarea></div>
+            <div class="skill-field"><label>Exclusions</label><textarea id="skRouteExclusions" rows="2">${_esc((routing.exclusions || []).join('\n'))}</textarea></div>
+            <label class="skill-routing-toggle"><input id="skRouteComposition" type="checkbox" ${routing.allowComposition ? 'checked' : ''}> 允许与其他角色组合</label>
+            <label class="skill-routing-toggle"><input id="skRouteContinuity" type="checkbox" ${routing.continuity ? 'checked' : ''}> 允许同会话连续使用</label>
+            <div class="skill-up-actions"><button class="skill-up-btn" id="skRouteReset">重置 Routing Override</button><button class="skill-up-btn primary" id="skRouteSave">保存 Routing Metadata</button></div>
+            <div class="skill-routing-save-status" id="skRouteSaveStatus"></div>
+          </details>` : (registry && registry.ok === false ? '<div class="skill-routing-error">Skill 路由数据无法读取</div>' : '')}
           <div class="skill-form">
             ${s.inputs.map(inp => `
               <div class="skill-field">
@@ -358,9 +392,51 @@
       const exportBtn = this.panel.querySelector('#skExport');
       if (exportBtn) exportBtn.addEventListener('click', () => this._exportSkill(s.id));
       const editBtn = this.panel.querySelector('#skEditRules');
+      const routeSave = this.panel.querySelector('#skRouteSave');
+      if (routeSave) routeSave.addEventListener('click', () => this._saveRoutingMetadata(s.id, registry.revision));
+      const routeReset = this.panel.querySelector('#skRouteReset');
+      if (routeReset) routeReset.addEventListener('click', () => this._resetRoutingMetadata(s.id, registry.revision));
       if (editBtn) editBtn.addEventListener('click', () => this._renderRulesEdit());
       const editCustomBtn = this.panel.querySelector('#skEditCustomRules');
       if (editCustomBtn) editCustomBtn.addEventListener('click', () => this._renderCustomRulesEdit());
+    }
+
+    _routingLines(selector) {
+      const element = this.panel.querySelector(selector);
+      return String(element && element.value || '').split(/[\n,，]/).map(item => item.trim()).filter(Boolean);
+    }
+
+    _saveRoutingMetadata(skillId, revision) {
+      const status = this.panel.querySelector('#skRouteSaveStatus');
+      try {
+        window.skillManifestService.updateRoutingOverride(skillId, {
+          status: this.panel.querySelector('#skRouteStatus').value,
+          role: this.panel.querySelector('#skRouteRole').value,
+          aliases: this._routingLines('#skRouteAliases'),
+          intents: this._routingLines('#skRouteIntents'),
+          domains: this._routingLines('#skRouteDomains'),
+          inputModalities: this._routingLines('#skRouteModalities'),
+          sensitivity: this.panel.querySelector('#skRouteSensitivity').value,
+          positiveExamples: this._routingLines('#skRoutePositive'),
+          negativeExamples: this._routingLines('#skRouteNegative'),
+          exclusions: this._routingLines('#skRouteExclusions'),
+          allowComposition: this.panel.querySelector('#skRouteComposition').checked,
+          continuity: this.panel.querySelector('#skRouteContinuity').checked,
+        }, revision);
+        this._renderDetail();
+      } catch (error) {
+        if (status) status.textContent = error.code === 'SKILL_REGISTRY_CHANGED' ? '另一窗口已修改，请重新打开后再保存。' : `保存失败：${error.message || error}`;
+      }
+    }
+
+    _resetRoutingMetadata(skillId, revision) {
+      try {
+        window.skillManifestService.resetRoutingOverride(skillId, revision);
+        this._renderDetail();
+      } catch (error) {
+        const status = this.panel.querySelector('#skRouteSaveStatus');
+        if (status) status.textContent = error.code === 'SKILL_REGISTRY_CHANGED' ? '另一窗口已修改，请重新打开后再重置。' : `重置失败：${error.message || error}`;
+      }
     }
 
     /** 自定义技能内容编辑：编辑 systemPrompt 正文；规范类保存后即作为机器人回复参考 */

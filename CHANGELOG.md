@@ -1,5 +1,15 @@
 # Changelog
 
+## P2-5 - 2026-08-09（IMPLEMENTED / WAITING REVIEW）
+
+- 建立 Teemo Skill Specification v1，保留导入 Raw Skill 原文并与 `Teemo-skill-registry.json` Internal Manifest 永久分离。
+- 新增 deterministic Provider-neutral Importer、Validator、Manifest Service、Router、Composer 和 runtime-only Session State；不使用 LLM、Embedding 或 Vector DB。
+- Registry 使用 schemaVersion/revision/expectedRevision、原子写和文件锁；损坏 fail closed、不覆盖原字节，双窗口 stale write 不静默覆盖。
+- Router 支持 explicit、NO_SKILL、ambiguity、hard exclusion、attachment modality、project enhancer、required-tool availability、adult/sensitive 同架构和最多三项跨 role composition。
+- Agent Core 统一 send/stream 与两个 Renderer 的 Skill 注入，保持 Skill、Cognition、Creative、Challenge、Current User 顺序；Router/Composer 失败普通聊天继续且不 fail open。
+- 两个既有 Skill UI 增加 Routing Metadata override、状态和轻量聊天 Skill chip；override、Registry 读取和重启不修改 Raw Skill。
+- 新增 8 个 P2-5 测试入口、32 条 deterministic benchmark 和隔离 Electron smoke；版本保持 1.2.1，当前等待 GPT strict review。
+
 ## P2-4 - 2026-08-09（IMPLEMENTED / WAITING REVIEW）
 
 - 新增 `TeemoCognitionIntelligence`，运行时派生 composite identity、exact dedup、freshness、effective confidence、conflict、promotion eligibility 和 relevance；顶层 schema 保持 v2，无 read-time migration。

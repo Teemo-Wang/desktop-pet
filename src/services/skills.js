@@ -6,6 +6,7 @@
 (function() {
   const fs = require('fs');
   const path = require('path');
+  const crypto = require('crypto');
   const storage = new window.TeemoStorageService();
   const DIR = storage.getDir();
   const FILE = storage.getPath('skills.json');
@@ -316,6 +317,7 @@ icon: 📋
       const idx = this.customSkills.findIndex(s => s.id === id);
       if (idx < 0) return false;
       this.customSkills[idx].systemPrompt = String(text || '');
+      this.customSkills[idx].rawSource = String(text || '');
       this._persist();
       return true;
     }
@@ -505,8 +507,10 @@ icon: 📋
      */
     upload(skill) {
       if (!skill || !skill.name) throw new Error('skill 必须含 name');
-      const id = skill.id || ('custom_' + Date.now().toString(36));
       const promptTpl = skill.prompt || '';
+      const stableSource = String(skill.rawSource != null ? skill.rawSource : skill.systemPrompt || `${skill.name}\n${promptTpl}`);
+      const stableId = crypto.createHash('sha256').update(`${String(skill.name).trim()}\n${stableSource}`, 'utf8').digest('hex').slice(0, 20);
+      const id = skill.id || `custom_teemo_${stableId}`;
       const item = {
         id,
         name: String(skill.name).slice(0, 30),
@@ -523,6 +527,9 @@ icon: 📋
         promptTpl,
         // 可选：md 文件来的 skill 用 systemPrompt 承载文档正文
         systemPrompt: skill.systemPrompt || '',
+        // 导入的 Raw Skill 原文字节单独保留；Routing/override 永远不得修改它。
+        rawSource: String(skill.rawSource != null ? skill.rawSource : skill.systemPrompt || ''),
+        triggers: String(skill.triggers || ''),
         // 规范类技能的结构化触发器：[{keywords:[...], reply:'...'}]，用于机器人回复时本地快速匹配
         ruleMatchers: Array.isArray(skill.ruleMatchers) ? skill.ruleMatchers : [],
         custom: true,
@@ -558,6 +565,7 @@ icon: 📋
         icon: Object.prototype.hasOwnProperty.call(values, 'icon') ? (String(values.icon || '').trim() || '⭐') : current.icon,
         desc: Object.prototype.hasOwnProperty.call(values, 'desc') ? String(values.desc || '').trim().slice(0, 80) : current.desc,
         systemPrompt: Object.prototype.hasOwnProperty.call(values, 'systemPrompt') ? String(values.systemPrompt || '') : current.systemPrompt,
+        rawSource: Object.prototype.hasOwnProperty.call(values, 'systemPrompt') ? String(values.systemPrompt || '') : (current.rawSource || current.systemPrompt || ''),
         updatedAt: Date.now(),
       };
       if (!next.name) throw new Error('Skill 名称不能为空');
@@ -590,6 +598,7 @@ icon: 📋
         inputs: [{ key: 'query', label: '你的需求', placeholder: '描述这次想让 skill 做什么...', type: 'textarea' }],
         prompt: '请基于以上 skill 指令，完成用户需求：\n\n{{query}}',
         systemPrompt: '',
+        rawSource: String(mdText),
       };
 
       // 提取 front matter
