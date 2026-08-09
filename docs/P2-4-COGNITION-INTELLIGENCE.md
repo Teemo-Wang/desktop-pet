@@ -1,6 +1,6 @@
 # Teemo助理 P2-4 Cognition Intelligence
 
-> 状态：`IMPLEMENTED / WAITING REVIEW`
+> 状态：`CLOSED / PASS / BLOCKERS: 0`
 > 分支：`Teemo/p2-personal-intelligence`
 > 应用版本：`1.2.1`
 > 边界：只实现 P2-4；未实现 P2-5、P3、Embedding、Vector DB、LLM Collector、Cloud Sync、Multi-Agent 或 GUI Automation。
@@ -149,7 +149,7 @@ P2-4 不新增聊天日志、行为追踪、Embedding Store、chain-of-thought�
 - 新 `evidenceDays` 只在新 mutation 时最小增量记录；历史 v2 若没有足够时间证据，不会被冒进自动晋升。
 - 文件锁使用 30 秒 stale 回收；异常退出不会永久阻塞下一次 Collector。
 
-当前未实现 P2-5 Skill Specification/Router，也未实现 P3 Inspiration Connector、Embedding、Vector DB、Cloud Sync、Multi-Agent、GUI Automation 或 Provider Native Tool Calling。等待 GPT P2-4 strict review；未创建 P2-4 recovery tag。
+当前未实现 P2-5 Skill Specification/Router，也未实现 P3 Inspiration Connector、Embedding、Vector DB、Cloud Sync、Multi-Agent、GUI Automation 或 Provider Native Tool Calling。GPT P2-4 strict review 已通过；关闭提交对应 recovery tag 为 `v1.2.1-p2.4-cognition-intelligence`。
 
 ## 14. GPT 首轮审阅修复
 
@@ -176,4 +176,12 @@ P2-4 不新增聊天日志、行为追踪、Embedding Store、chain-of-thought�
 - `genericFollowUp` 只保留为排序加分，不再独立获得 relevance admission。当前消息必须有实际 keyword/concept overlap、明确 personal-profile query，或最近真实对话提供相关 overlap。
 - 补充 ambiguous correction 重启、跨两天三次证据、Context 排除，以及无前文/无关前文/相关前文的 send/stream 正反测试。
 
-当前等待第三轮 blocker fix commit 与更新后的完整 review bundle 复审，仍未标记 PASS/CLOSED。
+Round 4 完整本地补丁与 19 项 P1/P2 回归证据通过最终固定门禁：
+
+- `STATUS: PASS`
+- `BLOCKERS: 0`
+- `REQUIRED_FIXES: NONE`
+- `CAN_CLOSE_AND_TAG: YES`
+- `NEXT_STAGE_ALLOWED: P2-5`
+
+P2-4 至此正式 `CLOSED / PASS / BLOCKERS: 0`。UTC natural day、deterministic relevance 少召回、空 query fallback 和 30 秒 stale lock 保留为 non-blocking risk，后续阶段不得借此回改 P2-4 边界。
