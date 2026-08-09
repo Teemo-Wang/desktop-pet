@@ -1,6 +1,6 @@
 # Teemo助理 P3-1 Inspiration Foundation
 
-> 状态：`IMPLEMENTED / WAITING REVIEW`
+> 状态：`CLOSED / PASS / BLOCKERS: 0`
 > 分支：`Teemo/p3-personal-inspiration`
 > 基线：`cd29e6f` / `v1.2.1-p3-baseline`
 > 开发版本：`1.3.0`（尚未构建、安装或发布）
@@ -68,4 +68,6 @@ P3-1 不实现真实来源连接器、Local Folder、Eagle、NAS、网页引用�
 
 ## 9. 审阅状态
 
-P3-1 当前为 `IMPLEMENTED / WAITING REVIEW`。本地实现与完整回归已完成，等待 GPT Gate。只有 GPT 返回 `STATUS: PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-2` 后，才允许建立 P3-1 recovery tag 并进入 P3-2。
+GPT Strict Review 已确认 `STATUS: PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-2`。P3-1 已允许关闭并建立 recovery tag。
+
+非阻塞风险保留到后续验收：P3 Final Acceptance 再次专项确认 release/tag 版本约束；P3-2 用真实 Local Folder source 验证 permission resource identity；Abort 测试可增加 before/after invocation delta 以提高证据可读性。

@@ -1,12 +1,13 @@
 # Changelog
 
-## P3-1 Inspiration Foundation - 2026-08-09（IMPLEMENTED / WAITING REVIEW）
+## P3-1 Inspiration Foundation - 2026-08-09（CLOSED / PASS）
 
 - 新增独立 `Teemo-inspiration-state.json`，默认关闭，支持文件锁、optimistic revision 与损坏状态 fail closed。
 - 新增只读 Connector Contract、Registry、P1 Permission Access Guard 和 Service；生产 Registry 保持为空。
 - 独立聊天新增“我的灵感”最小管理页，只显示隐私边界、基础开关、状态和空来源列表。
 - 未接入真实素材来源、索引、Embedding、Vector Store、检索或 Agent Context；P2 事实源与消息顺序不变。
 - 新增三组隔离专项测试；开发版本升至 1.3.0，已安装生产版仍为 1.2.1，当前不构建、不安装。
+- GPT Strict Review 确认 `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-2`。
 
 ## Teemo Release Update Policy - 2026-08-09
 - 新版本在后台下载完成后直接静默安装并强制重启 Teemo 助理，不再等待“稍后”确认。
