@@ -2,13 +2,14 @@
 
 ## v1.2.0 - 2026-08-09
 
-### P2-1 Cognition UI / Memory Center（IMPLEMENTED / WAITING REVIEW）
+### P2-1 Cognition UI / Memory Center（CLOSED / PASS）
 
 - 独立聊天侧栏新增「Teemo 对我的了解」，展示长期、近期、项目认知、不再适用历史与 Observation 依据。
 - 新增手动添加、纠正/修改、安全 scope migration、不再适用、搜索过滤和 Cognition 开关。
 - Cognition Schema 兼容升级到 version 2，增加 enabled/revision；管理操作使用结构化 Service API、敏感信息拦截和 optimistic concurrency。
 - Context Builder 与 Collector 每轮读取最新 Cognition，关闭开关后停止新增和注入但保留数据。
-- 新增 Cognition management 测试与隔离 Electron UI smoke；等待 GPT 审阅，未创建 P2-1 CLOSED tag。
+- 新增 Cognition management 测试与隔离 Electron UI smoke；P1 全量回归、版本检查与 diff 检查全部 PASS。
+- GPT 严格审阅确认 `STATUS: PASS / BLOCKERS: 0 / REQUIRED_FIXES: 无`；阶段恢复标签为 `v1.2.0-p2.1-cognition-ui`，未进入 P2-2。
 
 ### 版本与 P1 封板一致
 

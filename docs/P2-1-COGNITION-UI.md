@@ -1,6 +1,6 @@
 # Teemo助理 P2-1 Cognition UI / Memory Center
 
-> 状态：`IMPLEMENTED / WAITING REVIEW`
+> 状态：`CLOSED / PASS / BLOCKERS: 0`
 > 分支：`Teemo/p2-personal-intelligence`
 > 范围：只实现用户 Cognition 的查看与控制，不包含 P2-2 Agent Creative Profile、P2-3 Creative Director 或 P2-4 智能采集升级。
 
@@ -148,3 +148,15 @@ Electron smoke 使用独立 `userData` 和 `TEEMO_ASSISTANT_DATA_DIR`，在真�
 ## 13. P2-2 边界
 
 本页面只管理“Teemo 如何理解用户”。未增加 Teemo 自己的审美、Agent Creative Profile、Creative Director、Challenge Mode、LLM Collector、Embedding、Vector DB、RAG 或自动语义聚类。
+
+## 14. GPT 严格审阅与恢复点
+
+- 审阅结论：`P2-1 Cognition UI / Memory Center STATUS: PASS`。
+- Blockers：`0`。
+- Required fixes：无。
+- 审阅确认结构化管理、软失效、作用域迁移、Observation 证据、开关、并发保护、敏感信息保护、Context Builder 回归与 P2-2/P2-4 边界均符合预期。
+- 实现提交：`fa13978 Teemo: add P2-1 cognition center`。
+- 封板提交：`Teemo: close P2-1 cognition center`。
+- 阶段恢复标签：`v1.2.0-p2.1-cognition-ui`。
+- 应用、界面、安装包版本继续为 `1.2.0`，与标签数字前缀一致。
+- P2-2 未开始，等待新的明确任务书。
