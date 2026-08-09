@@ -1,6 +1,6 @@
 # Teemo助理 P3-3 Visual Metadata Index
 
-> 状态：`IMPLEMENTED / WAITING REVIEW`
+> 状态：`CLOSED / PASS / BLOCKERS: 0`
 > 分支：`Teemo/p3-personal-inspiration`
 > 开始基线：`f1863f46441729e331903626b3cb88e2ac39ff70`
 > P3-2 标签：`v1.3.0-p3.2-local-folder-connector`
@@ -152,14 +152,16 @@ npm.cmd run test:inspiration-index-ui-smoke
 
 ## 12. Review Gate
 
-当前只允许：
+GPT Strict Review 已完成，当前状态：
 
 ```text
 P3-3 Visual Metadata Index
-IMPLEMENTED / WAITING REVIEW
+CLOSED / PASS / BLOCKERS: 0
 ```
 
-在 GPT 明确返回 `STATUS: PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-4` 前，不得写 CLOSED、不得创建 P3-3 close commit/tag、不得开始 P3-4、不得安装或重启开发版。
+GPT 返回：`STATUS: PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-4`。
+审阅记录见 `docs/Teemo-P3-3-GPT-STRICT-REVIEW.md`。
+P3-3 close commit 和 annotated recovery tag 已按 Gate 创建；P3-4 尚未开始。
 
 `FORMAL_USER_DATA_TOUCHED: NO`
 
