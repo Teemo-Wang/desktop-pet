@@ -84,16 +84,18 @@ try {
   try {
     const validRaw = 'Raw Teemo Valid';
     const invalidRaw = 'Raw Teemo Invalid';
-    const validManifest = manifest('valid', 'Teemo Valid', { rawBody: validRaw, routing: { intents: ['valid task'] } });
-    const invalidManifest = manifest('invalid', 'Teemo Invalid', { rawBody: invalidRaw });
-    invalidManifest.routing.role = 'bad_role';
-    const mixedRegistryPath = path.join(mixedRoot, 'Teemo-skill-registry.json');
-    const mixedBytes = Buffer.from(JSON.stringify({ schemaVersion: 1, revision: 3, updatedAt: '2026-08-09T00:00:00.000Z', skills: [validManifest, invalidManifest] }, null, 2), 'utf8');
-    fs.writeFileSync(mixedRegistryPath, mixedBytes);
     const mixedSkills = new FakeSkillService([
-      { id: 'valid', name: 'Teemo Valid', systemPrompt: validRaw },
-      { id: 'invalid', name: 'Teemo Invalid', systemPrompt: invalidRaw },
+      { id: 'valid', name: 'Teemo Valid', desc: 'valid task', triggers: 'valid task', systemPrompt: validRaw },
+      { id: 'invalid', name: 'Teemo Invalid', desc: 'invalid task', triggers: 'invalid task', systemPrompt: invalidRaw },
     ]);
+    const mixedStorage = new StorageService({ dataDir: mixedRoot });
+    const bootstrapService = new ManifestService({ skillService: mixedSkills, storage: mixedStorage });
+    const mixedRegistryPath = path.join(mixedRoot, 'Teemo-skill-registry.json');
+    const invalidRegistry = JSON.parse(fs.readFileSync(mixedRegistryPath, 'utf8'));
+    invalidRegistry.revision = 3;
+    invalidRegistry.skills.find(item => item.skillId === 'invalid').routing.role = 'bad_role';
+    const mixedBytes = Buffer.from(JSON.stringify(invalidRegistry, null, 2), 'utf8');
+    fs.writeFileSync(mixedRegistryPath, mixedBytes);
     const mixedService = new ManifestService({ skillService: mixedSkills, storage: new StorageService({ dataDir: mixedRoot }) });
     const mixedSnapshot = mixedService.getRegistrySnapshot();
     assert.equal(mixedSnapshot.ok, true);
@@ -107,6 +109,31 @@ try {
     mixedService.reload();
     assert.deepEqual(fs.readFileSync(mixedRegistryPath), mixedBytes, 'individual invalid manifest must not rewrite Registry bytes');
     assert.equal(mixedSkills.get('invalid').systemPrompt, invalidRaw, 'individual invalid manifest must not rewrite Raw Skill');
+
+    const afterValidSave = mixedService.updateRoutingOverride('valid', { aliases: ['Teemo Valid Alias'] }, mixedSnapshot.revision);
+    assert.deepEqual(mixedService.getSkillManifest('valid').routing.aliases, ['Teemo Valid Alias']);
+    assert.deepEqual(afterValidSave.invalidSkills.map(item => item.skillId), ['invalid'], 'invalid neighbor must stay isolated during valid Skill save');
+    const afterValidReset = mixedService.resetRoutingOverride('valid', afterValidSave.revision);
+    assert.deepEqual(mixedService.getSkillManifest('valid').overrides, {});
+    assert.deepEqual(afterValidReset.invalidSkills.map(item => item.skillId), ['invalid'], 'invalid neighbor must stay isolated during valid Skill reset');
+    assert.deepEqual(new Router({ manifestService: mixedService }).route({ text: 'valid task' }).selectedSkillIds, ['valid']);
+
+    const currentInvalidRaw = `${invalidRaw}\nCurrent Raw Skill content`;
+    mixedSkills.update('invalid', { systemPrompt: currentInvalidRaw });
+    const beforeRebuild = mixedService.getRegistrySnapshot();
+    assert.deepEqual(beforeRebuild.invalidSkills.map(item => item.skillId), ['invalid']);
+    const rebuilt = mixedService.rebuildManifest('invalid', beforeRebuild.revision);
+    assert.deepEqual(rebuilt.invalidSkills, []);
+    assert.ok(rebuilt.skills.some(item => item.skillId === 'invalid'));
+    assert.equal(mixedService.getSkillManifest('invalid').source.contentHash, Specification.hashText(currentInvalidRaw), 'rebuild must use current Raw Skill');
+    assert.equal(mixedSkills.get('invalid').systemPrompt, currentInvalidRaw, 'rebuild must not change Raw Skill');
+    const restartedMixedService = new ManifestService({ skillService: mixedSkills, storage: new StorageService({ dataDir: mixedRoot }) });
+    const restartedMixedSnapshot = restartedMixedService.getRegistrySnapshot();
+    assert.equal(restartedMixedSnapshot.ok, true);
+    assert.deepEqual(restartedMixedSnapshot.invalidSkills, []);
+    assert.ok(restartedMixedService.getSkillManifest('invalid'), 'repaired Manifest must persist across restart');
+    assert.equal(restartedMixedService.getSkillManifest('invalid').source.contentHash, Specification.hashText(currentInvalidRaw));
+    assert.equal(mixedSkills.get('invalid').systemPrompt, currentInvalidRaw, 'restart must not change Raw Skill');
   } finally {
     fs.rmSync(mixedRoot, { recursive: true, force: true });
   }

@@ -80,6 +80,25 @@ function makeRouter(skills = standardManifests(), tools = []) {
   assert.equal(route('不要使用 Teemo 海报生成，直接普通回答').type, 'no_skill');
   assert.equal(route('Teemo 海报生成是干什么的？').type, 'no_skill');
   assert.equal(route('解释一下“使用 Teemo 海报生成”这句话').type, 'no_skill');
+  for (const question of [
+    '使用 Teemo 海报生成 可以做什么？',
+    '使用 Teemo 海报生成 有什么作用？',
+    '我想知道，使用 Teemo 海报生成 可以做什么？',
+    '使用 Teemo 海报生成 和 Teemo 图片修改对比一下',
+  ]) {
+    assert.equal(Router.isTextExplicitInvocation(question, 'Teemo 海报生成'), false, `meta question must not be explicit: ${question}`);
+    assert.equal(route(question).type, 'no_skill');
+  }
+  const suppressed = route('不要用海报助手，帮我生成海报');
+  assert.equal(suppressed.type, 'no_skill');
+  assert.ok(suppressed.excluded.some(item => item.skillId === 'poster' && item.code === 'suppressed_by_user'));
+  const suppressedExplicitId = env.router.route({
+    text: '不要用海报助手，帮我生成海报',
+    explicitSkillId: 'poster',
+    registrySnapshot: env.registrySnapshot,
+  });
+  assert.equal(suppressedExplicitId.type, 'no_skill');
+  assert.ok(suppressedExplicitId.excluded.some(item => item.skillId === 'poster' && item.code === 'suppressed_by_user'));
 }
 
 {
@@ -98,17 +117,40 @@ function makeRouter(skills = standardManifests(), tools = []) {
   const excludedFollowUp = route({ text: '改成长 H5', sessionId: 'excluded', ...available });
   assert.equal(excludedFollowUp.type, 'no_skill');
   assert.ok(excludedFollowUp.excluded.some(item => item.skillId === 'hard' && item.code === 'excluded_by_manifest'));
+  assert.equal(env.state.get('excluded'), null, 'hard-rejected active Skill must be removed from Session State');
+  assert.equal(route({ text: '标题再大一点', sessionId: 'excluded', ...available }).type, 'no_skill', 'hard-rejected Skill must not revive on a later follow-up');
 
   assert.deepEqual(route({ text: '生成海报', sessionId: 'tool', ...available }).selectedSkillIds, ['hard']);
   const missingToolFollowUp = route({ text: '标题再大一点', sessionId: 'tool', ...available, availableTools: [] });
   assert.equal(missingToolFollowUp.type, 'no_skill');
   assert.ok(missingToolFollowUp.excluded.some(item => item.skillId === 'hard' && item.code === 'missing_required_tool'));
 
+  assert.deepEqual(route({ text: hard.routing.intents[0], sessionId: 'suppressed', ...available }).selectedSkillIds, ['hard']);
+  const suppressedFollowUp = route({ text: `不要用 ${hard.name}，${hard.routing.intents[0]}`, sessionId: 'suppressed', ...available });
+  assert.equal(suppressedFollowUp.type, 'no_skill');
+  assert.ok(suppressedFollowUp.excluded.some(item => item.skillId === 'hard' && item.code === 'suppressed_by_user'));
+  assert.equal(env.state.get('suppressed'), null);
+  assert.equal(route({ text: '标题再大一点', sessionId: 'suppressed', ...available }).type, 'no_skill');
+
   assert.equal(route({ text: '使用 Teemo 海报路由 长 H5', explicitSkillId: 'hard', ...available }).type, 'no_skill');
   assert.equal(route({ text: '使用 Teemo 海报路由', explicitSkillId: 'hard', ...available, availableDependencies: [] }).type, 'no_skill');
   assert.equal(route({ text: '使用 Teemo 海报路由', explicitSkillId: 'hard', ...available, modalities: ['image'] }).type, 'no_skill');
   assert.deepEqual(route({ text: '使用 Teemo 待审核' }).selectedSkillIds, ['review']);
   assert.equal(route({ text: '使用 Teemo 已禁用', explicitSkillId: 'disabled' }).type, 'no_skill');
+}
+
+{
+  const task = manifest('session-task', 'Teemo Session Task', { routing: { role: 'task', intents: ['生成海报'], allowComposition: true, continuity: true } });
+  const brand = manifest('session-brand', 'Teemo Session Brand', { routing: { role: 'brand', intents: ['遵循品牌'], exclusions: ['去掉品牌'], allowComposition: true, continuity: true } });
+  const env = makeRouter([task, brand]);
+  const route = text => env.router.route({ text, sessionId: 'multi-hard', registrySnapshot: env.registrySnapshot });
+  assert.deepEqual(route('生成海报并遵循品牌').selectedSkillIds, ['session-task', 'session-brand']);
+  const survivor = route('改成去掉品牌');
+  assert.deepEqual(survivor.selectedSkillIds, ['session-task']);
+  assert.deepEqual(env.state.get('multi-hard').selectedSkillIds, ['session-task']);
+  const continued = route('标题再大一点');
+  assert.deepEqual(continued.selectedSkillIds, ['session-task']);
+  assert.equal(continued.continuityUsed, true);
 }
 
 {

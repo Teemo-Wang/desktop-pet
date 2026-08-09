@@ -27,10 +27,27 @@
   function matchedItems(text, values) { return (values || []).filter(item => Spec.containsPhrase(text, item)); }
   function reason(code, skillId, detail) { return { code, skillId, ...(detail ? { detail } : {}) }; }
   function escapeRegExp(value) { return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  function isSkillMentionSuppressed(text, name) {
+    const normalized = Spec.normalizeText(text);
+    const target = Spec.normalizeText(name);
+    if (!normalized || target.length < 2) return false;
+    let index = normalized.indexOf(target);
+    while (index >= 0) {
+      const prefix = normalized.slice(Math.max(0, index - 48), index);
+      const suffix = normalized.slice(index + target.length, index + target.length + 64);
+      const negative = /(不要|别|不再|不|不用|无需|不需要|禁止|避免)\s*(?:使用|用|按照|调用|启用|选择|切换到)?\s*$/i.test(prefix);
+      const metaPrefix = /(解释|说明|介绍|讨论|评价|对比|比较|复述|引用|文档|示例|例子|这句话|那句话|原文|为什么|我想知道)[^。！？]{0,24}(?:使用|用|按照|调用|启用)?\s*$/i.test(prefix);
+      const metaSuffix = /^\s*(?:skill\s*)?(?:(?:可以|能|能够)?\s*(?:做什么|干什么)|有什么作用|有何作用|是什么|什么意思|如何工作|怎么用|为什么|是否|对比|比较|和.{0,36}(?:对比|比较)|与.{0,36}(?:对比|比较)|跟.{0,36}(?:对比|比较))/i.test(suffix);
+      if (negative || metaPrefix || metaSuffix) return true;
+      index = normalized.indexOf(target, index + target.length);
+    }
+    return false;
+  }
   function isTextExplicitInvocation(text, name) {
     const normalized = Spec.normalizeText(text);
     const target = Spec.normalizeText(name);
     if (!normalized || target.length < 2) return false;
+    if (isSkillMentionSuppressed(text, name)) return false;
     const targetPattern = escapeRegExp(target).replace(/\s+/g, '\\s*');
     const pattern = new RegExp(`(?:^|\\s)(?:请\\s*)?(?:接下来\\s*)?(?:使用|用|按照|调用|启用|选择|切换到)\\s*(?:一下\\s*)?${targetPattern}(?:\\s*skill)?(?=$|\\s)`, 'gi');
     let match;
@@ -80,6 +97,7 @@
     _hardEligibility(manifest, text, modalities, request, options = {}) {
       const excluded = [];
       const routing = manifest.routing;
+      if (options.suppressed) excluded.push('suppressed_by_user');
       if (routing.status === 'disabled') excluded.push('disabled');
       else if (routing.status !== 'ready' && !(options.allowNeedsReview && routing.status === 'needs_review')) excluded.push('needs_review');
       const exclusions = matchedItems(text, routing.exclusions);
@@ -95,8 +113,8 @@
       return { excluded, missingTools, modalityMatch };
     }
 
-    _evaluate(manifest, text, modalities, projectText, request) {
-      const eligibility = this._hardEligibility(manifest, text, modalities, request);
+    _evaluate(manifest, text, modalities, projectText, request, suppressed = false) {
+      const eligibility = this._hardEligibility(manifest, text, modalities, request, { suppressed });
       const { excluded, missingTools, modalityMatch } = eligibility;
       const routing = manifest.routing;
       const positive = matchedItems(text, routing.positiveExamples);
@@ -151,6 +169,15 @@
       const snapshot = request.registrySnapshot || (this.manifestService && this.manifestService.reload ? this.manifestService.reload() : null);
       if (!snapshot || snapshot.ok === false) return Spec.emptyResult({ error: snapshot && snapshot.error || { code: 'SKILL_REGISTRY_UNREADABLE' } });
       const manifests = (snapshot.skills || []).slice();
+      const suppressedSkillIds = new Set(manifests.filter(item => [item.name, ...(item.routing.aliases || [])]
+        .some(name => isSkillMentionSuppressed(text, name))).map(item => item.skillId));
+      if (request.explicitSkillId && suppressedSkillIds.has(String(request.explicitSkillId))) {
+        const result = Spec.emptyResult({
+          excluded: [reason('suppressed_by_user', String(request.explicitSkillId))],
+        });
+        if (this.sessionState && request.sessionId) this.sessionState.clear(request.sessionId);
+        return result;
+      }
       const explicitMatches = this._explicit(manifests, text, request.explicitSkillId);
       if (request.explicitSkillId || explicitMatches.length) {
         const result = this._routeExplicit(explicitMatches, text, modalities, request);
@@ -161,7 +188,7 @@
         return result;
       }
 
-      const evaluated = manifests.map(item => this._evaluate(item, text, modalities, projectText, request));
+      const evaluated = manifests.map(item => this._evaluate(item, text, modalities, projectText, request, suppressedSkillIds.has(item.skillId)));
       const excluded = [];
       for (const item of evaluated) for (const code of item.excluded) excluded.push(reason(code, item.manifest.skillId, code === 'missing_required_tool' ? item.missingTools.join(', ') : null));
       const viable = evaluated.filter(item => item.viable).sort((a, b) => this._compare(a, b));
@@ -171,7 +198,7 @@
         const activeEvaluated = active && active.selectedSkillIds
           .map(id => manifests.find(item => item.skillId === id))
           .filter(Boolean)
-          .map(manifest => ({ manifest, eligibility: this._hardEligibility(manifest, text, modalities, request) }));
+          .map(manifest => ({ manifest, eligibility: this._hardEligibility(manifest, text, modalities, request, { suppressed: suppressedSkillIds.has(manifest.skillId) }) }));
         const activeManifests = activeEvaluated && activeEvaluated
           .filter(item => item.manifest.routing.continuity && item.eligibility.excluded.length === 0)
           .map(item => item.manifest);
@@ -180,6 +207,13 @@
             if (!excluded.some(entry => entry.code === code && entry.skillId === item.manifest.skillId)) {
               excluded.push(reason(code, item.manifest.skillId, code === 'missing_required_tool' ? item.eligibility.missingTools.join(', ') : null));
             }
+          }
+        }
+        if (active && activeEvaluated) {
+          const hardSurvivorIds = activeEvaluated.filter(item => item.eligibility.excluded.length === 0).map(item => item.manifest.skillId);
+          if (hardSurvivorIds.length !== active.selectedSkillIds.length) {
+            if (hardSurvivorIds.length) this.sessionState.set(request.sessionId, { selectedSkillIds: hardSurvivorIds }, { explicit: active.explicit });
+            else this.sessionState.clear(request.sessionId);
           }
         }
         if (activeManifests && activeManifests.length) {
@@ -255,6 +289,7 @@
 
   TeemoSkillRouter.isGenericFollowUp = isGenericFollowUp;
   TeemoSkillRouter.isNonTask = isNonTask;
+  TeemoSkillRouter.isSkillMentionSuppressed = isSkillMentionSuppressed;
   TeemoSkillRouter.isTextExplicitInvocation = isTextExplicitInvocation;
   return TeemoSkillRouter;
 });

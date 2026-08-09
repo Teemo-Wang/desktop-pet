@@ -31,20 +31,23 @@ const rawSkills = [
 fs.writeFileSync(skillsPath, JSON.stringify(rawSkills, null, 2), 'utf8');
 const rawSkillBytes = fs.readFileSync(skillsPath);
 const pagePath = path.join(__dirname, '..', 'Teemo-chat-window', 'Teemo-chat-window.html');
+const mainPagePath = path.join(__dirname, '..', 'index.html');
 
-async function createWindow() {
+async function createWindow(targetPath = pagePath) {
   const window = new BrowserWindow({
     width: 1400, height: 900, show: false,
     webPreferences: { nodeIntegration: true, contextIsolation: false, sandbox: false },
   });
-  await window.loadFile(pagePath);
+  await window.loadFile(targetPath);
   return window;
 }
 
 app.whenReady().then(async () => {
   let first;
   let restarted;
+  let mainInvalid;
   let invalid;
+  let repairedRestarted;
   let corrupt;
   try {
     first = await createWindow();
@@ -120,26 +123,92 @@ app.whenReady().then(async () => {
     invalidRegistry.skills.find(item => item.skillId === 'brand').routing.role = 'bad_role';
     const invalidBytes = Buffer.from(JSON.stringify(invalidRegistry, null, 2), 'utf8');
     fs.writeFileSync(registryPath, invalidBytes);
+
+    mainInvalid = await createWindow(mainPagePath);
+    const mainInvalidResult = await mainInvalid.webContents.executeJavaScript(`(async () => {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const panel = document.getElementById('skillsPanel');
+      const component = new window.SkillsComponent(panel, new window.SkillService());
+      component.open();
+      panel.querySelector('[data-id="brand"]').click();
+      await new Promise(resolve => setTimeout(resolve, 30));
+      return {
+        warning: panel.textContent,
+        repairButton: Boolean(panel.querySelector('#skRouteRepair')),
+      };
+    })()`);
+    if (!mainInvalidResult.repairButton || !/Needs repair/.test(mainInvalidResult.warning)) throw new Error('main Skill UI repair path missing');
+    mainInvalid.destroy();
+    mainInvalid = null;
+
     invalid = await createWindow();
     const invalidResult = await invalid.webContents.executeJavaScript(`(async () => {
+      const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
       document.getElementById('settingsButton').click();
-      await new Promise(resolve => setTimeout(resolve, 40));
-      const snapshot = window.skillManifestService.getRegistrySnapshot();
+      await wait(40);
+      const initialSnapshot = window.skillManifestService.getRegistrySnapshot();
+      const brandRow = document.querySelector('[data-skill-id="brand"]');
+      const initialWarning = document.getElementById('skillList').textContent;
+      const initialInvalidRow = brandRow.textContent;
+      brandRow.querySelector('[data-skill-edit="brand"]').click();
+      await wait(30);
+      const repairButton = document.querySelector('[data-routing-invalid="brand"] [data-route-rebuild]');
+      const repairVisible = Boolean(repairButton) && /Rebuild Routing Metadata/.test(repairButton.textContent);
+
+      document.querySelector('[data-skill-id="poster"] [data-skill-edit="poster"]').click();
+      await wait(30);
+      let editor = document.querySelector('[data-routing-skill="poster"]');
+      editor.querySelector('[data-route-field="aliases"]').value = 'Isolated Save';
+      editor.querySelector('[data-route-save]').click();
+      await wait(50);
+      const savedBesideInvalid = window.skillManifestService.getSkillManifest('poster').routing.aliases.includes('Isolated Save')
+        && window.skillManifestService.getRegistrySnapshot().invalidSkills.some(item => item.skillId === 'brand');
+      editor = document.querySelector('[data-routing-skill="poster"]');
+      editor.querySelector('[data-route-reset]').click();
+      await wait(50);
+      const resetBesideInvalid = Object.keys(window.skillManifestService.getSkillManifest('poster').overrides).length === 0
+        && window.skillManifestService.getRegistrySnapshot().invalidSkills.some(item => item.skillId === 'brand');
+
+      document.querySelector('[data-skill-id="brand"] [data-skill-edit="brand"]').click();
+      await wait(30);
+      document.querySelector('[data-routing-invalid="brand"] [data-route-rebuild]').click();
+      await wait(60);
+      const repairedSnapshot = window.skillManifestService.getRegistrySnapshot();
       return {
-        warning: document.getElementById('skillList').textContent,
-        invalidRow: document.querySelector('[data-skill-id="brand"]').textContent,
+        warning: initialWarning,
+        invalidRow: initialInvalidRow,
         route: window.skillRouter.route({ text: '生成海报', sessionId: 'invalid' }),
-        validIds: snapshot.skills.map(item => item.skillId),
-        invalidIds: snapshot.invalidSkills.map(item => item.skillId),
+        validIds: initialSnapshot.skills.map(item => item.skillId),
+        invalidIds: initialSnapshot.invalidSkills.map(item => item.skillId),
+        repairVisible,
+        savedBesideInvalid,
+        resetBesideInvalid,
+        repairedIds: repairedSnapshot.skills.map(item => item.skillId),
+        repairedInvalidIds: repairedSnapshot.invalidSkills.map(item => item.skillId),
       };
     })()`);
     if (!/Needs repair/.test(invalidResult.warning) || !/Routing invalid/.test(invalidResult.invalidRow)) throw new Error('individual invalid Manifest UI warning missing');
     if (!invalidResult.route.selectedSkillIds.includes('poster')) throw new Error('valid Skill stopped routing beside invalid Manifest');
     if (invalidResult.validIds.includes('brand') || !invalidResult.invalidIds.includes('brand')) throw new Error('invalid Manifest was not isolated');
-    if (!fs.readFileSync(registryPath).equals(invalidBytes)) throw new Error('individual invalid Manifest rewrote Registry bytes');
+    if (!invalidResult.repairVisible) throw new Error('chat Skill UI repair path missing');
+    if (!invalidResult.savedBesideInvalid || !invalidResult.resetBesideInvalid) throw new Error('valid Skill could not save/reset beside invalid Manifest');
+    if (!invalidResult.repairedIds.includes('brand') || invalidResult.repairedInvalidIds.includes('brand')) throw new Error('invalid Manifest repair did not replace isolated entry');
     if (!fs.readFileSync(skillsPath).equals(rawSkillBytes)) throw new Error('individual invalid Manifest changed Raw Skill bytes');
+    const repairedRegistry = fs.readFileSync(registryPath);
+    if (repairedRegistry.equals(invalidBytes)) throw new Error('repair did not persist a replacement Manifest');
     invalid.destroy();
     invalid = null;
+
+    repairedRestarted = await createWindow();
+    const repairedRestartResult = await repairedRestarted.webContents.executeJavaScript(`({
+      validIds: window.skillManifestService.getRegistrySnapshot().skills.map(item => item.skillId),
+      invalidIds: window.skillManifestService.getRegistrySnapshot().invalidSkills.map(item => item.skillId),
+    })`);
+    if (!repairedRestartResult.validIds.includes('brand') || repairedRestartResult.invalidIds.includes('brand')) throw new Error('repaired Manifest did not persist across restart');
+    if (!fs.readFileSync(registryPath).equals(repairedRegistry)) throw new Error('restart rewrote repaired Registry bytes');
+    if (!fs.readFileSync(skillsPath).equals(rawSkillBytes)) throw new Error('repair restart changed Raw Skill bytes');
+    repairedRestarted.destroy();
+    repairedRestarted = null;
 
     const corruptBytes = Buffer.from('{broken-registry', 'utf8');
     fs.writeFileSync(registryPath, corruptBytes);
@@ -156,13 +225,13 @@ app.whenReady().then(async () => {
     if (corruptResult.route.type !== 'no_skill' || !corruptResult.route.error) throw new Error('unreadable Registry did not fail closed');
     if (!fs.readFileSync(registryPath).equals(corruptBytes)) throw new Error('unreadable Registry was overwritten');
 
-    console.log(JSON.stringify({ ok: true, isolatedRoot, firstResult, restartResult, corrupt: true }));
+    console.log(JSON.stringify({ ok: true, isolatedRoot, firstResult, restartResult, repairedRestartResult, corrupt: true }));
     app.exit(0);
   } catch (error) {
     console.error(error);
     app.exit(1);
   } finally {
-    [first, restarted, invalid, corrupt].forEach(window => { if (window && !window.isDestroyed()) window.destroy(); });
+    [first, restarted, mainInvalid, invalid, repairedRestarted, corrupt].forEach(window => { if (window && !window.isDestroyed()) window.destroy(); });
   }
 });
 

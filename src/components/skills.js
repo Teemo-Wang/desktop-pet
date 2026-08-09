@@ -356,7 +356,7 @@
           <button class="skill-run-btn" id="skExport" style="margin-bottom:10px;background:rgba(0,118,255,0.08);color:var(--brand);">⬇ 导出分享（SKILL.md）</button>
           ${s.id === 'skill1' ? `<button class="skill-run-btn" id="skEditRules" style="margin-bottom:10px;background:rgba(0,118,255,0.08);color:var(--brand);">✏️ 编辑规则</button>` : ''}
           ${s.custom ? `<button class="skill-run-btn" id="skEditCustomRules" style="margin-bottom:10px;background:rgba(0,118,255,0.08);color:var(--brand);">✏️ 查看/编辑内容</button>` : ''}
-          ${invalidManifest ? `<div class="skill-routing-error">Routing invalid · Needs repair<br>${_esc((invalidManifest.errors || []).join('; '))}<br>该 Skill 已从自动路由隔离，Raw Skill 未被修改。</div>` : manifest ? `
+          ${invalidManifest ? `<div class="skill-routing-error">Routing invalid · Needs repair<br>${_esc((invalidManifest.errors || []).join('; '))}<br>该 Skill 已从自动路由隔离，Raw Skill 未被修改。<button class="skill-up-btn" id="skRouteRepair" type="button">Rebuild Routing Metadata</button><div class="skill-routing-save-status" id="skRouteRepairStatus"></div></div>` : manifest ? `
           <details class="skill-routing-editor">
             <summary>Routing Metadata · ${routing.status} · ${routing.role}</summary>
             <div class="skill-field"><label>Auto Routing</label><select id="skRouteStatus"><option value="ready" ${routing.status === 'ready' ? 'selected' : ''}>Ready</option><option value="needs_review" ${routing.status === 'needs_review' ? 'selected' : ''}>Needs Review</option><option value="disabled" ${routing.status === 'disabled' ? 'selected' : ''}>Disabled</option></select></div>
@@ -400,6 +400,16 @@
       if (routeSave) routeSave.addEventListener('click', () => this._saveRoutingMetadata(s.id, registry.revision));
       const routeReset = this.panel.querySelector('#skRouteReset');
       if (routeReset) routeReset.addEventListener('click', () => this._resetRoutingMetadata(s.id, registry.revision));
+      const routeRepair = this.panel.querySelector('#skRouteRepair');
+      if (routeRepair) routeRepair.addEventListener('click', () => {
+        const status = this.panel.querySelector('#skRouteRepairStatus');
+        try {
+          window.skillManifestService.rebuildManifest(s.id, registry.revision);
+          this._renderDetail();
+        } catch (error) {
+          if (status) status.textContent = error.code === 'SKILL_REGISTRY_CHANGED' ? '另一窗口已修改，请重新打开后再重建。' : `重建失败：${error.message || error}`;
+        }
+      });
       if (editBtn) editBtn.addEventListener('click', () => this._renderRulesEdit());
       const editCustomBtn = this.panel.querySelector('#skEditCustomRules');
       if (editCustomBtn) editCustomBtn.addEventListener('click', () => this._renderCustomRulesEdit());

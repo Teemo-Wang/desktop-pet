@@ -48,11 +48,7 @@
       }));
     }
 
-    _read() {
-      const value = this.storage.readJson(this.registryFile, null);
-      const state = this.storage.getReadState(this.registryFile);
-      if (state === 'error') throw registryError('SKILL_REGISTRY_UNREADABLE', 'Skill 路由数据无法读取');
-      if (state === 'missing') return null;
+    _normalizeRegistry(value) {
       const envelope = this.validator.validateRegistryEnvelope(value);
       if (!envelope.valid) throw registryError('SKILL_REGISTRY_UNREADABLE', `Skill 路由数据无效：${envelope.errors[0]}`);
       const skills = [];
@@ -71,18 +67,33 @@
           errors: validation.errors.slice(),
         });
       }
-      return { ...value, skills, invalidSkills };
+      const normalized = { ...value, skills, invalidSkills };
+      Object.defineProperty(normalized, '_registrySkills', {
+        value: value.skills.map(item => Spec.clone(item)),
+        enumerable: false,
+      });
+      return normalized;
     }
 
-    _write(registry) {
+    _read() {
+      const value = this.storage.readJson(this.registryFile, null);
+      const state = this.storage.getReadState(this.registryFile);
+      if (state === 'error') throw registryError('SKILL_REGISTRY_UNREADABLE', 'Skill 路由数据无法读取');
+      if (state === 'missing') return null;
+      return this._normalizeRegistry(value);
+    }
+
+    _write(registry, options = {}) {
       const persistent = Spec.clone(registry);
       delete persistent.invalidSkills;
-      const validation = this.validator.validateRegistry(persistent);
+      const validation = options.allowInvalidEntries
+        ? this.validator.validateRegistryEnvelope(persistent)
+        : this.validator.validateRegistry(persistent);
       if (!validation.valid) throw registryError('SKILL_MANIFEST_INVALID', validation.errors.join('; '));
       this.storage.writeJson(this.registryFile, persistent);
-      this.registry = persistent;
+      this.registry = this._normalizeRegistry(persistent);
       this.error = null;
-      return persistent;
+      return this.registry;
     }
 
     synchronize() {
@@ -149,24 +160,32 @@
       const source = this.skillService.get(String(skillId));
       if (!source) return null;
       return {
-        skillId: String(source.id), name: source.name,
+        skillId: String(source.id), id: String(source.id), name: source.name,
+        desc: source.desc, description: source.desc, triggers: source.triggers,
+        domains: source.domains, allowComposition: source.allowComposition,
         rawBody: String(source.rawSource != null ? source.rawSource : source.systemPrompt || source.promptTpl || (typeof source.prompt === 'string' ? source.prompt : '') || ''),
+        sourceRef: `skills.json#${String(source.id)}`,
       };
     }
 
-    _update(skillId, expectedRevision, mutate) {
+    _update(skillId, expectedRevision, mutate, options = {}) {
       const locked = this.storage.withFileLock(this.registryFile, () => {
         const current = this._read();
         if (!current) throw registryError('SKILL_REGISTRY_UNREADABLE', 'Skill Registry 不存在');
-        if (current.invalidSkills && current.invalidSkills.length) throw registryError('SKILL_MANIFEST_INVALID', '存在无效 Skill Manifest，请先修复后再保存 Routing Metadata');
         if (expectedRevision != null && current.revision !== expectedRevision) throw registryError('SKILL_REGISTRY_CHANGED', 'Skill 路由信息已变化，请重新载入');
-        const index = current.skills.findIndex(item => item.skillId === String(skillId));
+        const entries = current._registrySkills || current.skills;
+        const index = entries.findIndex(item => item && item.skillId === String(skillId));
         if (index < 0) throw registryError('SKILL_MANIFEST_INVALID', 'Skill Manifest 不存在');
-        const next = Spec.clone(current);
+        const targetValidation = this.validator.validateManifest(entries[index]);
+        if (!targetValidation.valid && !options.allowInvalidTarget) throw registryError('SKILL_MANIFEST_INVALID', '该 Skill Manifest 无效，请先显式重建 Routing Metadata');
+        const next = {
+          schemaVersion: current.schemaVersion,
+          revision: current.revision + 1,
+          updatedAt: new Date().toISOString(),
+          skills: entries.map(item => Spec.clone(item)),
+        };
         next.skills[index] = mutate(next.skills[index]);
-        next.revision += 1;
-        next.updatedAt = new Date().toISOString();
-        return this._write(next);
+        return this._write(next, { allowInvalidEntries: Boolean(current.invalidSkills && current.invalidSkills.length) });
       });
       if (!locked.acquired) throw registryError('SKILL_REGISTRY_CHANGED', 'Skill 路由信息正在由另一窗口更新');
       return this.getRegistrySnapshot();
@@ -217,7 +236,16 @@
     rebuildManifest(skillId, expectedRevision) {
       const source = this.getRawSkill(skillId);
       if (!source) throw registryError('SKILL_MANIFEST_INVALID', 'Raw Skill 不存在');
-      return this._update(skillId, expectedRevision, previous => this.importer.buildManifest({ ...source, id: source.skillId, sourceRef: previous.source.sourceRef }, previous));
+      return this._update(skillId, expectedRevision, previous => {
+        const rebuilt = this.importer.buildManifest({
+          ...source,
+          id: source.skillId,
+          sourceRef: previous && previous.source && previous.source.sourceRef || `skills.json#${source.skillId}`,
+        }, null);
+        const validation = this.validator.validateManifest(rebuilt, { rawBody: source.rawBody });
+        if (!validation.valid) throw registryError('SKILL_MANIFEST_INVALID', validation.errors.join('; '));
+        return rebuilt;
+      }, { allowInvalidTarget: true });
     }
 
     validateSkill(skillId) {

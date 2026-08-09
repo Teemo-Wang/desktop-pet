@@ -2200,7 +2200,7 @@
           <button class="teemo-skill-export" data-skill-export="${escapeHtml(skill.id)}" type="button" title="下载为可重新导入的 Markdown 文件">导出</button>
           ${skill.custom ? `<button class="teemo-skill-delete" data-skill-delete="${escapeHtml(skill.id)}" type="button">删除</button>` : ''}
         </div>
-        ${expanded ? (invalidManifest ? `<div class="teemo-skill-routing-error">Routing invalid · Needs repair<br>${escapeHtml((invalidManifest.errors || []).join('; '))}<br>该 Skill 已从自动路由隔离，Raw Skill 未被修改。</div>` : routingEditorFields(manifest, registry.revision)) + skillEditorFields(values) : ''}
+        ${expanded ? (invalidManifest ? `<div class="teemo-skill-routing-error" data-routing-invalid="${escapeHtml(skill.id)}" data-routing-revision="${registry.revision}">Routing invalid · Needs repair<br>${escapeHtml((invalidManifest.errors || []).join('; '))}<br>该 Skill 已从自动路由隔离，Raw Skill 未被修改。<button class="teemo-secondary-button" data-route-rebuild type="button">Rebuild Routing Metadata</button></div>` : routingEditorFields(manifest, registry.revision)) + skillEditorFields(values) : ''}
       </div>`;
 
     };
@@ -2445,6 +2445,21 @@
         } catch (error) {
           els.skillSaveStatus.style.color = '#e58b8b';
           els.skillSaveStatus.textContent = error.code === 'SKILL_REGISTRY_CHANGED' ? '另一窗口已修改，请重新载入后再重置' : `Routing 重置失败：${error.message || error}`;
+        }
+      });
+    });
+    els.skillList.querySelectorAll('[data-route-rebuild]').forEach(button => {
+      button.addEventListener('click', event => {
+        event.stopPropagation();
+        const panel = button.closest('[data-routing-invalid]');
+        try {
+          skillManifestService.rebuildManifest(panel.dataset.routingInvalid, Number(panel.dataset.routingRevision));
+          renderSkills();
+          els.skillSaveStatus.style.color = '';
+          els.skillSaveStatus.textContent = 'Routing Metadata 已重建；Raw Skill 未修改';
+        } catch (error) {
+          els.skillSaveStatus.style.color = '#e58b8b';
+          els.skillSaveStatus.textContent = error.code === 'SKILL_REGISTRY_CHANGED' ? '另一窗口已修改，请重新载入后再重建' : `Routing 重建失败：${error.message || error}`;
         }
       });
     });

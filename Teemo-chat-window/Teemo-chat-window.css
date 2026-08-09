@@ -868,6 +868,7 @@ button { color: inherit; }
 .teemo-skill-row-copy em { display: block; margin-top: 3px; color: #7298c8; font-size: 9px; font-style: normal; }
 .teemo-skill-row-copy em.invalid { color: #e58b8b; }
 .teemo-skill-routing-error { margin: 0 0 10px; padding: 8px; border: 1px solid rgba(229, 139, 139, .28); border-radius: 6px; background: rgba(229, 139, 139, .08); color: #e58b8b; font-size: 10px; }
+.teemo-skill-routing-error button { margin-top: 8px; }
 .teemo-skill-routing-editor { margin: 0 12px 12px; padding: 9px; border: 1px solid rgba(73, 144, 226, .22); border-radius: 6px; background: rgba(73, 144, 226, .06); }
 .teemo-skill-routing-editor summary { color: #8dbbff; font-size: 10px; font-weight: 600; cursor: pointer; }
 .teemo-routing-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding-top: 9px; }
