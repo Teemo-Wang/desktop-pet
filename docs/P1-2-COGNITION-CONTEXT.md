@@ -192,3 +192,18 @@ npm.cmd run test:cognition
 - 当前项目作用域来自项目工作台详情页；独立聊天窗口没有项目选择 UI，因此默认无 projectId。
 - Profile/Recent/Project 暂无用户管理页面，只能通过 Service API 管理。
 - Provider 原生 Tool Calling、正式 Tool Registry、Permission Layer、向量检索和 Agent Creative Profile 均不属于本阶段。
+
+## 13. GPT 审阅与封板
+
+首轮审阅确认整体架构符合 P1-2 预期，并要求修正两个 Cognition 正确性风险：active project 中的模糊审美不能进入 Profile；“这个只适用于这个项目”不能随机选择最近认知迁移。修正提交 `a0c2f04` 已补齐保守作用域规则和对应自动测试。
+
+最终复审结论：
+
+```text
+P1-2 Teemo Cognition + Context Builder
+STATUS: CLOSED
+RESULT: PASS
+BLOCKERS: 0
+```
+
+阶段恢复标签：`v1.1.7-p1.2-cognition-context`。P1-2 封板后不顺带开始 P1-3。

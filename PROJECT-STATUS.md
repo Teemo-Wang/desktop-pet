@@ -1,6 +1,6 @@
 # Teemo助理 — 项目进度与规划
 
-> 文档版本：v1.4 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.1.7（P1-2 开发完成，待 GPT 审阅）**
+> 文档版本：v1.5 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.1.7（P1-2 已封板）**
 
 ## 当前状态
 
@@ -9,7 +9,7 @@
 - Source：`D:\Teemo助手\Teemo机器人项目\Teemo-source`
 - P0：`CLOSED`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
-- Current Development：`P1-2 Cognition + Context Builder implementation complete / GPT review pending`
+- Current Development：`P1-2 Cognition + Context Builder CLOSED / PASS`
 - Current Branch：`Teemo/p1-agent-core`
 
 ## P0 阶段收尾（2026-08-09）
@@ -29,7 +29,7 @@
 - 仅提供无副作用的 `echo` 与 `get_agent_runtime_info` 内部测试 Tool。
 - 详细记录见 `docs/P1-1-AGENT-CORE.md`。
 - P1-1 已经 GPT 审阅确认封板；阶段提交为 `20f90b0` 和 `dbfc598`，恢复标签为 `v1.1.7-p1.1-agent-core`。
-- P1-2（Teemo Cognition + Context Builder）已完成实现与本地自动测试，详细记录见 `docs/P1-2-COGNITION-CONTEXT.md`；当前等待 GPT 审阅，尚未创建 CLOSED tag。
+- P1-2（Teemo Cognition + Context Builder）已完成实现、本地自动测试和 GPT 两轮审阅，详细记录见 `docs/P1-2-COGNITION-CONTEXT.md`；阶段恢复标签为 `v1.1.7-p1.2-cognition-context`。
 
 ## P1-2 阶段（2026-08-09）
 
@@ -38,6 +38,8 @@
 - 新增统一 Context Builder：按当前指令 > 项目 > Recent > Profile 的优先级组装有限预算上下文。
 - Agent Core 以可选依赖最小接入；Builder/Collector 失败时普通非流式和流式聊天均安全降级。
 - Cognition 只通过 TeemoStorageService 保存到本地 `Teemo-cognition.json`；测试使用隔离临时目录，没有读取或修改正式用户数据。
+- GPT 首轮审阅指出 active project 模糊偏好和指代迁移两个作用域风险；修正提交 `a0c2f04` 已收紧为“项目内模糊审美默认归项目、仅唯一候选允许迁移”。
+- GPT 最终审阅结论：`P1-2 Teemo Cognition + Context Builder STATUS: CLOSED / RESULT: PASS / BLOCKERS: 0`。
 
 ### P0 已知风险
 
