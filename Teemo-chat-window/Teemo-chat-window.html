@@ -36,6 +36,11 @@
           <div><strong>Teemo 的设计判断</strong><span>专业判断框架</span></div>
           <span class="teemo-settings-chevron">›</span>
         </button>
+        <button class="teemo-sidebar-memory teemo-sidebar-inspiration" id="TeemoInspirationButton" title="查看我的灵感">
+          <span class="teemo-sidebar-memory-icon">✦</span>
+          <div><strong>我的灵感</strong><span>个人灵感系统</span></div>
+          <span class="teemo-settings-chevron">›</span>
+        </button>
         <button class="teemo-sidebar-foot" id="settingsButton" title="打开设置">
           <img src="../icon/Teemo-app.png" alt="">
           <div><strong>Teemo</strong><span id="modelLabel">私人助理</span></div>
@@ -180,6 +185,39 @@
             <span>约束优先级</span>
             <strong>明确要求 → 项目约束 → Skill 规范 → 专业判断</strong>
             <p>Teemo 会在约束内给出专业建议，不会擅自改写品牌色、文案、尺寸或任务要求。</p>
+          </section>
+        </div>
+      </main>
+
+      <main class="teemo-settings-page teemo-inspiration-page" id="TeemoInspirationView" hidden>
+        <div class="teemo-settings-head teemo-memory-head">
+          <button id="TeemoInspirationBackButton" class="teemo-back-button">← 返回聊天</button>
+          <div class="teemo-memory-head-copy"><h1>我的灵感</h1><p>Personal Inspiration Intelligence</p></div>
+          <div class="teemo-memory-head-actions">
+            <label class="teemo-memory-switch"><input id="TeemoInspirationEnabled" type="checkbox"><span>启用灵感基础能力</span></label>
+            <button class="teemo-secondary-button" id="TeemoInspirationRefreshButton" type="button">刷新</button>
+          </div>
+        </div>
+        <div class="teemo-inspiration-content">
+          <section class="teemo-inspiration-privacy">
+            <div><span>Privacy</span><strong>灵感数据默认保留在本机</strong><p>连接任何本地或在线来源前都需要明确授权，当前版本不会上传素材。</p></div>
+            <em>只读基础</em>
+          </section>
+          <div class="teemo-inspiration-status" id="TeemoInspirationStatus" aria-live="polite"></div>
+          <section class="teemo-inspiration-overview" aria-labelledby="TeemoInspirationOverviewTitle">
+            <div>
+              <span>Foundation</span>
+              <h2 id="TeemoInspirationOverviewTitle">独立灵感数据域</h2>
+              <p>与 Cognition、Creative Profile、Challenge 和 Skill 分开管理。</p>
+            </div>
+            <dl>
+              <div><dt>状态</dt><dd id="TeemoInspirationStateLabel" data-state="disabled">当前停用</dd></div>
+              <div><dt>已连接来源</dt><dd id="TeemoInspirationSourceCount">0</dd></div>
+            </dl>
+          </section>
+          <section class="teemo-inspiration-sources" aria-labelledby="TeemoInspirationSourcesTitle">
+            <header><span>Sources</span><h2 id="TeemoInspirationSourcesTitle">素材来源</h2></header>
+            <div id="TeemoInspirationSourceList"></div>
           </section>
         </div>
       </main>
@@ -423,6 +461,10 @@
   </div>
 
   <script src="../src/services/TeemoStorageService.js"></script>
+  <script src="../src/inspiration/TeemoInspirationContracts.js"></script>
+  <script src="../src/inspiration/TeemoInspirationConnectorRegistry.js"></script>
+  <script src="../src/inspiration/TeemoInspirationAccessGuard.js"></script>
+  <script src="../src/inspiration/TeemoInspirationService.js"></script>
   <script src="../src/skills/TeemoSkillSpecification.js"></script>
   <script src="../src/skills/TeemoSkillValidator.js"></script>
   <script src="../src/skills/TeemoSkillImporter.js"></script>
@@ -466,6 +508,7 @@
   <script src="../src/services/projects.js"></script>
   <script src="../src/cognition/TeemoCognitionCenter.js"></script>
   <script src="../src/creative/TeemoCreativeProfileCenter.js"></script>
+  <script src="../src/inspiration/TeemoInspirationCenter.js"></script>
   <script src="../src/utils/markdown.js"></script>
   <script src="Teemo-chat-window.js"></script>
 </body>

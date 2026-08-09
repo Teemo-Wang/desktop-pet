@@ -3,10 +3,12 @@
 ## 当前阶段
 
 - Product：Teemo助理
-- Branch：`Teemo/p2-personal-intelligence`
-- Phase：P2 Personal Intelligence
-- State：`CLOSED / PASS / BLOCKERS: 0`
-- App Version：`v1.2.1`
+- Branch：`Teemo/p3-personal-inspiration`
+- Phase：P3-1 Inspiration Foundation
+- State：`IMPLEMENTED / WAITING REVIEW`
+- Installed App Version：`v1.2.1`
+- Development App Version：`v1.3.0`
+- P3 Baseline：`cd29e6f` / `v1.2.1-p3-baseline`
 - P1 Recovery Tag：`v1.2.0-p1-agent-foundation`
 - P2-1 Recovery Tag：`v1.2.0-p2.1-cognition-ui`
 - P2-2 Recovery Tag：`v1.2.1-p2.2-creative-profile`
@@ -14,28 +16,22 @@
 - P2-4 Recovery Tag：`v1.2.1-p2.4-cognition-intelligence`
 - P2-5 Recovery Tag：`v1.2.1-p2.5-skill-intelligence`
 
-## P2-5 已实现
+## P3-1 已实现
 
-- Teemo Skill Specification v1、Raw Skill/Manifest 分离、SHA-256 source hash 和原样 `rawSource`。
-- revisioned/locked `Teemo-skill-registry.json`，双窗口 optimistic concurrency，损坏 fail closed 且不覆盖原字节。
-- deterministic Provider-neutral Router；NO_SKILL、explicit、ambiguity、hard exclusion、required-tool availability 和 adult/sensitive 同架构。
-- 最多 3 个、每 role 最多 1 个的 Skill Composition；6,000 字符总预算和 provenance。
-- runtime-only session continuity；missing sessionId、新窗口、新 session 和 restart 隔离。
-- Agent Core 统一 send/stream 与两个 Renderer；消息顺序为 Skill、Cognition、Creative、Challenge、Current User。
-- 两个既有 Skill UI 的 Routing Metadata override、状态和聊天 Skill chip。
-- 整轮 negative/meta/question/comparison suppression，统一阻止 textual explicit、`explicitSkillId`、auto 与 continuity 回流。
-- hard-rejected Session 清理与 multi-Skill survivor retention；invalid Manifest 隔离、合法邻居 save/reset、双 UI 显式 Repair 和重启持久化。
-- 8 组专项测试、32 条 benchmark 与隔离 Electron smoke 已通过。
+- 独立 `Teemo-inspiration-state.json`，默认关闭，revisioned/locked，损坏 fail closed 且不覆盖原字节。
+- 只读 Connector Definition、Registry、Access Guard 和 Service；生产 Registry 为空。
+- Connector 写 capability/方法注册即拒绝；读取必须先通过 P1 Permission Service。
+- 独立聊天新增“我的灵感”最小管理页，不提供任何真实来源或未来功能假按钮。
+- Agent Core 与 Skill/Cognition/Creative/Challenge Context 顺序完全未改，不注入 Inspiration。
+- 三组 P3-1 专项测试通过；测试使用隔离临时 profile，正式用户数据零触碰。
 
-## 最终验收结果
+## 当前验收流程
 
-1. P2-5 实现、专项测试和 22 Node / 9 Electron 全量回归完成；文档见 `docs/P2-5-SKILL-INTELLIGENCE.md`。
-2. GPT 四轮 strict review 最终确认 `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES`。
-3. P2-5 关闭提交与恢复标签固定为当前阶段恢复点，P1 与 P2-1 至 P2-4 的既有标签均未移动。
-4. P2 Final Acceptance 已完成跨模块契约、完整回归、版本、标签与正式数据隔离核验。
-5. GPT 确认 `PASS / BLOCKERS: 0 / CAN_CLOSE_P2: YES / NEXT_STAGE_ALLOWED: RELEASE-INSTALL-RESTART`。
-6. 当前执行正式 Windows installer 构建、安装和重启；不进入 P3。
+1. P3-1 实现与三组专项测试已完成；文档见 `docs/Teemo-P3-1-INSPIRATION-FOUNDATION.md`。
+2. 完整 P1/P2 regression、Electron smoke、benchmark、自动更新、语法、diff 与版本检查已通过。
+3. 当前提交 P3-1，并向 GPT 发送完整证据包。
+4. GPT 未返回 `CAN_CLOSE_AND_TAG: YES` 前，不创建 P3-1 close tag，不进入 P3-2。
 
 ## 禁止扩展
 
-当前不得开发 P3 Inspiration、Semantic Search、Embedding、Vector DB、LLM Router、自动学习 Router、行为追踪数据库、Safety Engine、Cloud Sync、Multi-Agent、GUI Automation 或 Provider Native Tool Calling。当前只做 v1.2.1 发布安装与重启，不新增功能。
+当前不得实现真实 Inspiration Connector、Local Folder、Eagle、NAS、Figma、网页平台、Metadata Index、Semantic Search、Embedding、Vector DB、Image Similarity、Inspiration Context、Taste Signals、Cloud Sync、Multi-Agent 或 GUI Automation。仅完成 P3-1 验收；P3-2 必须等待 GPT Gate。

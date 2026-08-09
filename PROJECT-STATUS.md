@@ -1,18 +1,31 @@
 # Teemo助理 — 项目进度与规划
 
-> 文档版本：v1.24 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.2.1（P2 Personal Intelligence CLOSED / PASS）**
+> 文档版本：v1.25 ｜ 更新日期：2026-08-09 ｜ 当前开发版本：**v1.3.0（P3-1 IMPLEMENTED / WAITING REVIEW）**
 
 ## 当前状态
 
 - Product：`Teemo助理`
-- Version：`v1.2.1`
+- Installed Version：`v1.2.1`
+- Development Version：`v1.3.0`
 - Source：`D:\Teemo助手\Teemo机器人项目\Teemo-source`
 - P0：`CLOSED`
 - P1：`CLOSED / PASS / BLOCKERS: 0`
 - P2：`CLOSED / PASS / BLOCKERS: 0`
+- P3：`IN PROGRESS`
+- P3-1：`IMPLEMENTED / WAITING REVIEW`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
-- Current Development：`RELEASE / INSTALL / RESTART`
-- Current Branch：`Teemo/p2-personal-intelligence`
+- P3 Baseline：`cd29e6f` / `v1.2.1-p3-baseline`
+- Current Development：`P3-1 INSPIRATION FOUNDATION REVIEW`
+- Current Branch：`Teemo/p3-personal-inspiration`
+
+## P3-1 阶段（2026-08-09，IMPLEMENTED / WAITING REVIEW）
+
+- 建立独立 `Teemo-inspiration-state.json`，默认关闭；文件锁、revision 冲突和损坏状态 fail closed 不覆盖原字节。
+- 建立严格只读 Connector Definition/Registry；生产 Registry 为空，写 capability 与写方法均拒绝。
+- 所有 Connector 读取必须先通过 P1 Permission Service；deny、异常、Abort 或状态关闭时 handler 不执行。
+- 独立聊天新增“我的灵感”最小管理页；只有基础开关、隐私边界、状态和空来源列表，不提供未来来源的假连接操作。
+- 未修改 Agent Core 或 P2 事实源，不注入 Inspiration Context，不实现任何真实连接器、索引、Embedding、Vector Store 或检索。
+- 三组 P3-1 专项、22 组 P1/P2 Node、9 组既有 Electron、32-case benchmark、自动更新、语法、diff 与版本检查全部通过；等待 GPT Gate。详见 `docs/Teemo-P3-1-INSPIRATION-FOUNDATION.md`。
 
 ## P2 Final Acceptance（2026-08-09，CLOSED / PASS）
 

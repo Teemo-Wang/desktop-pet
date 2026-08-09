@@ -43,6 +43,17 @@
   window.teemoCreativeDirectorState = creativeDirectorState;
   window.teemoChallengeContextBuilder = challengeContextBuilder;
   const permissionClient = window.TeemoPermissionClient ? new window.TeemoPermissionClient({ ipcRenderer }) : null;
+  const inspirationRegistry = window.TeemoInspirationConnectorRegistry
+    ? new window.TeemoInspirationConnectorRegistry()
+    : null;
+  const inspirationAccessGuard = window.TeemoInspirationAccessGuard && inspirationRegistry
+    ? new window.TeemoInspirationAccessGuard({ registry: inspirationRegistry, permissionService: permissionClient })
+    : null;
+  const inspirationService = window.TeemoInspirationService
+    ? new window.TeemoInspirationService({ registry: inspirationRegistry, accessGuard: inspirationAccessGuard })
+    : null;
+  window.teemoInspirationRegistry = inspirationRegistry;
+  window.teemoInspirationService = inspirationService;
   const fileClient = window.TeemoFileClient ? new window.TeemoFileClient({ ipcRenderer }) : null;
   const gitClient = window.TeemoGitClient ? new window.TeemoGitClient({ ipcRenderer }) : null;
   const executeClient = window.TeemoExecuteClient ? new window.TeemoExecuteClient({ ipcRenderer }) : null;
@@ -137,10 +148,12 @@
     memoryButton: document.getElementById('memoryButton'),
     memoryBack: document.getElementById('memoryBackButton'),
     creativeButton: document.getElementById('TeemoCreativeButton'),
+    inspirationButton: document.getElementById('TeemoInspirationButton'),
     chatView: document.getElementById('chatView'),
     settingsView: document.getElementById('settingsView'),
     memoryView: document.getElementById('memoryView'),
     creativeView: document.getElementById('TeemoCreativeView'),
+    inspirationView: document.getElementById('TeemoInspirationView'),
     challengeQuick: document.getElementById('TeemoChallengeQuickButton'),
     challengeQuickLabel: document.getElementById('TeemoChallengeQuickLabel'),
     directorBalanced: document.getElementById('TeemoDirectorBalanced'),
@@ -1621,6 +1634,7 @@
     els.chatView.hidden = true;
     if (els.memoryView) els.memoryView.hidden = true;
     if (els.creativeView) els.creativeView.hidden = true;
+    if (els.inspirationView) els.inspirationView.hidden = true;
     els.settingsView.hidden = false;
   }
 
@@ -1629,6 +1643,7 @@
     els.settingsView.hidden = true;
     if (els.memoryView) els.memoryView.hidden = true;
     if (els.creativeView) els.creativeView.hidden = true;
+    if (els.inspirationView) els.inspirationView.hidden = true;
     els.chatView.hidden = false;
     renderAll();
     els.input.focus();
@@ -1652,6 +1667,7 @@
     els.chatView.hidden = true;
     els.settingsView.hidden = true;
     if (els.creativeView) els.creativeView.hidden = true;
+    if (els.inspirationView) els.inspirationView.hidden = true;
     if (els.memoryView) els.memoryView.hidden = false;
     const center = ensureCognitionCenter();
     if (center) center.show();
@@ -1659,6 +1675,7 @@
 
   function hideMemory() {
     if (els.memoryView) els.memoryView.hidden = true;
+    if (els.inspirationView) els.inspirationView.hidden = true;
     els.settingsView.hidden = true;
     els.chatView.hidden = false;
     renderAll();
@@ -1682,6 +1699,7 @@
     els.chatView.hidden = true;
     els.settingsView.hidden = true;
     if (els.memoryView) els.memoryView.hidden = true;
+    if (els.inspirationView) els.inspirationView.hidden = true;
     if (els.creativeView) els.creativeView.hidden = false;
     const center = ensureCreativeProfileCenter();
     if (center) center.show();
@@ -1690,6 +1708,39 @@
   function hideCreativeProfile() {
     if (els.creativeView) els.creativeView.hidden = true;
     if (els.memoryView) els.memoryView.hidden = true;
+    if (els.inspirationView) els.inspirationView.hidden = true;
+    els.settingsView.hidden = true;
+    els.chatView.hidden = false;
+    renderAll();
+    els.input.focus();
+  }
+
+  let inspirationCenter = null;
+
+  function ensureInspirationCenter() {
+    if (!inspirationCenter && window.TeemoInspirationCenter && inspirationService) {
+      inspirationCenter = new window.TeemoInspirationCenter({
+        service: inspirationService,
+        onBack: hideInspiration,
+      });
+    }
+    return inspirationCenter;
+  }
+
+  function showInspiration() {
+    els.chatView.hidden = true;
+    els.settingsView.hidden = true;
+    if (els.memoryView) els.memoryView.hidden = true;
+    if (els.creativeView) els.creativeView.hidden = true;
+    if (els.inspirationView) els.inspirationView.hidden = false;
+    const center = ensureInspirationCenter();
+    if (center) center.show();
+  }
+
+  function hideInspiration() {
+    if (els.inspirationView) els.inspirationView.hidden = true;
+    if (els.memoryView) els.memoryView.hidden = true;
+    if (els.creativeView) els.creativeView.hidden = true;
     els.settingsView.hidden = true;
     els.chatView.hidden = false;
     renderAll();
@@ -3067,6 +3118,7 @@
   els.settingsBack.addEventListener('click', hideSettings);
   if (els.memoryButton) els.memoryButton.addEventListener('click', showMemory);
   if (els.creativeButton) els.creativeButton.addEventListener('click', showCreativeProfile);
+  if (els.inspirationButton) els.inspirationButton.addEventListener('click', showInspiration);
   if (els.challengeQuick) {
     els.challengeQuick.addEventListener('click', () => {
       const state = creativeDirectorState && creativeDirectorState.getState(activeDirectorSessionId());
