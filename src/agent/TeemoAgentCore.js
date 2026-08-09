@@ -194,6 +194,7 @@
             sessionId: options.sessionId || null,
             maxChars: options.creativeContextBudget,
           });
+          if (creativeContext && creativeContext.stateError) creativeError = { ...creativeContext.stateError };
           if (creativeContext && creativeContext.systemMessage && creativeContext.systemMessage.content) {
             let insertAt = useActionContract ? 1 : 0;
             while (insertAt < messages.length && messages[insertAt].role === 'system') insertAt += 1;

@@ -36,9 +36,9 @@ Agent Creative Profile 回答“Teemo Agent 认为怎样才是好的设计”。
 
 `src/creative/TeemoCreativeContextBuilder.js` 是独立、模型无关的 Context Source。Agent Core 通过可选的 `creativeContextBuilder` 注入它，与 Cognition Builder 平行；Creative Builder 失败只记录 `creativeError` 并安全降级，不中断 Cognition 或正常聊天。
 
-Builder 每轮读取最新开关，只在设计评审、视觉优化、品牌、营销视觉、UI/UX、3D、Motion 等相关请求中注入。普通聊天不注入；视觉附件只有同时存在评审、优化、选择或建议意图时才触发。
+Builder 每轮读取最新开关，只在设计评审、视觉优化、品牌、营销视觉、UI/UX、3D、Motion 等相关请求中注入。当前用户意图是主信号，Project 与 Skill 中的设计词不能单独触发；设计任务中的“这个怎么样”“再优化一下”等弱表达需要已有设计上下文才触发。普通聊天不注入；视觉附件只有同时存在评审、优化、选择或建议意图时才触发。
 
-Domain Lens 根据当前用户请求、已加载 Skill Context 与 Project Context 检测，未知场景回退 General。默认预算为 1,400 字符；输出包含 Profile 版本、角色、约束优先级、原则、领域关注、评价维度和响应政策，超出预算的行不会写入。
+Domain Lens 根据当前用户请求、已加载 Skill Context 与 Project Context 检测，未知场景回退 General。默认预算为 1,400 字符。Profile 版本、角色、约束优先级、偏好/专业判断边界和禁止编造项目事实属于 mandatory core，先写入且不可被预算裁剪；剩余预算再用于原则、领域关注和评价维度。
 
 约束优先级明确为：
 
@@ -63,7 +63,7 @@ Profile 和 Builder 位于 Agent Core 上游，不写入 AIService 或任一 Pro
 
 状态文件只包含 `schemaVersion`、`profileVersion`、`enabled`、`revision` 和 `updatedAt`。专业原则、维度、权重与 Lens 始终来自源码，不复制到用户数据文件。
 
-开关采用 latest-read 与 optimistic revision，跨窗口旧快照返回 `CREATIVE_PROFILE_CHANGED`，不会覆盖新状态。损坏 JSON 继承 TeemoStorageService 的读取失败禁止覆盖保护。
+开关采用 latest-read 与 optimistic revision，跨窗口旧快照返回 `CREATIVE_PROFILE_CHANGED`，不会覆盖新状态。损坏 JSON 继承 TeemoStorageService 的读取失败禁止覆盖保护，同时以 `CREATIVE_PROFILE_STATE_UNREADABLE` fail closed：本轮不注入、UI 显示读取异常且原文件保持不变，不会静默恢复 enabled=true。
 
 Creative Service 不读取或写入 `Teemo-cognition.json`、聊天历史、设置、Skills、Projects、授权根、凭据或个人素材库。Cognition Collector 不能修改 Creative Profile；用户偏好、收藏与未来 Inspiration 结果也不能自动修改它。
 
@@ -92,9 +92,9 @@ npm.cmd run test:creative-ui-smoke
 
 单元测试覆盖默认 Schema、版本、唯一 ID、权重总和、Lens 回退、开关持久化、revision 冲突、损坏状态保护，以及 Cognition Collector 不能修改 Creative State。
 
-Context 测试覆盖相关性门控、预算、Cognition 与 Creative 四种开关组合、项目与 Skill 约束、Provider A/B 一致消息，以及 Creative Builder 失败时的独立降级。
+Context 测试覆盖相关性门控的误触发/弱表达/图片边界、800 字符最坏预算下 mandatory policy、实际 message 顺序、Cognition 与 Creative 四种开关组合、项目与 Skill 约束、Provider A/B 一致消息、send/stream 一致注入、跨实例 reload/revision，以及 Creative Builder 或状态读取失败时的独立降级。
 
-Electron smoke 使用独立 `TEEMO_ASSISTANT_DATA_DIR` 和 Electron profile，验证真实页面、10 条原则、9 个维度、6 个 Lens、只读边界、开关跨重启持久化，以及状态文件不包含原则正文。测试不读取或修改正式 Cognition、设置、历史、Skills、Projects、授权根、凭据或个人素材库。
+Electron smoke 使用独立 `TEEMO_ASSISTANT_DATA_DIR` 和 Electron profile，验证真实页面、10 条原则、9 个维度、6 个 Lens、只读边界、开关跨重启持久化、损坏状态关闭并显示错误，以及状态文件不包含原则正文。测试不读取或修改正式 Cognition、设置、历史、Skills、Projects、授权根、凭据或个人素材库。
 
 ## 8. 人工体验 Scenario A-E
 
@@ -112,4 +112,6 @@ P3 Personal Inspiration Intelligence 仍只保留架构边界。当前没有 Ins
 
 ## 10. 审阅状态
 
-实现与隔离专项测试已完成，当前状态严格保持 `IMPLEMENTED / WAITING REVIEW`。在 GPT 严格审阅确认前不标记 PASS/CLOSED，不创建 P2-2 closed tag。
+实现与隔离专项测试已完成，当前状态严格保持 `IMPLEMENTED / WAITING REVIEW`。GPT 首轮严格审阅给出 5 个 blocker：恢复点证据、mandatory policy 预算、relevance 边界、损坏状态 fail-safe、流式与跨实例验证；均已完成小范围修复并通过第二轮全量回归，等待复审。在 GPT 确认前不标记 PASS/CLOSED，不创建 P2-2 closed tag。
+
+恢复点核验：`v1.2.0-p2.1-cognition-ui` 是 annotated tag，tag object 为 `5b04b7b...`，peeled commit 仍为原封板提交 `8eaa7aec...`，远程 peeled tag 一致；`v1.2.1-cognition-input^{}` 为 `528a493`，是 P2-2 实现提交 `095ca4c` 的直接父提交，因此 1.2.1 维护版本在 P2-2 开始前已经存在。

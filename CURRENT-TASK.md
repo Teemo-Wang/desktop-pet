@@ -28,8 +28,8 @@
 ## 当前验收进度
 
 1. P2-2 实现和专项隔离测试已完成。
-2. 待执行 P1/P2-1 全量回归、静态检查、版本检查和完整 diff 审核。
-3. 待提交 `Teemo: add P2-2 creative profile` 并发送 60 项报告到 GPT「Teemo助手升级」严格审阅。
+2. P1/P2-1 全量回归、静态检查、版本检查和完整 diff 审核均已通过。
+3. 实现提交 `095ca4c Teemo: add P2-2 creative profile`；GPT 首轮审阅的 5 个 blocker 已修复并通过专项及全量回归，等待复审。
 4. GPT 审阅前不创建 P2-2 closed tag，不标记 PASS/CLOSED。
 5. 审阅通过并修复全部 blocker 后，按用户授权自动进入 P2-3、P2-4，直至 P2 总验收、构建、安装和重启完成。
 

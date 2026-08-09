@@ -9,6 +9,7 @@
 - 新增“Teemo 的设计判断”只读页面、独立 enabled 开关和 optimistic revision；本地状态文件不保存原则正文。
 - 明确 Cognition、Creative Profile 与未来 Personal Inspiration Intelligence 三者事实源独立，以及用户 > 项目 > Skill > Creative Judgment 的约束优先级。
 - 新增 `test:creative-profile`、`test:creative-context` 和隔离 Electron `test:creative-ui-smoke`；P2-2 未修改 package/UI/installer 版本。
+- GPT 首轮严格审阅后收紧：mandatory policy 不受预算裁剪；当前用户意图主导 relevance；损坏 Creative state fail closed；补齐默认 send/stream、附件、实际消息顺序和跨实例回归。
 - 当前等待 P1/P2-1 全量回归与 GPT 严格审阅；审阅前不标记 PASS/CLOSED，不实现 P2-3、P2-4 或 P3。
 
 ## v1.2.0 - 2026-08-09

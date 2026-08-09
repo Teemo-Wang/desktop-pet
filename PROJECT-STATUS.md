@@ -19,7 +19,8 @@
 - 新增相关性门控、默认 1,400 字符预算的 Creative Context Builder，并以可选依赖平行接入 Agent Core；普通非设计聊天不注入，失败时独立降级。
 - 约束优先级为当前用户明确要求 > 项目约束 > Skill 规范 > Creative Judgment；GPT、Grok、DeepSeek 共用同一 Provider-neutral Profile。
 - 新增“Teemo 的设计判断”只读页面和独立开关；本地状态仅保存 enabled/version/revision，不保存或学习用户偏好与个人素材。
-- 专项单元与隔离 Electron smoke 已通过；P1/P2-1 全量回归与 GPT 严格审阅待完成。详细记录见 `docs/P2-2-CREATIVE-PROFILE.md`。
+- 专项单元、隔离 Electron smoke 和 P1/P2-1 全量回归已通过；GPT 严格复审待完成。详细记录见 `docs/P2-2-CREATIVE-PROFILE.md`。
+- GPT 首轮审阅的恢复点证据、mandatory policy 预算、relevance 边界、损坏状态 fail-safe、流式/跨实例验证 5 个 blocker 已修复；第二轮全量回归通过，当前等待复审。
 - 未实现 P2-3 Challenge/Creative Director、P2-4 Cognition Intelligence Upgrade 或 P3 Personal Inspiration Intelligence；当前不得标记 PASS/CLOSED。
 
 ## v1.2.1 维护更新（2026-08-09）

@@ -72,6 +72,7 @@
       if (!this.snapshot) return;
       const { state, profile } = this.snapshot;
       if (this.els.enabled) this.els.enabled.checked = state.enabled !== false;
+      if (state.readError) this._setStatus(state.readError.message || '设计判断状态读取失败，已安全停用', true);
       if (this.els.version) this.els.version.textContent = `Profile ${profile.profileVersion}`;
       if (this.els.principles) {
         this.els.principles.innerHTML = profile.principles.map((item, index) => `

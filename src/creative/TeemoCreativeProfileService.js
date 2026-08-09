@@ -32,6 +32,17 @@
     };
   }
 
+  function unreadableState() {
+    return {
+      ...defaultState(),
+      enabled: false,
+      readError: {
+        code: 'CREATIVE_PROFILE_STATE_UNREADABLE',
+        message: '设计判断状态文件无法读取，已安全停用；请恢复或移除损坏文件后重试',
+      },
+    };
+  }
+
   function normalizeState(value) {
     const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
     const state = defaultState();
@@ -52,7 +63,9 @@
 
     _load() {
       if (!this.storage.exists(this.fileName)) return defaultState();
-      return normalizeState(this.storage.readJson(this.fileName, null));
+      const value = this.storage.readJson(this.fileName, null);
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return unreadableState();
+      return normalizeState(value);
     }
 
     reload() {
@@ -69,7 +82,7 @@
     }
 
     isEnabled() {
-      return this.state.enabled !== false;
+      return !this.state.readError && this.state.enabled !== false;
     }
 
     getState() {
@@ -87,6 +100,14 @@
 
     setEnabled(enabled, options = {}) {
       this.reload();
+      if (this.state.readError) {
+        return {
+          ok: false,
+          code: this.state.readError.code,
+          message: this.state.readError.message,
+          snapshot: { state: this.getState(), profile: this.getProfile() },
+        };
+      }
       const currentRevision = Math.max(0, Number(this.state.revision) || 0);
       if (options.expectedRevision != null && Number(options.expectedRevision) !== currentRevision) {
         return {

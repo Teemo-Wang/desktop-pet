@@ -66,8 +66,11 @@ async function main() {
     const invalid = '{ invalid creative state json';
     fs.writeFileSync(stateFile, invalid, 'utf8');
     const service = new TeemoCreativeProfileService({ dataDir: dir });
-    assert.equal(service.isEnabled(), true, 'corrupt state must fail to safe in-memory default');
-    assert.throws(() => service.setEnabled(false), /拒绝覆盖读取失败/);
+    assert.equal(service.isEnabled(), false, 'corrupt state must fail closed');
+    assert.equal(service.getState().readError.code, 'CREATIVE_PROFILE_STATE_UNREADABLE');
+    const rejected = service.setEnabled(true);
+    assert.equal(rejected.ok, false);
+    assert.equal(rejected.code, 'CREATIVE_PROFILE_STATE_UNREADABLE');
     assert.equal(fs.readFileSync(stateFile, 'utf8'), invalid);
   });
 

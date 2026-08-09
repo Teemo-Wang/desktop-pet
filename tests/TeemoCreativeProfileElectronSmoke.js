@@ -72,6 +72,7 @@ async function verifyPage(window, expectedEnabled) {
 app.whenReady().then(async () => {
   let first;
   let second;
+  let third;
   try {
     first = await createWindow();
     const result = await verifyPage(first, true);
@@ -106,7 +107,17 @@ app.whenReady().then(async () => {
       await new Promise(resolve => setTimeout(resolve, 60));
       if (!toggle.checked) throw new Error('Creative switch did not re-enable');
     })()`);
-    console.log(JSON.stringify({ ok: true, isolatedRoot, result, restarted }));
+    second.destroy();
+    second = null;
+
+    const invalidState = '{ invalid creative state json';
+    fs.writeFileSync(stateFile, invalidState, 'utf8');
+    third = await createWindow();
+    const failClosed = await verifyPage(third, false);
+    const stateError = await third.webContents.executeJavaScript(`document.getElementById('TeemoCreativeStatus').textContent`);
+    if (!/无法读取|安全停用/.test(stateError)) throw new Error('Creative state read error is not visible');
+    if (fs.readFileSync(stateFile, 'utf8') !== invalidState) throw new Error('corrupt Creative state was overwritten');
+    console.log(JSON.stringify({ ok: true, isolatedRoot, result, restarted, failClosed, stateError }));
     app.exit(0);
   } catch (error) {
     console.error(error);
@@ -114,6 +125,7 @@ app.whenReady().then(async () => {
   } finally {
     if (first && !first.isDestroyed()) first.destroy();
     if (second && !second.isDestroyed()) second.destroy();
+    if (third && !third.isDestroyed()) third.destroy();
   }
 });
 
