@@ -6,6 +6,8 @@ const TeemoFileService = require('./src/services/TeemoFileService');
 const TeemoPermissionService = require('./src/permissions/TeemoPermissionService');
 const registerTeemoPermissionIpc = require('./src/permissions/TeemoPermissionIpc');
 const registerTeemoFileToolIpc = require('./src/tools/file/TeemoFileToolIpc');
+const TeemoGitService = require('./src/services/TeemoGitService');
+const registerTeemoGitToolIpc = require('./src/tools/git/TeemoGitToolIpc');
 const dingtalkBridge = require('./dingtalk-bridge');
 const materialBridge = require('./material-bridge');
 
@@ -15,6 +17,7 @@ const TEEMO_ARCHIVE_DIR = 'D:\\Teemo助手';
 const TEEMO_COMFY_OUTPUT_DIR = 'I:\\ComfyUI\\ComfyUI\\output';
 const LOCAL_ACCESS_FILE = 'local-file-access.json';
 const fileService = new TeemoFileService();
+const teemoGitService = new TeemoGitService({ fileService });
 const teemoPermissionService = new TeemoPermissionService();
 registerTeemoPermissionIpc(ipcMain, teemoPermissionService);
 
@@ -27,6 +30,10 @@ function loadLocalAccessRoots() {
 }
 
 registerTeemoFileToolIpc(ipcMain, fileService, {
+  rootsProvider: loadLocalAccessRoots,
+  permissionService: teemoPermissionService,
+});
+registerTeemoGitToolIpc(ipcMain, teemoGitService, {
   rootsProvider: loadLocalAccessRoots,
   permissionService: teemoPermissionService,
 });

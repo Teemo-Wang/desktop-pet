@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+<head><meta charset="UTF-8"><title>Teemo Git Tools Smoke</title></head>
+<body>
+  <script>window.TeemoPermissionPrompt = { request: () => new Promise(() => {}) };</script>
+  <script src="../../src/permissions/TeemoPermissionClient.js"></script>
+  <script src="../../src/tools/TeemoToolRegistry.js"></script>
+  <script src="../../src/tools/git/TeemoGitClient.js"></script>
+  <script src="../../src/tools/git/TeemoGitTools.js"></script>
+  <script>
+    const { ipcRenderer } = require('electron');
+    const permissionClient = new window.TeemoPermissionClient({ ipcRenderer });
+    const gitClient = new window.TeemoGitClient({ ipcRenderer });
+    const registry = new window.TeemoToolRegistry({ permissionService: permissionClient });
+    window.TeemoGitTools.register(registry, { gitClient });
+    window.runGitTool = (name, args, sessionId = 'git-smoke-session') => registry.execute(name, args, {
+      runId: `run-${name}`, sessionId, step: 1,
+    });
+    window.runAbortedGitTool = (name, args) => {
+      const controller = new AbortController();
+      const execution = registry.execute(name, args, {
+        runId: `run-abort-${name}`, sessionId: 'git-abort-session', step: 1, signal: controller.signal,
+      });
+      setTimeout(() => controller.abort(), 150);
+      return execution;
+    };
+    window.TeemoGitToolsSmokeReady = true;
+  </script>
+</body>
+</html>

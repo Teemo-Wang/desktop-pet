@@ -6,11 +6,12 @@ class TeemoResourceMatcher {
     try {
       const url = new URL(value);
       if (!url.protocol) return null;
-      if (url.protocol === 'file:') {
+      const localFileProtocol = ['file:', 'git+file:', 'exec+file:'].includes(url.protocol);
+      if (localFileProtocol) {
         if (url.hostname) return null;
       } else if (!url.hostname) return null;
       const pathname = url.pathname.replace(/\/{2,}/g, '/').replace(/\/$/, '') || '/';
-      const normalizedPath = url.protocol === 'file:' && process.platform === 'win32'
+      const normalizedPath = localFileProtocol && process.platform === 'win32'
         ? pathname.toLowerCase()
         : pathname;
       return `${url.protocol.toLowerCase()}//${url.hostname.toLowerCase()}${normalizedPath}`;

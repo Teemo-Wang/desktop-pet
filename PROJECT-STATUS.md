@@ -1,6 +1,6 @@
 # Teemo助理 — 项目进度与规划
 
-> 文档版本：v1.11 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.1.7（P1-5 已封板）**
+> 文档版本：v1.12 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.1.7（P1-6A Gate 已通过）**
 
 ## 当前状态
 
@@ -9,7 +9,7 @@
 - Source：`D:\Teemo助手\Teemo机器人项目\Teemo-source`
 - P0：`CLOSED`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
-- Current Development：`P1-5 Safe File Tools CLOSED / PASS；下一阶段 P1-6 Git + Controlled Execute`
+- Current Development：`P1-6A Git Tools Gate PASS；正在进入 P1-6B Controlled Execute`
 - Current Branch：`Teemo/p1-agent-core`
 
 ## P0 阶段收尾（2026-08-09）
@@ -68,6 +68,14 @@
 - 桌宠和独立聊天窗口由同一 `TeemoFileTools` Definition Factory 注册相同工具，共享 Main 授权根与权限状态。
 - 单元/安全/并发回归及隔离 Electron 双 renderer、完整应用烟测均通过；详细记录见 `docs/P1-5-FILE-TOOLS.md`。
 - GPT 严格审阅确认：`P1-5 Safe File Tools STATUS: CLOSED / RESULT: PASS / BLOCKERS: 0`；实现提交为 `0211a40`，阶段恢复标签为 `v1.1.7-p1.5-file-tools`。
+
+## P1-6A 阶段（2026-08-09，Git Safety Gate PASS）
+
+- 新增 `git_status`、`git_diff`、`git_log`、`git_show` 四个 read Tool，以及 `git_stage_files`、`git_commit` 两个 write Tool。
+- repo 必须位于既有 authorized root；Main 生成可信 `git+file:///` resource，并在 Permission 后复核 repo/git-dir identity、stage 文件 hash 或 HEAD/staged tree。
+- Git 进程固定 `shell:false` 与参数数组，具备环境脱敏、输出限制、timeout、abort/process-tree 清理；Main 一次性 execution authorization 防止 direct IPC、owner spoof 与 replay。
+- stage 只处理明确文件；commit 不自动 add。正式 Definition 中 destructive Git 与 remote Git Tool 数量均为 0。
+- `test:git-tools` 与 P1-1 至 P1-5 全量回归、双 renderer 隔离 Git 烟测均 PASS；详细记录见 `docs/P1-6-GIT-EXECUTE.md`。
 
 ### P0 已知风险
 

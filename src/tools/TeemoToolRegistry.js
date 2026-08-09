@@ -278,6 +278,12 @@
               }));
               definitionForRelease = definition;
             } catch (error) {
+              if ((signal && signal.aborted) || (error && /CANCELLED$/.test(String(error.code || '')))) {
+                return resultEnvelope({
+                  ok: false, tool, toolCallId, startedAt, cancelled: true,
+                  code: 'TOOL_CANCELLED', message: 'Tool execution was cancelled.',
+                });
+              }
               const failure = publicFailure(error, 'FILE_RESOURCE_RESOLUTION_FAILED', 'Tool resource could not be resolved safely.');
               return resultEnvelope({
                 ok: false, tool, toolCallId, startedAt,
