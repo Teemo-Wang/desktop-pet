@@ -1,5 +1,17 @@
 const assert = require('node:assert/strict');
 const TeemoAgentCore = require('../src/agent/TeemoAgentCore');
+const TeemoToolRegistry = require('../src/tools/TeemoToolRegistry');
+const TeemoBuiltinTools = require('../src/tools/TeemoBuiltinTools');
+
+function createRegistry(extraDefinitions = []) {
+  const registry = TeemoBuiltinTools.createRegistry();
+  for (const definition of extraDefinitions) registry.register(definition);
+  return registry;
+}
+
+function emptyObjectSchema() {
+  return { type: 'object', properties: {}, required: [], additionalProperties: false };
+}
 
 function sequenceAI(values, options = {}) {
   let index = 0;
@@ -28,11 +40,15 @@ async function main() {
       JSON.stringify({ type: 'tool_request', tool: 'echo', arguments: { text: 'hello' } }),
       JSON.stringify({ type: 'final_response', content: '工具已完成' }),
     ]);
-    const result = await new TeemoAgentCore({ aiService: ai }).run({ messages: [{ role: 'user', content: '测试工具' }] });
+    const result = await new TeemoAgentCore({ aiService: ai, toolRegistry: createRegistry() }).run({ messages: [{ role: 'user', content: '测试工具' }] });
     assert.equal(result.content, '工具已完成');
     assert.equal(result.run.toolCalls.length, 1);
     assert.equal(ai.calls.length, 2);
-    assert.match(ai.calls[1].messages.at(-1).content, /hello/);
+    const toolMessage = JSON.parse(ai.calls[1].messages.at(-1).content);
+    assert.equal(toolMessage.ok, true);
+    assert.equal(toolMessage.tool, 'echo');
+    assert.deepEqual(toolMessage.data, { text: 'hello' });
+    assert.equal(result.run.toolCalls[0].toolCallId, toolMessage.toolCallId);
   }
 
   {
@@ -41,14 +57,14 @@ async function main() {
       JSON.stringify({ type: 'tool_request', tool: 'echo', arguments: { text: 'two' } }),
       JSON.stringify({ type: 'final_response', content: '完成' }),
     ]);
-    const result = await new TeemoAgentCore({ aiService: ai, maxSteps: 3 }).run({ messages: [] });
+    const result = await new TeemoAgentCore({ aiService: ai, maxSteps: 3, toolRegistry: createRegistry() }).run({ messages: [] });
     assert.equal(result.run.toolCalls.length, 2);
     assert.equal(result.run.step, 3);
   }
 
   {
-    const ai = sequenceAI([JSON.stringify({ type: 'tool_request', tool: 'echo', arguments: {} })]);
-    const result = await new TeemoAgentCore({ aiService: ai, maxSteps: 1 }).run({ messages: [] });
+    const ai = sequenceAI([JSON.stringify({ type: 'tool_request', tool: 'echo', arguments: { text: '' } })]);
+    const result = await new TeemoAgentCore({ aiService: ai, maxSteps: 1, toolRegistry: createRegistry() }).run({ messages: [] });
     assert.equal(result.ok, false);
     assert.equal(result.error.code, 'MAX_STEPS');
     assert.equal(result.run.status, 'failed');
@@ -56,17 +72,22 @@ async function main() {
 
   {
     const ai = sequenceAI([JSON.stringify({ type: 'tool_request', tool: 'not_allowed', arguments: {} })]);
-    const result = await new TeemoAgentCore({ aiService: ai }).run({ messages: [] });
+    const result = await new TeemoAgentCore({ aiService: ai, toolRegistry: createRegistry() }).run({ messages: [] });
     assert.equal(result.ok, false);
     assert.equal(result.error.code, 'UNKNOWN_TOOL');
   }
 
   {
     const ai = sequenceAI([JSON.stringify({ type: 'tool_request', tool: 'echo', arguments: {} })]);
-    const core = new TeemoAgentCore({ aiService: ai, tools: { echo: async () => { throw new Error('boom'); } } });
+    const registry = new TeemoToolRegistry();
+    registry.register({
+      name: 'echo', description: 'Fail safely.', inputSchema: emptyObjectSchema(),
+      handler: async () => { throw new Error('boom'); },
+    });
+    const core = new TeemoAgentCore({ aiService: ai, toolRegistry: registry });
     const result = await core.run({ messages: [] });
     assert.equal(result.ok, false);
-    assert.equal(result.error.code, 'TOOL_FAILED');
+    assert.equal(result.error.code, 'TOOL_HANDLER_FAILED');
   }
 
   {
@@ -82,10 +103,12 @@ async function main() {
   {
     const controller = new AbortController();
     const ai = sequenceAI([JSON.stringify({ type: 'tool_request', tool: 'stop_now', arguments: {} })]);
-    const core = new TeemoAgentCore({
-      aiService: ai,
-      tools: { stop_now: async () => controller.abort() },
+    const registry = new TeemoToolRegistry();
+    registry.register({
+      name: 'stop_now', description: 'Abort the current test run.', inputSchema: emptyObjectSchema(),
+      handler: async () => controller.abort(),
     });
+    const core = new TeemoAgentCore({ aiService: ai, toolRegistry: registry });
     const result = await core.run({ messages: [], signal: controller.signal });
     assert.equal(result.ok, false);
     assert.equal(result.error.code, 'AGENT_CANCELLED');
@@ -117,12 +140,15 @@ async function main() {
       JSON.stringify({ type: 'final_response', content: 'B completed' }),
     ]);
     const core = new TeemoAgentCore({
-      tools: {
-        wait_for_abort: async (_args, context) => {
+      toolRegistry: createRegistry([{
+        name: 'wait_for_abort',
+        description: 'Abort one isolated test run.',
+        inputSchema: emptyObjectSchema(),
+        handler: async (_args, context) => {
           controllerA.abort();
           return { runId: context.runId };
         },
-      },
+      }]),
     });
     const [runA, runB] = await Promise.all([
       core.run({ aiService: aiA, messages: [{ role: 'user', content: 'A' }], sessionId: 'session-A', signal: controllerA.signal }),
@@ -134,7 +160,7 @@ async function main() {
     assert.equal(runB.ok, true);
     assert.equal(runB.content, 'B completed');
     assert.equal(runB.run.sessionId, 'session-B');
-    assert.equal(runB.run.toolCalls[0].tool, 'echo');
+    assert.equal(runB.run.toolCalls[0].name, 'echo');
     assert.match(runB.run.messages.at(-1).content, /B only/);
     assert.ok(!runB.run.messages.some(message => String(message.content).includes('A should not finish')));
   }
@@ -152,10 +178,10 @@ async function main() {
         return response;
       },
     };
-    const result = await new TeemoAgentCore({ aiService: ai }).runStream({ messages: [] });
+    const result = await new TeemoAgentCore({ aiService: ai, toolRegistry: createRegistry() }).runStream({ messages: [] });
     assert.equal(result.ok, true);
     assert.equal(result.content, '流式闭环完成');
-    assert.equal(result.run.toolCalls[0].tool, 'echo');
+    assert.equal(result.run.toolCalls[0].name, 'echo');
   }
 
   assert.deepEqual(TeemoAgentCore.normalizeAction('plain'), { type: 'direct_response', content: 'plain' });

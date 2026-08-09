@@ -2,6 +2,14 @@
 
 ## v1.1.7 - 2026-08-09
 
+### P1-3 Tool Registry（等待 GPT 审阅）
+
+- 新增模型无关的统一 `TeemoToolRegistry`、轻量 JSON Schema 校验、独立 toolCallId、受控执行 context、Abort 和统一 Tool Result envelope。
+- 将无副作用的 `echo`、`get_agent_runtime_info` 迁移为共享内置 Tool Definitions；Agent Core 不再硬编码具体 Tool handler。
+- 桌宠与独立聊天窗口在 renderer 启动时各创建一次稳定 Registry，并共享相同 Definition 来源。
+- 增加 `registry.listDefinitions()` 安全导出，明确排除 handler、metadata 和内部 context，为未来 Provider Adapter 预留边界。
+- 增加 `docs/P1-3-TOOL-REGISTRY.md` 和 `npm.cmd run test:tools`；未引入 Permission 或任何真实高权限 Tool。
+
 ### P1-2 Cognition + Context Builder（CLOSED / PASS）
 
 - 新增 Teemo Profile、Recent Context、按 projectId 隔离的 Project Context 和 Observation 数据模型。

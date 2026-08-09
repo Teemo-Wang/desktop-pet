@@ -28,10 +28,12 @@
   const contextBuilder = window.TeemoContextBuilder && cognitionService
     ? new window.TeemoContextBuilder({ cognitionService })
     : null;
+  const toolRegistry = window.TeemoBuiltinTools ? window.TeemoBuiltinTools.createRegistry() : null;
   const agentCore = window.TeemoAgentCore ? new window.TeemoAgentCore({
     aiService: ai,
     contextBuilder,
     cognitionCollector,
+    toolRegistry,
   }) : null;
   const ruleCapture = window.RuleCaptureService ? new window.RuleCaptureService(skills, ai) : null;
   const comfyui = new window.TeemoComfyUIService(store);

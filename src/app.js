@@ -9,10 +9,12 @@
   window.cognitionService = new window.TeemoCognitionService();
   window.cognitionCollector = new window.TeemoCognitionCollector({ cognitionService: window.cognitionService });
   window.contextBuilder = new window.TeemoContextBuilder({ cognitionService: window.cognitionService });
+  window.teemoToolRegistry = window.TeemoBuiltinTools.createRegistry();
   window.agentCore = new window.TeemoAgentCore({
     aiService: window.aiService,
     contextBuilder: window.contextBuilder,
     cognitionCollector: window.cognitionCollector,
+    toolRegistry: window.teemoToolRegistry,
   });
   const dtService = new window.DingTalkService();
   const yqService = new window.YuqueService();

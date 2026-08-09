@@ -1,7 +1,7 @@
 /*
  * TeemoAgentCore
- * Model-neutral Agent Run/Step loop. It only exposes harmless in-memory tools
- * in P1-1; filesystem, shell, Git and network tools belong to later phases.
+ * Model-neutral Agent Run/Step loop. Concrete tools are supplied exclusively
+ * through TeemoToolRegistry; filesystem, shell, Git and network tools are absent.
  */
 (function (root, factory) {
   const AgentCore = factory();
@@ -68,17 +68,6 @@
     return { type: 'agent_error', code: 'INVALID_ACTION', message: `未知 Agent Action 类型：${action.type || '(空)'}` };
   }
 
-  function createSafeTestTools() {
-    return {
-      echo: async (args) => ({ text: String(args && args.text != null ? args.text : '') }),
-      get_agent_runtime_info: async (_args, context) => ({
-        runId: context.runId,
-        step: context.step,
-        test: true,
-      }),
-    };
-  }
-
   const ACTION_CONTRACT = [
     '你正在 Teemo Agent Core 中执行任务。',
     '如果无需工具，必须只返回 JSON：{"type":"direct_response","content":"你的回答"}。',
@@ -93,7 +82,7 @@
       this.contextBuilder = options.contextBuilder || null;
       this.cognitionCollector = options.cognitionCollector || null;
       this.maxSteps = Number.isInteger(options.maxSteps) && options.maxSteps > 0 ? options.maxSteps : 4;
-      this.tools = { ...createSafeTestTools(), ...(options.tools || {}) };
+      this.toolRegistry = options.toolRegistry || null;
       this.activeRuns = new Map();
     }
 
@@ -118,6 +107,39 @@
     }
 
     getRun(runId) { return this.activeRuns.get(runId) || null; }
+
+    async _executeTool(registry, action, run, signal) {
+      if (!registry || typeof registry.execute !== 'function') {
+        throw Object.assign(new Error(`未知 Tool：${action.tool || '(空)'}`), { code: 'UNKNOWN_TOOL' });
+      }
+      run.status = 'tool_waiting';
+      const envelope = await registry.execute(action.tool, action.arguments, {
+        runId: run.runId,
+        sessionId: run.sessionId,
+        step: run.step,
+        signal,
+      });
+      const call = {
+        toolCallId: envelope.toolCallId,
+        name: action.tool,
+        arguments: action.arguments,
+        step: run.step,
+        status: envelope.status,
+        startedAt: envelope.startedAt,
+        finishedAt: envelope.finishedAt,
+        result: envelope.ok ? envelope.data : null,
+        error: envelope.ok ? null : envelope.error,
+      };
+      run.toolCalls.push(call);
+      if (!envelope.ok) {
+        if (envelope.error && envelope.error.code === 'TOOL_CANCELLED') throw abortError();
+        const error = new Error((envelope.error && envelope.error.message) || 'Tool 执行失败');
+        error.code = (envelope.error && envelope.error.code) || 'TOOL_REGISTRY_INTERNAL_ERROR';
+        error.toolResult = envelope;
+        throw error;
+      }
+      return envelope;
+    }
 
     async _prepareMessages(options, useActionContract) {
       const initialMessages = Array.isArray(options.messages)
@@ -193,7 +215,7 @@
       const run = this.createRun({ ...options, messages, cognitionContext, cognitionError });
       const signal = options.signal;
       const maxSteps = Number.isInteger(options.maxSteps) && options.maxSteps > 0 ? options.maxSteps : this.maxSteps;
-      const tools = options.tools ? { ...this.tools, ...options.tools } : this.tools;
+      const registry = options.toolRegistry || this.toolRegistry;
       run.status = 'thinking';
       try {
         for (let step = 1; step <= maxSteps; step += 1) {
@@ -212,17 +234,12 @@
             return { ok: true, run, action, content: action.content };
           }
           if (action.type === 'agent_error') throw Object.assign(new Error(action.message), { code: action.code });
-          if (!tools[action.tool] || typeof tools[action.tool] !== 'function') throw Object.assign(new Error(`未知 Tool：${action.tool || '(空)'}`), { code: 'UNKNOWN_TOOL' });
-          run.status = 'tool_waiting';
-          run.toolCalls.push({ tool: action.tool, arguments: action.arguments, step });
-          let result;
-          try { result = await tools[action.tool](action.arguments, { runId: run.runId, step, signal }); }
-          catch (error) { throw Object.assign(new Error(`Tool 执行失败：${error.message || error}`), { code: 'TOOL_FAILED', cause: error }); }
+          const result = await this._executeTool(registry, action, run, signal);
           if (signal && signal.aborted) throw abortError();
           run.messages.push({ role: 'assistant', content: JSON.stringify(action) });
-          run.messages.push({ role: 'tool', name: action.tool, content: JSON.stringify(result ?? null) });
+          run.messages.push({ role: 'tool', name: action.tool, content: JSON.stringify(result) });
           run.status = 'continuing';
-          if (typeof options.onStatus === 'function') options.onStatus(`已执行测试 Tool：${action.tool}`, run);
+          if (typeof options.onStatus === 'function') options.onStatus(`已执行 Tool：${action.tool}`, run);
         }
         throw Object.assign(new Error(`Agent 已达到最大步骤限制（${maxSteps}）`), { code: 'MAX_STEPS' });
       } catch (error) {
@@ -243,7 +260,7 @@
       const run = this.createRun({ ...options, messages, cognitionContext, cognitionError });
       const signal = options.signal;
       const maxSteps = Number.isInteger(options.maxSteps) && options.maxSteps > 0 ? options.maxSteps : this.maxSteps;
-      const tools = options.tools ? { ...this.tools, ...options.tools } : this.tools;
+      const registry = options.toolRegistry || this.toolRegistry;
       run.status = 'thinking';
       try {
         for (let step = 1; step <= maxSteps; step += 1) {
@@ -259,21 +276,10 @@
             return { ok: true, run, action, content: action.content };
           }
           if (action.type === 'agent_error') throw Object.assign(new Error(action.message), { code: action.code });
-          if (!tools[action.tool] || typeof tools[action.tool] !== 'function') {
-            throw Object.assign(new Error(`未知 Tool：${action.tool || '(空)'}`), { code: 'UNKNOWN_TOOL' });
-          }
-          run.status = 'tool_waiting';
-          const call = { tool: action.tool, arguments: action.arguments, step };
-          run.toolCalls.push(call);
-          let result;
-          try {
-            result = await tools[action.tool](action.arguments, { runId: run.runId, step, signal });
-          } catch (error) {
-            throw Object.assign(new Error(`Tool 执行失败：${error.message || error}`), { code: 'TOOL_FAILED', cause: error });
-          }
+          const result = await this._executeTool(registry, action, run, signal);
           if (signal && signal.aborted) throw abortError();
           run.messages.push({ role: 'assistant', content: JSON.stringify(action) });
-          run.messages.push({ role: 'tool', name: action.tool, content: JSON.stringify(result ?? null) });
+          run.messages.push({ role: 'tool', name: action.tool, content: JSON.stringify(result) });
           run.status = 'continuing';
         }
         throw Object.assign(new Error(`Agent 已达到最大步骤限制（${maxSteps}）`), { code: 'MAX_STEPS' });
@@ -292,7 +298,6 @@
     }
   }
 
-  TeemoAgentCore.createSafeTestTools = createSafeTestTools;
   TeemoAgentCore.normalizeAction = normalizeAction;
   return TeemoAgentCore;
 });
