@@ -74,8 +74,9 @@
 - 新增 `git_status`、`git_diff`、`git_log`、`git_show` 四个 read Tool，以及 `git_stage_files`、`git_commit` 两个 write Tool。
 - repo 必须位于既有 authorized root；Main 生成可信 `git+file:///` resource，并在 Permission 后复核 repo/git-dir identity、stage 文件 hash 或 HEAD/staged tree。
 - Git 进程固定 `shell:false` 与参数数组，具备环境脱敏、输出限制、timeout、abort/process-tree 清理；Main 一次性 execution authorization 防止 direct IPC、owner spoof 与 replay。
+- 全部 Git 调用统一覆盖空 hooksPath、关闭 fsmonitor/commit signing、清空 credential helper/external diff；stage/diff 对 Git filter attributes 保守 fail closed，防止 read/write 权限经 Git 配置间接启动外部程序。
 - stage 只处理明确文件；commit 不自动 add。正式 Definition 中 destructive Git 与 remote Git Tool 数量均为 0。
-- `test:git-tools` 与 P1-1 至 P1-5 全量回归、双 renderer 隔离 Git 烟测均 PASS；详细记录见 `docs/P1-6-GIT-EXECUTE.md`。
+- `test:git-tools` 包含 hooks/custom hooksPath/signing/filter/fsmonitor 恶意 marker 测试；P1-1 至 P1-5 回归与双 renderer 隔离 Git 烟测均 PASS。详细记录见 `docs/P1-6-GIT-EXECUTE.md`。
 
 ## P1-6B 阶段（2026-08-09，Controlled Execute Gate PASS）
 

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { spawn } = require('child_process');
 const { pathToFileURL } = require('url');
 const crypto = require('crypto');
@@ -44,6 +45,10 @@ class TeemoGitService {
     this.fileService = options.fileService;
     this.gitExecutable = options.gitExecutable || 'git';
     this.spawnImpl = options.spawnImpl || spawn;
+    const hooksDirectory = options.safeHooksDirectory
+      || fs.mkdtempSync(path.join(os.tmpdir(), 'Teemo-git-empty-hooks-'));
+    this.safeHooksDirectory = fs.realpathSync.native(hooksDirectory);
+    this.safeHooksIdentity = identity(this.safeHooksDirectory);
     this.limits = Object.freeze({
       timeoutMs: Number(options.timeoutMs) || 15000,
       maxOutputBytes: Number(options.maxOutputBytes) || 512 * 1024,
@@ -93,6 +98,37 @@ class TeemoGitService {
     try { child.kill('SIGKILL'); } catch (_) {}
   }
 
+  _assertSafeHooksDirectory() {
+    let canonical;
+    try {
+      canonical = fs.realpathSync.native(this.safeHooksDirectory);
+      if (!samePath(canonical, this.safeHooksDirectory)
+        || identity(canonical) !== this.safeHooksIdentity
+        || !fs.statSync(canonical).isDirectory()
+        || fs.readdirSync(canonical).length !== 0) {
+        fail('GIT_EXTERNAL_EXECUTION_NOT_ALLOWED', 'Safe Git hooks policy is unavailable.');
+      }
+    } catch (error) {
+      if (error instanceof TeemoGitError) throw error;
+      fail('GIT_EXTERNAL_EXECUTION_NOT_ALLOWED', 'Safe Git hooks policy is unavailable.');
+    }
+  }
+
+  _safeInvocationArgs(args) {
+    this._assertSafeHooksDirectory();
+    return [
+      '--no-pager',
+      '-c', 'color.ui=false',
+      '-c', 'core.pager=cat',
+      '-c', 'core.fsmonitor=false',
+      '-c', `core.hooksPath=${this.safeHooksDirectory}`,
+      '-c', 'commit.gpgSign=false',
+      '-c', 'credential.helper=',
+      '-c', 'diff.external=',
+      ...args,
+    ];
+  }
+
   _runGit(cwd, args, options = {}) {
     const timeoutMs = Math.min(Math.max(Number(options.timeoutMs) || this.limits.timeoutMs, 100), 60000);
     const maxOutputBytes = Number(options.maxOutputBytes) || this.limits.maxOutputBytes;
@@ -105,10 +141,7 @@ class TeemoGitService {
       }
       let child;
       try {
-        const processArgs = options.rawExecutableArgs ? args : [
-          '--no-pager', '-c', 'color.ui=false', '-c', 'core.pager=cat', '-c', 'core.fsmonitor=false',
-          ...args,
-        ];
+        const processArgs = options.rawExecutableArgs ? args : this._safeInvocationArgs(args);
         child = this.spawnImpl(this.gitExecutable, processArgs, {
           cwd,
           windowsHide: true,
@@ -116,8 +149,10 @@ class TeemoGitService {
           stdio: ['ignore', 'pipe', 'pipe'],
           env: this._minimalEnvironment(options.env),
         });
-      } catch (_) {
-        reject(new TeemoGitError('GIT_OPERATION_FAILED', 'Git process could not be started.'));
+      } catch (error) {
+        reject(error instanceof TeemoGitError
+          ? error
+          : new TeemoGitError('GIT_OPERATION_FAILED', 'Git process could not be started.'));
         return;
       }
       const stdout = [];
@@ -278,6 +313,21 @@ class TeemoGitService {
     return result.stdout.split('\u0000').filter(Boolean);
   }
 
+  async _assertNoExternalFilters(repo, files, options = {}) {
+    const paths = Array.from(new Set((files || []).map(value => String(value || '')).filter(Boolean)));
+    if (!paths.length) return;
+    const result = await this._git(repo, ['check-attr', '-z', 'filter', '--', ...paths], options);
+    const fields = result.stdout.split('\u0000');
+    for (let index = 0; index + 2 < fields.length; index += 3) {
+      const file = sanitizeOutput(fields[index]);
+      const attribute = fields[index + 1];
+      const value = fields[index + 2];
+      if (attribute === 'filter' && value !== 'unspecified' && value !== 'unset') {
+        fail('GIT_EXTERNAL_FILTER_NOT_ALLOWED', `External Git filters are not allowed for ${file || 'a staged file'}.`);
+      }
+    }
+  }
+
   _snapshotRepo(resolved, extra = {}) {
     return Object.freeze({
       repo: resolved.repo,
@@ -294,7 +344,10 @@ class TeemoGitService {
     if (!GIT_TOOLS.has(tool)) fail('GIT_TOOL_UNKNOWN', 'Unknown Git tool.');
     const resolved = await this._resolveRepo(args.repo, roots, options);
     const extra = {};
-    if (tool === 'git_diff' && args.file) extra.file = this._safeRelativeFile(resolved.repo, args.file, roots);
+    if (tool === 'git_diff' && args.file) {
+      extra.file = this._safeRelativeFile(resolved.repo, args.file, roots);
+      await this._assertNoExternalFilters(resolved.repo, [extra.file.relative], options);
+    }
     if (tool === 'git_show') {
       const revision = String(args.revision || 'HEAD');
       if (!/^(?!-)[A-Za-z0-9][A-Za-z0-9._\/^~+-]{0,199}$/.test(revision)) fail('GIT_PATH_INVALID', 'Git revision is invalid.');
@@ -313,6 +366,7 @@ class TeemoGitService {
       if (new Set(extra.files.map(file => file.relative.toLowerCase())).size !== extra.files.length) {
         fail('GIT_PATH_INVALID', 'Duplicate Git file paths are not allowed.');
       }
+      await this._assertNoExternalFilters(resolved.repo, extra.files.map(file => file.relative), options);
       for (const file of extra.files.filter(item => !item.exists)) {
         const tracked = await this._git(resolved.repo, ['ls-files', '--error-unmatch', '--', file.relative], {
           ...options, allowFailure: true,
@@ -364,6 +418,7 @@ class TeemoGitService {
       if (verified.stdout.trim() !== prepared.snapshot.commit) fail('GIT_RESOURCE_CHANGED', 'Git revision changed while permission was pending.');
     }
     if (prepared.tool === 'git_stage_files') {
+      await this._assertNoExternalFilters(current.repo, prepared.snapshot.files.map(file => file.relative), options);
       for (const before of prepared.snapshot.files) {
         let after;
         try { after = this._safeRelativeFile(current.repo, before.relative, roots, { forStage: true }); }
@@ -444,6 +499,9 @@ class TeemoGitService {
     const names = await this._git(repo, nameArgs, options);
     const files = names.stdout.split('\u0000').filter(Boolean);
     const selected = files.slice(0, this.limits.maxFiles);
+    await this._assertNoExternalFilters(repo, prepared.snapshot.file
+      ? [prepared.snapshot.file.relative]
+      : selected, options);
     const args = ['diff', ...(staged ? ['--cached'] : []), '--no-ext-diff', '--no-textconv', '--no-color', '--'];
     if (prepared.snapshot.file) args.push(prepared.snapshot.file.relative);
     else args.push(...selected);
@@ -472,6 +530,7 @@ class TeemoGitService {
 
   async _stage(repo, prepared, options) {
     const files = prepared.snapshot.files.map(file => file.relative);
+    await this._assertNoExternalFilters(repo, files, options);
     await this._git(repo, ['add', '--', ...files], options);
     return { repo, stagedFiles: files, status: await this._status(repo, options) };
   }

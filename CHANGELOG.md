@@ -7,6 +7,7 @@
 - 新增 4 个只读 Git Tool、显式文件 stage 与 staged-only commit；不存在 destructive/remote Git Tool。
 - 新增 `run_npm_script` 与 Node-only `run_process`；不存在任意 shell、cmd、PowerShell、Python 或任意 executable Tool。
 - Git/Execute 都使用 Main canonical policy、可信动态 Permission Resource、一次性 execution authorization、授权后 TOCTOU 复核与 owner/replay 防护。
+- Git Safe Invocation Policy 以空 hooksPath、关闭 fsmonitor/commit signing、清空 credential helper/external diff 与 filter attribute fail-closed，阻止 read/write Git Tool 间接启动外部程序绕过 execute permission。
 - 所有子进程固定 `shell:false`、参数数组、最小环境、secret filter、输出清洗/上限、timeout、Abort 与 process-tree cleanup。
 - `test:git-tools`、`test:execute` 与 P1-1 至 P1-5 全量回归通过；Git/Execute 双 renderer 隔离烟测及完整应用隔离启动通过。
 - P1-6A 实现提交为 `ecd7bda`；P1-6B 提交与最终 `v1.2.0-p1-agent-foundation` 标签需在总审阅后记录。

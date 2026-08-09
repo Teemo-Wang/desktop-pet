@@ -47,6 +47,7 @@ Provider-neutral Action
 - File/Git/Execute 在 Permission 后、真实副作用前重做 canonical/identity/hash 检查。
 - create/patch/rename 不覆盖未知内容；Git 只 stage 明确文件、commit 只提交已 staged 内容。
 - Execute 只允许可信 Node 与已声明 npm script，`shell:false`、stdin disabled、无 detached process。
+- Git read/write 调用统一禁用 hooks、custom hooksPath、fsmonitor、commit signing、external diff/textconv 与 credential interaction；stage/diff 遇到 filter attribute 保守拒绝，避免间接绕过 execute permission。
 - 子进程使用最小环境与 secret-name filter，并具有输出上限、ANSI/control 清洗、timeout、Abort 与 process-tree cleanup。
 - 正式用户数据、authorized roots、settings、history、Skills、Cognition 与 Projects 没有被测试读取或修改；Electron 验证均使用隔离 profile/data。
 

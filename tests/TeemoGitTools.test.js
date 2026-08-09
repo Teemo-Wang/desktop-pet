@@ -46,6 +46,23 @@ function isProcessAlive(pid) {
   try { process.kill(pid, 0); return true; } catch (_) { return false; }
 }
 
+function writeHook(scriptPath, markerPath) {
+  const marker = markerPath.replace(/\\/g, '/').replace(/"/g, '\\"');
+  fs.writeFileSync(scriptPath, `#!/bin/sh\nprintf hook > "${marker}"\nexit 0\n`, 'utf8');
+  fs.chmodSync(scriptPath, 0o755);
+}
+
+function writeMarkerExecutable(directory, name, markerPath) {
+  if (process.platform === 'win32') {
+    const scriptPath = path.join(directory, `${name}.cmd`);
+    fs.writeFileSync(scriptPath, `@echo off\r\n> "${markerPath}" echo marker\r\nexit /b 1\r\n`, 'utf8');
+    return scriptPath;
+  }
+  const scriptPath = path.join(directory, name);
+  writeHook(scriptPath, markerPath);
+  return scriptPath;
+}
+
 async function main() {
   const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'Teemo-P1-6A-git-tools-'));
   const authorized = path.join(sandbox, 'authorized');
@@ -238,6 +255,91 @@ async function main() {
     try { execFileSync('taskkill', ['/PID', String(childPid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }); } catch (_) {}
   }
   assert.equal(childAlive, false, 'Abort must terminate the process tree');
+
+  const policyRepo = path.join(authorized, 'Teemo-safe-git-policy-repo');
+  fs.mkdirSync(policyRepo);
+  git(policyRepo, ['init', '--initial-branch=main']);
+  git(policyRepo, ['config', 'user.name', 'Teemo Test']);
+  git(policyRepo, ['config', 'user.email', 'teemo-test@example.invalid']);
+  fs.writeFileSync(path.join(policyRepo, 'Teemo-policy-base.md'), 'base\n', 'utf8');
+  git(policyRepo, ['add', '--', 'Teemo-policy-base.md']);
+  git(policyRepo, ['commit', '-m', 'Policy baseline']);
+  const policyGitDir = git(policyRepo, ['rev-parse', '--absolute-git-dir']).trim();
+  const policyService = new TeemoGitService({ fileService, timeoutMs: 5000 });
+
+  const preCommitMarker = path.join(sandbox, 'Teemo-pre-commit.marker');
+  const postCommitMarker = path.join(sandbox, 'Teemo-post-commit.marker');
+  writeHook(path.join(policyGitDir, 'hooks', 'pre-commit'), preCommitMarker);
+  writeHook(path.join(policyGitDir, 'hooks', 'post-commit'), postCommitMarker);
+  fs.writeFileSync(path.join(policyRepo, 'Teemo-hook-test.md'), 'hook safe\n', 'utf8');
+  await policyService.executePrepared(await policyService.prepareOperation('git_stage_files', {
+    repo: policyRepo, files: ['Teemo-hook-test.md'],
+  }, roots), roots);
+  await policyService.executePrepared(await policyService.prepareOperation('git_commit', {
+    repo: policyRepo, message: 'Teemo hook policy test',
+  }, roots), roots);
+  assert.equal(fs.existsSync(preCommitMarker), false, 'pre-commit must not execute');
+  assert.equal(fs.existsSync(postCommitMarker), false, 'post-commit must not execute');
+
+  const customHooksDirectory = path.join(policyRepo, 'Teemo-malicious-hooks');
+  fs.mkdirSync(customHooksDirectory);
+  const customHookMarker = path.join(sandbox, 'Teemo-custom-hook.marker');
+  writeHook(path.join(customHooksDirectory, 'pre-commit'), customHookMarker);
+  git(policyRepo, ['config', 'core.hooksPath', customHooksDirectory]);
+  fs.writeFileSync(path.join(policyRepo, 'Teemo-custom-hook-test.md'), 'custom hook safe\n', 'utf8');
+  await policyService.executePrepared(await policyService.prepareOperation('git_stage_files', {
+    repo: policyRepo, files: ['Teemo-custom-hook-test.md'],
+  }, roots), roots);
+  await policyService.executePrepared(await policyService.prepareOperation('git_commit', {
+    repo: policyRepo, message: 'Teemo custom hook policy test',
+  }, roots), roots);
+  assert.equal(fs.existsSync(customHookMarker), false, 'custom core.hooksPath must not execute');
+
+  const signingMarker = path.join(sandbox, 'Teemo-signing.marker');
+  const signingExecutable = writeMarkerExecutable(sandbox, 'Teemo-fake-gpg', signingMarker);
+  git(policyRepo, ['config', 'commit.gpgSign', 'true']);
+  git(policyRepo, ['config', 'gpg.program', signingExecutable]);
+  fs.writeFileSync(path.join(policyRepo, 'Teemo-signing-test.md'), 'signing safe\n', 'utf8');
+  await policyService.executePrepared(await policyService.prepareOperation('git_stage_files', {
+    repo: policyRepo, files: ['Teemo-signing-test.md'],
+  }, roots), roots);
+  await policyService.executePrepared(await policyService.prepareOperation('git_commit', {
+    repo: policyRepo, message: 'Teemo signing policy test',
+  }, roots), roots);
+  assert.equal(fs.existsSync(signingMarker), false, 'commit signing program must not execute');
+
+  const filterMarker = path.join(sandbox, 'Teemo-filter.marker');
+  const filterScript = path.join(sandbox, 'Teemo-filter.js');
+  fs.writeFileSync(filterScript, [
+    "const fs=require('fs');",
+    `fs.writeFileSync(${JSON.stringify(filterMarker)},'filter');`,
+    'process.stdin.pipe(process.stdout);',
+  ].join('\n'), 'utf8');
+  git(policyRepo, ['config', 'filter.evil.clean', `"${process.execPath}" "${filterScript}"`]);
+  fs.writeFileSync(path.join(policyRepo, '.gitattributes'), 'Teemo-filter.txt filter=evil\n', 'utf8');
+  fs.writeFileSync(path.join(policyRepo, 'Teemo-filter.txt'), 'must not filter\n', 'utf8');
+  await expectCode(policyService.prepareOperation('git_stage_files', {
+    repo: policyRepo, files: ['Teemo-filter.txt'],
+  }, roots), 'GIT_EXTERNAL_FILTER_NOT_ALLOWED');
+  await expectCode(policyService.prepareOperation('git_diff', {
+    repo: policyRepo, staged: false, file: 'Teemo-filter.txt',
+  }, roots), 'GIT_EXTERNAL_FILTER_NOT_ALLOWED');
+  assert.equal(fs.existsSync(filterMarker), false, 'clean/process filter must not execute');
+  assert.equal(git(policyRepo, ['diff', '--cached', '--name-only']).split(/\r?\n/).includes('Teemo-filter.txt'), false);
+
+  const fsmonitorMarker = path.join(sandbox, 'Teemo-fsmonitor.marker');
+  const fsmonitorExecutable = writeMarkerExecutable(sandbox, 'Teemo-fake-fsmonitor', fsmonitorMarker);
+  git(policyRepo, ['config', 'core.fsmonitor', fsmonitorExecutable]);
+  const safeStatus = await policyService.executePrepared(await policyService.prepareOperation('git_status', {
+    repo: policyRepo,
+  }, roots), roots);
+  assert.equal(safeStatus.repo, policyRepo);
+  fs.writeFileSync(path.join(policyRepo, 'Teemo-fsmonitor-test.md'), 'fsmonitor safe\n', 'utf8');
+  await policyService.executePrepared(await policyService.prepareOperation('git_stage_files', {
+    repo: policyRepo, files: ['Teemo-fsmonitor-test.md'],
+  }, roots), roots);
+  assert.equal(fs.existsSync(fsmonitorMarker), false, 'fsmonitor program must not execute for read or write Git tools');
+  assert.equal(fs.existsSync(filterMarker), false, 'Git status must not execute configured clean/process filters');
 
   const oldRepo = path.join(authorized, 'Teemo-old-repo');
   const replacePrepared = await service.prepareOperation('git_status', { repo }, roots);

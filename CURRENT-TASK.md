@@ -5,7 +5,7 @@
 - Product：Teemo助理
 - Branch：`Teemo/p1-agent-core`
 - Phase：P1 最终总审阅
-- State：P1-1 至 P1-6 本地实现与 Gate 已完成，等待“Teemo助手升级”严格审阅
+- State：P1 总审阅发现的 Git 间接执行 blocker 已修正并通过本地回归，等待“Teemo助手升级”最终复审
 - Guardrail：总审阅确认前不进入 P2
 
 ## 已完成
@@ -20,10 +20,9 @@
 
 ## 当前动作
 
-1. 提交 P1-6B implementation commit。
-2. 向“Teemo助手升级”发送 P1-6 与整个 P1 的证据化审阅报告。
-3. 修复审阅指出的 blocker 或必要优化并重跑受影响 Gate。
-4. 审阅通过后创建 close commit、`v1.2.0-p1-agent-foundation` 标签并推送。
+1. 提交 `Teemo: prevent git tools from bypassing execute permission` 安全修正。
+2. 向“Teemo助手升级”发送实现、恶意仓库测试、全量回归、Electron smoke 与 commit hash。
+3. 最终复审通过后创建 close commit、`v1.2.0-p1-agent-foundation` 标签并推送。
 
 ## 禁止扩展
 
