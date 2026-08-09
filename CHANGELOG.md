@@ -1,13 +1,14 @@
 # Changelog
 
-## P3-2 Local Folder Connector - 2026-08-09（IMPLEMENTED / WAITING REVIEW）
+## P3-2 Local Folder Connector - 2026-08-09（CLOSED / PASS）
 
 - 新增独立 Local Folder Source Registry、只读 Main Process Connector/Service/IPC 和“我的灵感”来源浏览 UI。
 - 只复用 P1 authorized roots；Source Registry 不具有授权效力，每次读取使用 source-specific Permission resource 与一次性 execution authorization。
 - 支持受限非递归目录浏览、实时 metadata 和 PNG/JPEG/WEBP/GIF 按需 preview；拒绝 traversal、UNC/device、link/junction、错误 signature 和超大文件。
 - 移除 Source 不删除用户文件、不撤销 P1 root；P1 撤权后立即 fail closed，并支持显式重新授权。
 - P3-2/P3-1 专项、22 组 P1/P2 Node、10 组既有 Electron、32-case benchmark、自动更新、语法、diff 与版本检查全部通过。
-- 未实现 Metadata Index、Embedding、Vector、Search、Eagle、NAS 或 Agent Context；等待 GPT Strict Review，不创建 close tag。
+- 未实现 Metadata Index、Embedding、Vector、Search、Eagle、NAS 或 Agent Context。
+- GPT Strict Review 确认 `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-3`；恢复标签为 `v1.3.0-p3.2-local-folder-connector`。
 
 ## P3-1 Inspiration Foundation - 2026-08-09（CLOSED / PASS）
 

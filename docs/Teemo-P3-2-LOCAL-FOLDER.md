@@ -1,6 +1,6 @@
 # Teemo助理 P3-2 Local Folder Connector
 
-> 状态：`IMPLEMENTED / WAITING REVIEW`
+> 状态：`CLOSED / PASS / BLOCKERS: 0`
 > 分支：`Teemo/p3-personal-inspiration`
 > 开始基线：`9cbab29af6c4691bccbe8f58d44bdb2e34080436`
 > P3-1 标签：`v1.3.0-p3.1-inspiration-foundation`，peeled commit 与开始基线一致
@@ -123,7 +123,9 @@ Agent assembly 仍为 `Skill -> Cognition -> Creative -> Challenge -> Current Us
 
 ## 11. Gate 状态
 
-P3-2 当前仅为 `IMPLEMENTED / WAITING REVIEW`。尚未创建 `v1.3.0-p3.2-local-folder-connector`，未 remote push，未开始 P3-3。只有 GPT 明确返回 `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-3` 后才允许关闭和打标签。
+GPT Strict Review 已确认 `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-3`。P3-2 已获准关闭并创建 annotated recovery tag `v1.3.0-p3.2-local-folder-connector`；remote push 未执行。
+
+GPT 确认的非阻塞风险：同步 OS filesystem call 无法由 `Promise.race` 强制中止；Windows `O_NOFOLLOW` 可用性有限，当前依靠 lstat/realpath、双 containment、open/fstat 与 post-read fstat 组合；移除 Source 后保留 P1 root 是有意的授权分离；rootPath 只保存在本地私有 Source 配置。以上均不阻塞 P3-2 关闭。
 
 `FORMAL_USER_DATA_TOUCHED: NO`
 
