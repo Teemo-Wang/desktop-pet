@@ -8,6 +8,7 @@
 - 新增仅内存运行的 `echo`、`get_agent_runtime_info` 安全测试 Tool。
 - 保持普通聊天流式输出、模型切换、历史会话、Skill 注入和附件上下文兼容。
 - 增加 `docs/P1-1-AGENT-CORE.md` 和 `npm.cmd run test:agent-core` 验证入口。
+- GPT 审阅后补齐并发 Run 隔离与非法 Action schema 校验，P1-1 已确认封板。
 
 ### P1 前稳定基线
 

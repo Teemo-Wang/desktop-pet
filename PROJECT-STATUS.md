@@ -9,7 +9,7 @@
 - Source：`D:\Teemo助手\Teemo机器人项目\Teemo-source`
 - P0：`CLOSED`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
-- Current Development：`P1-1 Agent Core foundation`
+- Current Development：`P1-1 Agent Core foundation CLOSED`
 - Current Branch：`Teemo/p1-agent-core`
 
 ## P0 阶段收尾（2026-08-09）
@@ -28,7 +28,8 @@
 - 已接入桌宠聊天和独立聊天窗口的流式兼容包装，保留原有 UI、历史、Skill、附件和模型切换。
 - 仅提供无副作用的 `echo` 与 `get_agent_runtime_info` 内部测试 Tool。
 - 详细记录见 `docs/P1-1-AGENT-CORE.md`。
-- P1-2（Teemo Cognition + Context Builder）尚未开始，等待审阅后再进入。
+- P1-1 已经 GPT 审阅确认封板；阶段提交为 `20f90b0` 和 `dbfc598`，恢复标签为 `v1.1.7-p1.1-agent-core`。
+- P1-2（Teemo Cognition + Context Builder）尚未开始，需在收到明确需求后进入。
 
 ### P0 已知风险
 
