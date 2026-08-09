@@ -44,6 +44,7 @@ async function createWindow() {
 app.whenReady().then(async () => {
   let first;
   let restarted;
+  let invalid;
   let corrupt;
   try {
     first = await createWindow();
@@ -115,6 +116,31 @@ app.whenReady().then(async () => {
     restarted.destroy();
     restarted = null;
 
+    const invalidRegistry = JSON.parse(persistedRegistry.toString('utf8'));
+    invalidRegistry.skills.find(item => item.skillId === 'brand').routing.role = 'bad_role';
+    const invalidBytes = Buffer.from(JSON.stringify(invalidRegistry, null, 2), 'utf8');
+    fs.writeFileSync(registryPath, invalidBytes);
+    invalid = await createWindow();
+    const invalidResult = await invalid.webContents.executeJavaScript(`(async () => {
+      document.getElementById('settingsButton').click();
+      await new Promise(resolve => setTimeout(resolve, 40));
+      const snapshot = window.skillManifestService.getRegistrySnapshot();
+      return {
+        warning: document.getElementById('skillList').textContent,
+        invalidRow: document.querySelector('[data-skill-id="brand"]').textContent,
+        route: window.skillRouter.route({ text: '生成海报', sessionId: 'invalid' }),
+        validIds: snapshot.skills.map(item => item.skillId),
+        invalidIds: snapshot.invalidSkills.map(item => item.skillId),
+      };
+    })()`);
+    if (!/Needs repair/.test(invalidResult.warning) || !/Routing invalid/.test(invalidResult.invalidRow)) throw new Error('individual invalid Manifest UI warning missing');
+    if (!invalidResult.route.selectedSkillIds.includes('poster')) throw new Error('valid Skill stopped routing beside invalid Manifest');
+    if (invalidResult.validIds.includes('brand') || !invalidResult.invalidIds.includes('brand')) throw new Error('invalid Manifest was not isolated');
+    if (!fs.readFileSync(registryPath).equals(invalidBytes)) throw new Error('individual invalid Manifest rewrote Registry bytes');
+    if (!fs.readFileSync(skillsPath).equals(rawSkillBytes)) throw new Error('individual invalid Manifest changed Raw Skill bytes');
+    invalid.destroy();
+    invalid = null;
+
     const corruptBytes = Buffer.from('{broken-registry', 'utf8');
     fs.writeFileSync(registryPath, corruptBytes);
     corrupt = await createWindow();
@@ -136,7 +162,7 @@ app.whenReady().then(async () => {
     console.error(error);
     app.exit(1);
   } finally {
-    [first, restarted, corrupt].forEach(window => { if (window && !window.isDestroyed()) window.destroy(); });
+    [first, restarted, invalid, corrupt].forEach(window => { if (window && !window.isDestroyed()) window.destroy(); });
   }
 });
 

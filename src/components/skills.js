@@ -50,6 +50,7 @@
         : { ok: false, skills: [] };
       const skills = this.service.getAll();
       const manifests = new Map((registry.skills || []).map(item => [item.skillId, item]));
+      const invalidManifests = new Map((registry.invalidSkills || []).map(item => [item.skillId, item]));
       this.panel.innerHTML = `
         <div class="panel-head">
           <span class="panel-head-title"><img class="panel-head-icon" src="icon/skill.png" alt="">技能中心</span>
@@ -58,15 +59,17 @@
         </div>
         <div class="panel-body">
           ${registry.ok === false ? `<div class="skill-routing-error">Skill 路由数据无法读取。自动路由已关闭，普通聊天不受影响。</div>` : ''}
+          ${registry.ok !== false && invalidManifests.size ? `<div class="skill-routing-error">${invalidManifests.size} 个 Skill 的 Routing Metadata 无效，已隔离并标记为 Needs repair；其他有效 Skill 仍可自动路由。</div>` : ''}
           <div class="skill-grid">
             ${skills.map(s => {
               const manifest = manifests.get(String(s.id));
+              const invalidManifest = invalidManifests.get(String(s.id));
               const status = manifest && manifest.routing.status;
               return `
               <div class="skill-card${s.custom ? ' skill-card-custom' : ''}" data-id="${s.id}">
                 <div class="skill-name">${s.name}</div>
                 <div class="skill-desc">${s.desc}</div>
-                ${manifest ? `<div class="skill-routing-summary">${status === 'ready' ? 'Auto Routing · Ready' : status === 'disabled' ? 'Auto Routing · Disabled' : '路由信息待完善'} · ${manifest.routing.role}</div>` : ''}
+                ${manifest ? `<div class="skill-routing-summary">${status === 'ready' ? 'Auto Routing · Ready' : status === 'disabled' ? 'Auto Routing · Disabled' : '路由信息待完善'} · ${manifest.routing.role}</div>` : invalidManifest ? '<div class="skill-routing-summary skill-routing-invalid">Routing invalid · Needs repair</div>' : ''}
               </div>
             `; }).join('')}
           </div>
@@ -340,6 +343,7 @@
       const s = this.currentSkill;
       const registry = window.skillManifestService && window.skillManifestService.reload ? window.skillManifestService.reload() : null;
       const manifest = registry && registry.ok ? registry.skills.find(item => item.skillId === String(s.id)) : null;
+      const invalidManifest = registry && registry.ok ? (registry.invalidSkills || []).find(item => item.skillId === String(s.id)) : null;
       const routing = manifest && manifest.routing;
       this.panel.innerHTML = `
         <div class="panel-head">
@@ -352,7 +356,7 @@
           <button class="skill-run-btn" id="skExport" style="margin-bottom:10px;background:rgba(0,118,255,0.08);color:var(--brand);">⬇ 导出分享（SKILL.md）</button>
           ${s.id === 'skill1' ? `<button class="skill-run-btn" id="skEditRules" style="margin-bottom:10px;background:rgba(0,118,255,0.08);color:var(--brand);">✏️ 编辑规则</button>` : ''}
           ${s.custom ? `<button class="skill-run-btn" id="skEditCustomRules" style="margin-bottom:10px;background:rgba(0,118,255,0.08);color:var(--brand);">✏️ 查看/编辑内容</button>` : ''}
-          ${manifest ? `
+          ${invalidManifest ? `<div class="skill-routing-error">Routing invalid · Needs repair<br>${_esc((invalidManifest.errors || []).join('; '))}<br>该 Skill 已从自动路由隔离，Raw Skill 未被修改。</div>` : manifest ? `
           <details class="skill-routing-editor">
             <summary>Routing Metadata · ${routing.status} · ${routing.role}</summary>
             <div class="skill-field"><label>Auto Routing</label><select id="skRouteStatus"><option value="ready" ${routing.status === 'ready' ? 'selected' : ''}>Ready</option><option value="needs_review" ${routing.status === 'needs_review' ? 'selected' : ''}>Needs Review</option><option value="disabled" ${routing.status === 'disabled' ? 'selected' : ''}>Disabled</option></select></div>

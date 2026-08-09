@@ -26,6 +26,24 @@
 
   function matchedItems(text, values) { return (values || []).filter(item => Spec.containsPhrase(text, item)); }
   function reason(code, skillId, detail) { return { code, skillId, ...(detail ? { detail } : {}) }; }
+  function escapeRegExp(value) { return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  function isTextExplicitInvocation(text, name) {
+    const normalized = Spec.normalizeText(text);
+    const target = Spec.normalizeText(name);
+    if (!normalized || target.length < 2) return false;
+    const targetPattern = escapeRegExp(target).replace(/\s+/g, '\\s*');
+    const pattern = new RegExp(`(?:^|\\s)(?:请\\s*)?(?:接下来\\s*)?(?:使用|用|按照|调用|启用|选择|切换到)\\s*(?:一下\\s*)?${targetPattern}(?:\\s*skill)?(?=$|\\s)`, 'gi');
+    let match;
+    while ((match = pattern.exec(normalized))) {
+      const prefix = normalized.slice(Math.max(0, match.index - 32), match.index);
+      const suffix = normalized.slice(pattern.lastIndex, pattern.lastIndex + 32);
+      const metaRequest = /(解释|说明|介绍|讨论|评价|对比|比较|复述|引用|文档|示例|例子|这句话|那句话|原文|为什么)[^。！？]{0,18}$/i.test(prefix);
+      const negated = /(不要|别|不再|不|不用|无需|不需要|禁止|避免)\s*$/i.test(prefix);
+      const questionAboutSkill = /^\s*(?:是|到底是|能做)?\s*(?:什么|做什么|干什么|什么意思|如何工作|怎么用)|^\s*(?:为什么|对比|比较)/i.test(suffix);
+      if (!metaRequest && !negated && !questionAboutSkill) return true;
+    }
+    return false;
+  }
   function isGenericFollowUp(text) {
     const value = Spec.normalizeText(text);
     if (!value || value.length > 36) return false;
@@ -53,18 +71,17 @@
 
     _explicit(manifests, text, explicitSkillId) {
       if (explicitSkillId) return manifests.filter(item => item.skillId === String(explicitSkillId));
-      const normalized = Spec.normalizeText(text);
-      if (!normalized) return [];
       return manifests.filter(item => {
-        const names = [item.name, ...(item.routing.aliases || [])].map(Spec.normalizeText).filter(value => value.length >= 2);
-        return names.some(name => normalized.includes(name));
+        const names = [item.name, ...(item.routing.aliases || [])];
+        return names.some(name => isTextExplicitInvocation(text, name));
       });
     }
 
-    _evaluate(manifest, text, modalities, projectText, request) {
+    _hardEligibility(manifest, text, modalities, request, options = {}) {
       const excluded = [];
       const routing = manifest.routing;
-      if (routing.status !== 'ready') excluded.push(routing.status === 'disabled' ? 'disabled' : 'needs_review');
+      if (routing.status === 'disabled') excluded.push('disabled');
+      else if (routing.status !== 'ready' && !(options.allowNeedsReview && routing.status === 'needs_review')) excluded.push('needs_review');
       const exclusions = matchedItems(text, routing.exclusions);
       if (exclusions.length) excluded.push('excluded_by_manifest');
       const missingTools = (manifest.requirements.toolsRequired || []).filter(name => !this._toolAvailable(name, request));
@@ -75,6 +92,13 @@
       const acceptedModalities = manifest.modalities.input || [];
       const modalityMatch = modalities.some(item => acceptedModalities.includes(item) || acceptedModalities.includes('mixed'));
       if (modalities.some(item => item !== 'text' && item !== 'unknown') && acceptedModalities.length && !modalityMatch && !acceptedModalities.includes('text')) excluded.push('modality_impossible');
+      return { excluded, missingTools, modalityMatch };
+    }
+
+    _evaluate(manifest, text, modalities, projectText, request) {
+      const eligibility = this._hardEligibility(manifest, text, modalities, request);
+      const { excluded, missingTools, modalityMatch } = eligibility;
+      const routing = manifest.routing;
       const positive = matchedItems(text, routing.positiveExamples);
       const negative = matchedItems(text, routing.negativeExamples);
       const intents = matchedItems(text, routing.intents);
@@ -99,7 +123,7 @@
       return left.manifest.skillId.localeCompare(right.manifest.skillId);
     }
 
-    _routeExplicit(matches, text, request) {
+    _routeExplicit(matches, text, modalities, request) {
       if (matches.length !== 1) {
         return Spec.emptyResult({
           reasons: [reason('ambiguous_candidates', null, 'explicit_name')],
@@ -107,9 +131,12 @@
         });
       }
       const manifest = matches[0];
-      if (manifest.routing.status === 'disabled') return Spec.emptyResult({ excluded: [reason('disabled', manifest.skillId)] });
-      const missing = (manifest.requirements.toolsRequired || []).filter(name => !this._toolAvailable(name, request));
-      if (missing.length) return Spec.emptyResult({ excluded: [reason('missing_required_tool', manifest.skillId, missing.join(', '))] });
+      const eligibility = this._hardEligibility(manifest, text, modalities, request, { allowNeedsReview: true });
+      if (eligibility.excluded.length) {
+        return Spec.emptyResult({
+          excluded: eligibility.excluded.map(code => reason(code, manifest.skillId, code === 'missing_required_tool' ? eligibility.missingTools.join(', ') : null)),
+        });
+      }
       return {
         type: 'single_skill', selectedSkillIds: [manifest.skillId], confidence: 'high',
         reasons: [reason('explicit_skill_name', manifest.skillId, manifest.name)], excluded: [],
@@ -126,7 +153,7 @@
       const manifests = (snapshot.skills || []).slice();
       const explicitMatches = this._explicit(manifests, text, request.explicitSkillId);
       if (request.explicitSkillId || explicitMatches.length) {
-        const result = this._routeExplicit(explicitMatches, text, request);
+        const result = this._routeExplicit(explicitMatches, text, modalities, request);
         if (this.sessionState && request.sessionId) {
           if (result.selectedSkillIds.length) this.sessionState.set(request.sessionId, result, { explicit: true });
           else this.sessionState.clear(request.sessionId);
@@ -141,7 +168,20 @@
 
       if (!viable.length && this.sessionState && request.sessionId && isGenericFollowUp(text) && !isNonTask(text)) {
         const active = this.sessionState.get(request.sessionId);
-        const activeManifests = active && active.selectedSkillIds.map(id => manifests.find(item => item.skillId === id)).filter(item => item && item.routing.status === 'ready' && item.routing.continuity);
+        const activeEvaluated = active && active.selectedSkillIds
+          .map(id => manifests.find(item => item.skillId === id))
+          .filter(Boolean)
+          .map(manifest => ({ manifest, eligibility: this._hardEligibility(manifest, text, modalities, request) }));
+        const activeManifests = activeEvaluated && activeEvaluated
+          .filter(item => item.manifest.routing.continuity && item.eligibility.excluded.length === 0)
+          .map(item => item.manifest);
+        for (const item of activeEvaluated || []) {
+          for (const code of item.eligibility.excluded) {
+            if (!excluded.some(entry => entry.code === code && entry.skillId === item.manifest.skillId)) {
+              excluded.push(reason(code, item.manifest.skillId, code === 'missing_required_tool' ? item.eligibility.missingTools.join(', ') : null));
+            }
+          }
+        }
         if (activeManifests && activeManifests.length) {
           return {
             type: activeManifests.length > 1 ? 'multi_skill' : 'single_skill',
@@ -159,7 +199,7 @@
 
       const primary = viable.find(item => item.manifest.routing.role === 'task') || viable[0];
       const sameRole = viable.filter(item => item.manifest.routing.role === primary.manifest.routing.role);
-      const signature = item => item.tuple.slice(0, 6).join('|');
+      const signature = item => item.tuple.join('|');
       const ambiguous = sameRole.filter(item => signature(item) === signature(primary));
       if (ambiguous.length > 1) {
         if (this.sessionState && request.sessionId) this.sessionState.clear(request.sessionId);
@@ -170,12 +210,23 @@
       }
 
       const selected = [primary];
+      const ambiguousSupplements = [];
       if (primary.manifest.routing.allowComposition) {
         const usedRoles = new Set([primary.manifest.routing.role]);
-        for (const candidate of viable.filter(item => item !== primary)) {
-          const role = candidate.manifest.routing.role;
-          if (selected.length >= this.maxSkills || usedRoles.has(role) || !candidate.manifest.routing.allowComposition) continue;
-          selected.push(candidate);
+        const supplementRoles = [...new Set(viable
+          .filter(item => item !== primary && item.manifest.routing.allowComposition)
+          .map(item => item.manifest.routing.role))]
+          .sort((left, right) => Spec.ROLE_ORDER[left] - Spec.ROLE_ORDER[right]);
+        for (const role of supplementRoles) {
+          if (selected.length >= this.maxSkills || usedRoles.has(role)) continue;
+          const candidates = viable.filter(item => item !== primary && item.manifest.routing.allowComposition && item.manifest.routing.role === role);
+          const best = candidates[0];
+          const tied = candidates.filter(item => signature(item) === signature(best));
+          if (tied.length > 1) {
+            ambiguousSupplements.push(...tied.map(item => item.manifest.skillId));
+            continue;
+          }
+          selected.push(best);
           usedRoles.add(role);
         }
       }
@@ -188,11 +239,12 @@
         if (item.evidence.modality) reasonList.push(reason(`${modalities.find(modality => modality !== 'text') || 'attachment'}_input_match`, item.manifest.skillId));
         if (item.evidence.project) reasonList.push(reason('project_domain_match', item.manifest.skillId));
       }
+      if (ambiguousSupplements.length) reasonList.push(reason('ambiguous_candidates', null, 'supplement_role'));
       const confidence = primary.evidence.positive || (primary.evidence.intent && primary.evidence.alias) ? 'high' : 'medium';
       const result = {
         type: selected.length > 1 ? 'multi_skill' : 'single_skill',
         selectedSkillIds: selected.map(item => item.manifest.skillId), confidence, reasons: reasonList,
-        excluded, continuityUsed: false, ambiguousCandidates: [],
+        excluded, continuityUsed: false, ambiguousCandidates: [...new Set(ambiguousSupplements)].sort(),
       };
       if (this.sessionState && request.sessionId) this.sessionState.set(request.sessionId, result);
       return result;
@@ -203,5 +255,6 @@
 
   TeemoSkillRouter.isGenericFollowUp = isGenericFollowUp;
   TeemoSkillRouter.isNonTask = isNonTask;
+  TeemoSkillRouter.isTextExplicitInvocation = isTextExplicitInvocation;
   return TeemoSkillRouter;
 });

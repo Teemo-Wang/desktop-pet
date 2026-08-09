@@ -2159,6 +2159,7 @@
     const all = skills.getAll();
     const registry = skillManifestService && skillManifestService.reload ? skillManifestService.reload() : { ok: false, skills: [] };
     const manifests = new Map((registry.skills || []).map(item => [item.skillId, item]));
+    const invalidManifests = new Map((registry.invalidSkills || []).map(item => [item.skillId, item]));
     const groups = typeof skills.getGroups === 'function' ? skills.getGroups() : [];
     const createBlock = creatingSkill
       ? `<div class="teemo-skill-item expanded creating">
@@ -2174,6 +2175,7 @@
     const skillRow = skill => {
       const expanded = !creatingSkill && selectedSkillId === skill.id;
       const manifest = manifests.get(String(skill.id));
+      const invalidManifest = invalidManifests.get(String(skill.id));
       const values = expanded
         ? {
           name: skill.name || '',
@@ -2186,7 +2188,7 @@
       return `<div class="teemo-skill-item ${expanded ? 'expanded' : ''}" data-skill-id="${escapeHtml(skill.id)}">
         <div class="teemo-skill-row ${expanded ? 'selected' : ''}" data-skill-edit="${escapeHtml(skill.id)}">
           <div class="teemo-skill-row-icon">${escapeHtml(skill.icon || '⭐')}</div>
-          <div class="teemo-skill-row-copy"><strong>${escapeHtml(skill.name)}</strong><span>${escapeHtml(skill.desc || (skill.id === 'skill1' ? '机器人当前回复规则' : '自定义 Skill'))}</span>${manifest ? `<em>${manifest.routing.status === 'needs_review' ? '路由信息待完善' : `Auto Routing · ${manifest.routing.status}`} · ${manifest.routing.role}</em>` : ''}</div>
+          <div class="teemo-skill-row-copy"><strong>${escapeHtml(skill.name)}</strong><span>${escapeHtml(skill.desc || (skill.id === 'skill1' ? '机器人当前回复规则' : '自定义 Skill'))}</span>${manifest ? `<em>${manifest.routing.status === 'needs_review' ? '路由信息待完善' : `Auto Routing · ${manifest.routing.status}`} · ${manifest.routing.role}</em>` : invalidManifest ? '<em class="invalid">Routing invalid · Needs repair</em>' : ''}</div>
           <label class="teemo-skill-group-picker" title="移动到分组">
             <span>分组</span>
             <select data-skill-group="${escapeHtml(skill.id)}">
@@ -2198,7 +2200,7 @@
           <button class="teemo-skill-export" data-skill-export="${escapeHtml(skill.id)}" type="button" title="下载为可重新导入的 Markdown 文件">导出</button>
           ${skill.custom ? `<button class="teemo-skill-delete" data-skill-delete="${escapeHtml(skill.id)}" type="button">删除</button>` : ''}
         </div>
-        ${expanded ? routingEditorFields(manifest, registry.revision) + skillEditorFields(values) : ''}
+        ${expanded ? (invalidManifest ? `<div class="teemo-skill-routing-error">Routing invalid · Needs repair<br>${escapeHtml((invalidManifest.errors || []).join('; '))}<br>该 Skill 已从自动路由隔离，Raw Skill 未被修改。</div>` : routingEditorFields(manifest, registry.revision)) + skillEditorFields(values) : ''}
       </div>`;
 
     };
@@ -2224,7 +2226,7 @@
     </details>`;
     const listHtml = (groups.length ? groupedHtml : '') + ungroupedHtml;
 
-    els.skillList.innerHTML = (registry.ok === false ? '<div class="teemo-skill-routing-error">Skill 路由数据无法读取。自动路由已关闭，普通聊天不受影响。</div>' : '') + createBlock + listHtml;
+    els.skillList.innerHTML = (registry.ok === false ? '<div class="teemo-skill-routing-error">Skill 路由数据无法读取。自动路由已关闭，普通聊天不受影响。</div>' : invalidManifests.size ? `<div class="teemo-skill-routing-error">${invalidManifests.size} 个 Skill 的 Routing Metadata 无效，已隔离并标记为 Needs repair；其他有效 Skill 仍可自动路由。</div>` : '') + createBlock + listHtml;
 
     els.skillList.querySelectorAll('[data-skill-group-section]').forEach(section => {
       section.addEventListener('toggle', () => {

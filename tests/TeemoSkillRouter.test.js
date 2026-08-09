@@ -74,6 +74,60 @@ function makeRouter(skills = standardManifests(), tools = []) {
 }
 
 {
+  const env = makeRouter();
+  const route = text => env.router.route({ text, registrySnapshot: env.registrySnapshot });
+  assert.deepEqual(route('使用 Teemo 海报生成').selectedSkillIds, ['poster']);
+  assert.equal(route('不要使用 Teemo 海报生成，直接普通回答').type, 'no_skill');
+  assert.equal(route('Teemo 海报生成是干什么的？').type, 'no_skill');
+  assert.equal(route('解释一下“使用 Teemo 海报生成”这句话').type, 'no_skill');
+}
+
+{
+  const hard = manifest('hard', 'Teemo 海报路由', {
+    routing: { intents: ['生成海报'], exclusions: ['长 H5'], continuity: true },
+    modalities: { input: ['video'] },
+    requirements: { toolsRequired: ['render'], dependencies: ['canvas'] },
+  });
+  const review = manifest('review', 'Teemo 待审核', { routing: { status: 'needs_review' } });
+  const disabled = manifest('disabled', 'Teemo 已禁用', { routing: { status: 'disabled' } });
+  const env = makeRouter([hard, review, disabled]);
+  const route = request => env.router.route({ registrySnapshot: env.registrySnapshot, ...request });
+  const available = { availableTools: ['render'], availableDependencies: ['canvas'], modalities: ['video'] };
+
+  assert.deepEqual(route({ text: '生成海报', sessionId: 'excluded', ...available }).selectedSkillIds, ['hard']);
+  const excludedFollowUp = route({ text: '改成长 H5', sessionId: 'excluded', ...available });
+  assert.equal(excludedFollowUp.type, 'no_skill');
+  assert.ok(excludedFollowUp.excluded.some(item => item.skillId === 'hard' && item.code === 'excluded_by_manifest'));
+
+  assert.deepEqual(route({ text: '生成海报', sessionId: 'tool', ...available }).selectedSkillIds, ['hard']);
+  const missingToolFollowUp = route({ text: '标题再大一点', sessionId: 'tool', ...available, availableTools: [] });
+  assert.equal(missingToolFollowUp.type, 'no_skill');
+  assert.ok(missingToolFollowUp.excluded.some(item => item.skillId === 'hard' && item.code === 'missing_required_tool'));
+
+  assert.equal(route({ text: '使用 Teemo 海报路由 长 H5', explicitSkillId: 'hard', ...available }).type, 'no_skill');
+  assert.equal(route({ text: '使用 Teemo 海报路由', explicitSkillId: 'hard', ...available, availableDependencies: [] }).type, 'no_skill');
+  assert.equal(route({ text: '使用 Teemo 海报路由', explicitSkillId: 'hard', ...available, modalities: ['image'] }).type, 'no_skill');
+  assert.deepEqual(route({ text: '使用 Teemo 待审核' }).selectedSkillIds, ['review']);
+  assert.equal(route({ text: '使用 Teemo 已禁用', explicitSkillId: 'disabled' }).type, 'no_skill');
+}
+
+{
+  const task = manifest('task', 'Teemo 海报任务', { routing: { role: 'task', intents: ['生成海报'], allowComposition: true } });
+  const brandA = manifest('brand-a', 'Teemo 品牌 A', { routing: { role: 'brand', intents: ['遵循品牌'], allowComposition: true } });
+  const brandB = manifest('brand-b', 'Teemo 品牌 B', { routing: { role: 'brand', intents: ['遵循品牌'], allowComposition: true } });
+  const ambiguousEnv = makeRouter([task, brandA, brandB]);
+  const ambiguous = ambiguousEnv.router.route({ text: '生成海报并遵循品牌', registrySnapshot: ambiguousEnv.registrySnapshot });
+  assert.deepEqual(ambiguous.selectedSkillIds, ['task'], 'ambiguous supplement role must be skipped');
+  assert.deepEqual(ambiguous.ambiguousCandidates, ['brand-a', 'brand-b']);
+
+  brandA.routing.priority = 1;
+  const uniqueEnv = makeRouter([task, brandA, brandB]);
+  const unique = uniqueEnv.router.route({ text: '生成海报并遵循品牌', registrySnapshot: uniqueEnv.registrySnapshot });
+  assert.deepEqual(unique.selectedSkillIds, ['task', 'brand-a']);
+  assert.deepEqual(unique.ambiguousCandidates, []);
+}
+
+{
   const env = makeRouter(standardManifests(), ['file_read']);
   const result = env.router.route({ text: '整理这些文件', registrySnapshot: env.registrySnapshot });
   assert.deepEqual(result.selectedSkillIds, ['tool-skill']);

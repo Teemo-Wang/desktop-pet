@@ -4,6 +4,7 @@ const os = require('os');
 const path = require('path');
 const StorageService = require('../src/services/TeemoStorageService');
 const ManifestService = require('../src/skills/TeemoSkillManifestService');
+const Router = require('../src/skills/TeemoSkillRouter');
 const Validator = require('../src/skills/TeemoSkillValidator');
 const Specification = require('../src/skills/TeemoSkillSpecification');
 const { manifest } = require('./TeemoSkillTestFixtures');
@@ -78,6 +79,37 @@ try {
   assert.equal(validator.validateManifest(invalidRole).valid, false);
   const duplicate = { schemaVersion: 1, revision: 1, skills: [manifest('same', 'A'), manifest('same', 'B')] };
   assert.equal(validator.validateRegistry(duplicate).valid, false);
+
+  const mixedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'teemo-p2-5-invalid-manifest-'));
+  try {
+    const validRaw = 'Raw Teemo Valid';
+    const invalidRaw = 'Raw Teemo Invalid';
+    const validManifest = manifest('valid', 'Teemo Valid', { rawBody: validRaw, routing: { intents: ['valid task'] } });
+    const invalidManifest = manifest('invalid', 'Teemo Invalid', { rawBody: invalidRaw });
+    invalidManifest.routing.role = 'bad_role';
+    const mixedRegistryPath = path.join(mixedRoot, 'Teemo-skill-registry.json');
+    const mixedBytes = Buffer.from(JSON.stringify({ schemaVersion: 1, revision: 3, updatedAt: '2026-08-09T00:00:00.000Z', skills: [validManifest, invalidManifest] }, null, 2), 'utf8');
+    fs.writeFileSync(mixedRegistryPath, mixedBytes);
+    const mixedSkills = new FakeSkillService([
+      { id: 'valid', name: 'Teemo Valid', systemPrompt: validRaw },
+      { id: 'invalid', name: 'Teemo Invalid', systemPrompt: invalidRaw },
+    ]);
+    const mixedService = new ManifestService({ skillService: mixedSkills, storage: new StorageService({ dataDir: mixedRoot }) });
+    const mixedSnapshot = mixedService.getRegistrySnapshot();
+    assert.equal(mixedSnapshot.ok, true);
+    assert.deepEqual(mixedSnapshot.skills.map(item => item.skillId), ['valid']);
+    assert.equal(mixedSnapshot.invalidSkills.length, 1);
+    assert.equal(mixedSnapshot.invalidSkills[0].skillId, 'invalid');
+    assert.ok(mixedSnapshot.invalidSkills[0].errors.some(error => error.includes('routing.role')));
+    const mixedRoute = new Router({ manifestService: mixedService }).route({ text: 'valid task' });
+    assert.deepEqual(mixedRoute.selectedSkillIds, ['valid']);
+    assert.equal(new Router({ manifestService: mixedService }).route({ text: 'use Teemo Invalid', explicitSkillId: 'invalid' }).type, 'no_skill');
+    mixedService.reload();
+    assert.deepEqual(fs.readFileSync(mixedRegistryPath), mixedBytes, 'individual invalid manifest must not rewrite Registry bytes');
+    assert.equal(mixedSkills.get('invalid').systemPrompt, invalidRaw, 'individual invalid manifest must not rewrite Raw Skill');
+  } finally {
+    fs.rmSync(mixedRoot, { recursive: true, force: true });
+  }
 
   const corruptRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'teemo-p2-5-corrupt-'));
   try {

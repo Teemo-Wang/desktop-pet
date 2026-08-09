@@ -519,6 +519,7 @@ html, body {
   cursor: help;
 }
 .skill-routing-summary { margin-top: 6px; color: #607087; font-size: 10px; }
+.skill-routing-summary.skill-routing-invalid { color: #a33; }
 .skill-routing-error { margin: 10px 12px; padding: 8px; border: 1px solid rgba(190, 45, 45, .24); border-radius: 6px; background: rgba(190, 45, 45, .06); color: #a33; font-size: 11px; }
 .skill-routing-editor { margin: 0 0 12px; padding: 8px; border: 1px solid rgba(0, 118, 255, .16); border-radius: 6px; background: rgba(0, 118, 255, .035); }
 .skill-routing-editor summary { cursor: pointer; color: var(--brand, #0076ff); font-size: 11px; font-weight: 600; }

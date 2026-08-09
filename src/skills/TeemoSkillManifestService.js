@@ -53,18 +53,36 @@
       const state = this.storage.getReadState(this.registryFile);
       if (state === 'error') throw registryError('SKILL_REGISTRY_UNREADABLE', 'Skill 路由数据无法读取');
       if (state === 'missing') return null;
-      const validation = this.validator.validateRegistry(value);
-      if (!validation.valid) throw registryError('SKILL_REGISTRY_UNREADABLE', `Skill 路由数据无效：${validation.errors[0]}`);
-      return value;
+      const envelope = this.validator.validateRegistryEnvelope(value);
+      if (!envelope.valid) throw registryError('SKILL_REGISTRY_UNREADABLE', `Skill 路由数据无效：${envelope.errors[0]}`);
+      const skills = [];
+      const invalidSkills = [];
+      for (const manifest of value.skills) {
+        const validation = this.validator.validateManifest(manifest);
+        if (validation.valid) {
+          skills.push(manifest);
+          continue;
+        }
+        invalidSkills.push({
+          skillId: String(manifest && manifest.skillId || ''),
+          name: String(manifest && manifest.name || manifest && manifest.skillId || 'Unknown Skill'),
+          sourceRef: String(manifest && manifest.source && manifest.source.sourceRef || ''),
+          status: 'invalid',
+          errors: validation.errors.slice(),
+        });
+      }
+      return { ...value, skills, invalidSkills };
     }
 
     _write(registry) {
-      const validation = this.validator.validateRegistry(registry);
+      const persistent = Spec.clone(registry);
+      delete persistent.invalidSkills;
+      const validation = this.validator.validateRegistry(persistent);
       if (!validation.valid) throw registryError('SKILL_MANIFEST_INVALID', validation.errors.join('; '));
-      this.storage.writeJson(this.registryFile, registry);
-      this.registry = registry;
+      this.storage.writeJson(this.registryFile, persistent);
+      this.registry = persistent;
       this.error = null;
-      return registry;
+      return persistent;
     }
 
     synchronize() {
@@ -73,6 +91,11 @@
           // Read, compare and write inside one lock so renderer startup/migration
           // cannot overwrite a newer override from another window.
           const existing = this._read();
+          if (existing && existing.invalidSkills && existing.invalidSkills.length) {
+            this.registry = existing;
+            this.error = null;
+            return existing;
+          }
           const sources = this._sources();
           const previousById = new Map((existing && existing.skills || []).map(item => [item.skillId, item]));
           const generated = sources.map(source => this.importer.buildManifest(source, previousById.get(source.id)));
@@ -112,7 +135,7 @@
 
     getRegistrySnapshot() {
       if (this.error) return { ok: false, error: { ...this.error }, schemaVersion: Spec.schemaVersion, revision: null, skills: [] };
-      const registry = this.registry || { schemaVersion: Spec.schemaVersion, revision: 0, updatedAt: null, skills: [] };
+      const registry = this.registry || { schemaVersion: Spec.schemaVersion, revision: 0, updatedAt: null, skills: [], invalidSkills: [] };
       return { ok: true, ...Spec.clone(registry) };
     }
 
@@ -135,6 +158,7 @@
       const locked = this.storage.withFileLock(this.registryFile, () => {
         const current = this._read();
         if (!current) throw registryError('SKILL_REGISTRY_UNREADABLE', 'Skill Registry 不存在');
+        if (current.invalidSkills && current.invalidSkills.length) throw registryError('SKILL_MANIFEST_INVALID', '存在无效 Skill Manifest，请先修复后再保存 Routing Metadata');
         if (expectedRevision != null && current.revision !== expectedRevision) throw registryError('SKILL_REGISTRY_CHANGED', 'Skill 路由信息已变化，请重新载入');
         const index = current.skills.findIndex(item => item.skillId === String(skillId));
         if (index < 0) throw registryError('SKILL_MANIFEST_INVALID', 'Skill Manifest 不存在');

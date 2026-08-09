@@ -52,7 +52,7 @@
       return { valid: errors.length === 0, errors };
     }
 
-    validateRegistry(registry) {
+    validateRegistryEnvelope(registry) {
       const errors = [];
       if (!isObject(registry)) return { valid: false, errors: ['registry must be an object'] };
       if (registry.schemaVersion !== Spec.schemaVersion) errors.push('schemaVersion is unsupported');
@@ -60,11 +60,19 @@
       if (!Array.isArray(registry.skills)) errors.push('skills must be an array');
       const ids = new Set();
       for (const manifest of Array.isArray(registry.skills) ? registry.skills : []) {
-        const result = this.validateManifest(manifest);
-        if (!result.valid) errors.push(`${manifest && manifest.skillId || '(unknown)'}: ${result.errors.join('; ')}`);
         const id = manifest && manifest.skillId;
         if (id && ids.has(id)) errors.push(`duplicate skillId: ${id}`);
         if (id) ids.add(id);
+      }
+      return { valid: errors.length === 0, errors };
+    }
+
+    validateRegistry(registry) {
+      const envelope = this.validateRegistryEnvelope(registry);
+      const errors = [...envelope.errors];
+      for (const manifest of registry && Array.isArray(registry.skills) ? registry.skills : []) {
+        const result = this.validateManifest(manifest);
+        if (!result.valid) errors.push(`${manifest && manifest.skillId || '(unknown)'}: ${result.errors.join('; ')}`);
       }
       return { valid: errors.length === 0, errors };
     }
