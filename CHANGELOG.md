@@ -1,6 +1,6 @@
 # Changelog
 
-## P2-5 - 2026-08-09（IMPLEMENTED / WAITING REVIEW）
+## P2-5 - 2026-08-09（CLOSED / PASS）
 
 - 建立 Teemo Skill Specification v1，保留导入 Raw Skill 原文并与 `Teemo-skill-registry.json` Internal Manifest 永久分离。
 - 新增 deterministic Provider-neutral Importer、Validator、Manifest Service、Router、Composer 和 runtime-only Session State；不使用 LLM、Embedding 或 Vector DB。
@@ -8,7 +8,10 @@
 - Router 支持 explicit、NO_SKILL、ambiguity、hard exclusion、attachment modality、project enhancer、required-tool availability、adult/sensitive 同架构和最多三项跨 role composition。
 - Agent Core 统一 send/stream 与两个 Renderer 的 Skill 注入，保持 Skill、Cognition、Creative、Challenge、Current User 顺序；Router/Composer 失败普通聊天继续且不 fail open。
 - 两个既有 Skill UI 增加 Routing Metadata override、状态和轻量聊天 Skill chip；override、Registry 读取和重启不修改 Raw Skill。
-- 新增 8 个 P2-5 测试入口、32 条 deterministic benchmark 和隔离 Electron smoke；版本保持 1.2.1，当前等待 GPT strict review。
+- 增加整轮 negative/meta/question/comparison suppression、hard-rejected Session 清理与 multi-Skill survivor retention，防止被拒绝 Skill 从 explicit/auto/continuity 回流。
+- 单个 invalid Manifest 支持隔离、合法邻居 save/reset 和双 UI 显式 Repair；重建从 current Raw Skill 生成并跨重启持久化，broken Registry 仍 fail closed 且不覆盖原 bytes。
+- 8 个 P2-5 测试入口、32 条 deterministic benchmark、22 组 Node 和 9 组 Electron smoke 全部通过；版本保持 1.2.1。
+- GPT 四轮 strict review 最终确认 `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P2-FINAL-ACCEPTANCE`；恢复标签为 `v1.2.1-p2.5-skill-intelligence`。
 
 ## P2-4 - 2026-08-09（IMPLEMENTED / WAITING REVIEW）
 

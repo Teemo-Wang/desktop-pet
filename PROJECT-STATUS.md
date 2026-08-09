@@ -1,6 +1,6 @@
 # Teemo助理 — 项目进度与规划
 
-> 文档版本：v1.22 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.2.1（P2 Personal Intelligence IN PROGRESS）**
+> 文档版本：v1.23 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.2.1（P2 Personal Intelligence FINAL ACCEPTANCE）**
 
 ## 当前状态
 
@@ -10,18 +10,20 @@
 - P0：`CLOSED`
 - P1：`CLOSED / PASS / BLOCKERS: 0`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
-- Current Development：`P2-5 Skill Intelligence IMPLEMENTED / WAITING REVIEW`
+- Current Development：`P2 FINAL ACCEPTANCE READY`
 - Current Branch：`Teemo/p2-personal-intelligence`
 
-## P2-5 阶段（2026-08-09，IMPLEMENTED / WAITING REVIEW）
+## P2-5 阶段（2026-08-09，CLOSED / PASS）
 
 - 建立 Teemo Skill Specification v1，Raw Skill 与 Internal Manifest 永久分离；导入 Markdown 原文保存在 `rawSource`，Registry 独立使用 `Teemo-skill-registry.json`。
 - 新增 deterministic、Provider-neutral Router、Composer、Validator、Importer、Manifest Service 和 runtime-only Session State；不使用 LLM、Embedding 或 Vector DB。
 - 不确定时正常 `NO_SKILL`；同 role 相近候选 ambiguous；Project 只增强；required tool 只读检查且 Router 不执行 Tool、不申请 Permission。
 - 自动组合最多 3 个且每 role 最多 1 个；Agent 实际顺序保持 Skill < Cognition < Creative < Challenge < Current User，失败独立降级且不 fail open。
 - 复用两个现有 Skill UI 增加 Routing Metadata override 和轻量聊天 Skill chip；override、重启和 Registry 读取均不修改 Raw Skill。
-- 8 组专项测试、32 条 benchmark、隔离 Electron smoke 已通过；完整 P1/P2 回归与 GPT strict review 待完成。详见 `docs/P2-5-SKILL-INTELLIGENCE.md`。
-- GPT PASS 前不创建 `v1.2.1-p2.5-skill-intelligence`；P2-5 PASS 后只进入 P2 Final Acceptance，不进入 P3。
+- 明确否定、问题、解释和对比会形成整轮 Skill suppression，阻止 textual explicit、`explicitSkillId`、auto 和 continuity 回流；hard-rejected Session 只保留仍合格的 survivors。
+- 单个 invalid Manifest 被隔离但不冻结合法 Skill；两个 Skill UI 均可显式重建 Routing Metadata，修复后跨重启持久化且不修改 Raw Skill。损坏 Registry 仍 whole-file fail closed 且原 bytes 不变。
+- 22 组 Node、9 组 Electron smoke、32 条 benchmark、语法、diff 与版本检查全部通过；正式用户数据未参与测试。详见 `docs/P2-5-SKILL-INTELLIGENCE.md`。
+- GPT 最终确认 `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P2-FINAL-ACCEPTANCE`；恢复标签为 `v1.2.1-p2.5-skill-intelligence`。下一步只执行 P2 Final Acceptance，不进入 P3。
 
 ## P2-4 阶段（2026-08-09，CLOSED / PASS）
 

@@ -5,7 +5,7 @@
 - Phase：P2-5 Skill Intelligence / Skill Router
 - Branch：`Teemo/p2-personal-intelligence`
 - Version：`1.2.1`，未自行升版
-- State：`IMPLEMENTED / WAITING GPT REVIEW`
+- State：`CLOSED / PASS / BLOCKERS: 0`
 - P3：未开始
 
 ## 2. Teemo Skill Specification v1
@@ -18,11 +18,11 @@ Raw Skill 是用户安装的真实 SOP/Prompt/Workflow；Manifest 只负责路�
 
 `TeemoSkillImporter` 只做确定性解析：frontmatter、标题、description、触发条件、适用场景、示例、不适用和 exclusion。没有可靠信号时标记 `needs_review`，不调用 LLM，也不使用 Embedding。
 
-`TeemoSkillValidator` 校验 schema、enum、数组上限、duplicate id、source hash、role、modality 和依赖字段。invalid Manifest 不进入 Router。
+`TeemoSkillValidator` 校验 schema、enum、数组上限、duplicate id、source hash、role、modality 和依赖字段。单个 invalid Manifest 不进入 Router，但不会关闭相邻合法 Skill。
 
 `TeemoSkillManifestService` 使用 `TeemoStorageService` 的原子写和 `.teemo-lock` 文件锁，Registry 含 `revision` 与 expectedRevision。双窗口 stale write 返回 `SKILL_REGISTRY_CHANGED`。读取、比较和 migration 写入在同一锁内完成，避免窗口启动覆盖较新的 override。损坏 Registry 不自动重建、不覆盖原文件，Router fail closed 为 `NO_SKILL`，UI 显示异常，普通聊天继续。
 
-Raw Skill 内容更新会重算 contentHash 和 generated metadata，同时保留 aliases、intents、examples、exclusions、role、composition、continuity、modality 和 sensitivity override。reset 只恢复 generated metadata。
+Raw Skill 内容更新会重算 contentHash 和 generated metadata，同时保留 aliases、intents、examples、exclusions、role、composition、continuity、modality 和 sensitivity override。reset 只恢复 generated metadata。存在 invalid 邻居时，合法 Skill 仍可保存或重置 override；invalid Skill 只能由用户在 UI 显式执行 `rebuildManifest()`，从完整 current Raw Skill 元数据原子替换并跨重启持久化，Raw Skill 不被改写。
 
 ## 4. Deterministic Router
 
@@ -31,6 +31,8 @@ Raw Skill 内容更新会重算 contentHash 和 generated metadata，同时保�
 Hard exclusion 先处理 disabled、needs_review auto route、invalid、modality impossible、manifest exclusion、missing required tool 和 dependency unavailable。required tool 只通过 Registry `has()` 检查；Router 不执行 Tool、不申请 Permission、不授予权限。sensitivity 只是 metadata，adult/sensitive Skill 使用同一 Router，既不自动禁用，也不会因敏感标签泄漏到无关请求。
 
 不确定时返回正常 `NO_SKILL`。同 role 同证据候选返回 ambiguous/NO_SKILL，不随机选择。显式 `needs_review` Skill 仍可用；显式 disabled Skill 不会被静默启用。
+
+对名称或 alias 的明确否定、问题、解释和对比形成 deterministic per-turn suppression。该策略覆盖 `不想用/不要再用/别再用/这次不用/先别用` 与 `怎么用/如何使用/如何调用` 等自然表达，并统一阻止 textual explicit、caller `explicitSkillId`、auto route 和 continuity 回流。
 
 ## 5. Composition 与 Context
 
@@ -44,11 +46,11 @@ Agent Core 的实际顺序为 Skill、Cognition、Creative、Challenge、Current
 
 `TeemoSkillSessionState` 只存在于 runtime Map。状态使用稳定 sessionId 隔离；缺失 sessionId 可以按当前请求重新 route，但不能读取其他 session continuity。新 session、新窗口和重启默认无 active Skill；Registry 正常持久化。
 
-明显 follow-up 且没有强新意图时可沿用 active Skill。强新意图替换旧 Skill；明确 non-task 或新任务 `NO_SKILL` 清除旧 continuity，避免后续模糊消息恢复无关 Skill。
+明显 follow-up 且没有强新意图时可沿用 active Skill。强新意图替换旧 Skill；明确 non-task 或新任务 `NO_SKILL` 清除旧 continuity，避免后续模糊消息恢复无关 Skill。active Skill 被 exclusion、tool/dependency、modality 或用户 suppression hard-reject 后立即从 Session State 移除；multi-Skill 只保留仍合格的 survivors。
 
 ## 7. UI 与双 Renderer
 
-桌宠 Skill Center 与独立聊天设置页复用现有 Skill UI，显示 Auto Routing 状态、role 和“路由信息待完善”。Routing Metadata 编辑器可修改 status、role、aliases、intents、domains、positive/negative examples、exclusions、composition、continuity、input modality 和 sensitivity；所有修改只写 Registry override。
+桌宠 Skill Center 与独立聊天设置页复用现有 Skill UI，显示 Auto Routing 状态、role 和“路由信息待完善”。Routing Metadata 编辑器可修改 status、role、aliases、intents、domains、positive/negative examples、exclusions、composition、continuity、input modality 和 sensitivity；所有修改只写 Registry override。invalid Manifest 在两套 UI 中显示 `Needs repair` 和显式 `Rebuild Routing Metadata` 操作。
 
 聊天消息附近显示轻量 `Skill · name` / `Skills · A + B` chip，hover 展示命中原因与高/中置信度，不显示伪概率。Ambiguous 情况可显示“未自动启用 Skill”。桌宠多模态路径已统一进入 Agent Core，独立窗口的旧直接 Skill 注入也已删除。
 
@@ -71,4 +73,4 @@ Electron smoke 使用独立 `TEEMO_ASSISTANT_DATA_DIR` 和 userData，验证实�
 
 ## 9. 阶段边界
 
-P2-5 未实现 LLM Router、Embedding、Vector DB、Semantic Search、自动学习 Router、行为追踪数据库、Safety Engine、Provider Capability Matrix、GUI Automation、Cloud Sync、Multi-Agent 或 P3 Inspiration。GPT 固定门禁 PASS 前不得创建 P2-5 recovery tag；PASS 后只能进入 P2 Final Acceptance。
+P2-5 未实现 LLM Router、Embedding、Vector DB、Semantic Search、自动学习 Router、行为追踪数据库、Safety Engine、Provider Capability Matrix、GUI Automation、Cloud Sync、Multi-Agent 或 P3 Inspiration。GPT 四轮 strict review 最终确认 `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P2-FINAL-ACCEPTANCE`。阶段恢复标签为 `v1.2.1-p2.5-skill-intelligence`；下一步只能进入 P2 Final Acceptance。
