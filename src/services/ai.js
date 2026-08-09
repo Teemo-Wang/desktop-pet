@@ -159,7 +159,7 @@
     async send(messages, opts = {}) {
       messages = _sanitizeChatMessages(messages);
       if (this.useMock) return this._mock(messages);
-      if (this._isAIBrain()) return this._aibrainExecute(messages, null);
+      if (this._isAIBrain()) return this._aibrainExecute(messages, opts.signal || null);
       if (!this.config.apiKey) throw new Error('⚠️ 请先配置 API Key');
       const timeoutMs = opts.timeout || 40000;
       // 仅对"连接被重置/GOAWAY"这类快速失败重试；超时不重试（超时说明网关慢，重试只会叠加等待）
@@ -170,11 +170,13 @@
             method: 'POST',
             headers: this._buildHeaders(),
             body: JSON.stringify({ model: this.config.modelName, messages, ...this._tokenLimitParam(8192), ...this._temperatureParam() }),
-            signal: AbortSignal.timeout(timeoutMs),
+            signal: opts.signal || AbortSignal.timeout(timeoutMs),
           });
           break;
         } catch (e) {
           lastErr = e;
+          // 用户主动取消时立即向上返回，Agent Core 不得进入重试或后续 Step。
+          if (opts.signal && opts.signal.aborted) throw e;
           const isTimeout = (e && (e.name === 'TimeoutError' || /timed?\s*out|abort/i.test(e.message || '')));
           console.warn('[ai.send] 第 ' + attempt + ' 次请求失败:', e && (e.message || e.name), isTimeout ? '(超时，不重试)' : '');
           if (isTimeout) break;   // 超时直接放弃，避免长时间"假死"

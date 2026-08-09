@@ -2,6 +2,13 @@
 
 ## v1.1.7 - 2026-08-09
 
+### P1-1 Agent Core
+
+- 新增模型无关的 `TeemoAgentCore` 基础执行循环、Run/Step 状态、统一 Action Contract、取消和最大步骤保护。
+- 新增仅内存运行的 `echo`、`get_agent_runtime_info` 安全测试 Tool。
+- 保持普通聊天流式输出、模型切换、历史会话、Skill 注入和附件上下文兼容。
+- 增加 `docs/P1-1-AGENT-CORE.md` 和 `npm.cmd run test:agent-core` 验证入口。
+
 ### P1 前稳定基线
 
 - 更新当前使用 SOP、README 和项目状态文档，统一记录 Teemo助理 v1.1.7、P0 恢复点及 P1 开发入口。

@@ -6,6 +6,7 @@
   "author": "Teemo Wang",
   "scripts": {
     "start": "electron .",
+    "test:agent-core": "node tests/TeemoAgentCore.test.js",
     "dist": "electron-builder --publish never",
     "dist:mac": "electron-builder --mac --publish never",
     "dist:win": "electron-builder --win --publish never",

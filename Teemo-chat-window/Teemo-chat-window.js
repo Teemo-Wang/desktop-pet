@@ -18,6 +18,7 @@
   const skills = new window.SkillService();
   const history = new window.ChatHistoryService();
   const ai = new window.AIService();
+  const agentCore = window.TeemoAgentCore ? new window.TeemoAgentCore({ aiService: ai }) : null;
   const ruleCapture = window.RuleCaptureService ? new window.RuleCaptureService(skills, ai) : null;
   const comfyui = new window.TeemoComfyUIService(store);
   window.comfyUIService = comfyui;
@@ -2607,14 +2608,30 @@
           if (isNearBottom(180)) scrollToBottom(false);
           else updateScrollBottomButton();
         };
-        full = await ai.stream(apiMessages, (chunk, accumulated) => {
+        const onChunk = (chunk, accumulated) => {
           full = accumulated;
           streamLatest = accumulated || '';
           if (!streamPaintScheduled) {
             streamPaintScheduled = true;
             requestAnimationFrame(paintStreamText);
           }
-        }, abortController.signal);
+        };
+        if (agentCore) {
+          const agentResult = await agentCore.runStream({
+            messages: apiMessages,
+            sessionId: active.id || null,
+            signal: abortController.signal,
+            disableActionContract: true,
+            onChunk,
+          });
+          if (!agentResult.ok) {
+            if (agentResult.error.cancelled) throw new DOMException('已停止生成', 'AbortError');
+            throw new Error(agentResult.error.message);
+          }
+          full = agentResult.content;
+        } else {
+          full = await ai.stream(apiMessages, onChunk, abortController.signal);
+        }
       }
       if (!useImageGen) {
         assistant.content = window.TeemoMessageSanitize

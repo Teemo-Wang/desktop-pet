@@ -9,7 +9,7 @@
 - Source：`D:\Teemo助手\Teemo机器人项目\Teemo-source`
 - P0：`CLOSED`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
-- Current Development：`P1 Agent Core`
+- Current Development：`P1-1 Agent Core foundation`
 - Current Branch：`Teemo/p1-agent-core`
 
 ## P0 阶段收尾（2026-08-09）
@@ -21,6 +21,14 @@
 - GPT 审阅结论：总体方向符合预期；已补齐 Storage 安全写入、多 AI 防覆盖、正式构建验收和 P1 Permission Layer 边界说明。
 - 正式 Windows 构建：`dist\Teemo-1.1.6-x64.exe` 已从 `Teemo-source` 生成并完成隔离 profile 启动烟测。
 - 下一阶段：P1-Agent Core。Agent Core、Tool Calling、Memory、Permission Layer、FileTool 写入/执行能力不属于 P0。
+
+## P1-1 阶段（2026-08-09）
+
+- 已建立 `src/agent/TeemoAgentCore.js`，支持 Agent Run/Step、统一 Action、最大步骤、取消和统一错误结果。
+- 已接入桌宠聊天和独立聊天窗口的流式兼容包装，保留原有 UI、历史、Skill、附件和模型切换。
+- 仅提供无副作用的 `echo` 与 `get_agent_runtime_info` 内部测试 Tool。
+- 详细记录见 `docs/P1-1-AGENT-CORE.md`。
+- P1-2（Teemo Cognition + Context Builder）尚未开始，等待审阅后再进入。
 
 ### P0 已知风险
 

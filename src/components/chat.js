@@ -929,7 +929,7 @@
         }
 
         let acc = '';
-        await window.aiService.stream(apiMessages, (chunk, full) => {
+        const onChunk = (chunk, full) => {
           // 第一片 chunk 到来时移除"思考中"
           if (placeholder.wrap.classList.contains('msg-typing')) {
             placeholder.wrap.classList.remove('msg-typing');
@@ -940,7 +940,24 @@
             window.Markdown.bindCopyButtons(placeholder.body, { messageCopy: false });
           }
           this.msgs.scrollTop = this.msgs.scrollHeight;
-        }, this.streamAbortCtrl.signal);
+        };
+        const agentCore = window.agentCore;
+        if (agentCore && typeof agentCore.runStream === 'function') {
+          const agentResult = await agentCore.runStream({
+            messages: apiMessages,
+            sessionId: active.id || null,
+            signal: this.streamAbortCtrl.signal,
+            disableActionContract: true,
+            onChunk,
+          });
+          if (!agentResult.ok) {
+            if (agentResult.error.cancelled) throw new DOMException('已停止生成', 'AbortError');
+            throw new Error(agentResult.error.message);
+          }
+          acc = agentResult.content || acc;
+        } else {
+          await window.aiService.stream(apiMessages, onChunk, this.streamAbortCtrl.signal);
+        }
 
         // 流式结束：必要时自动落库 Skill / 规则
         if (acc && captureSvc && (

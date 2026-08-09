@@ -6,6 +6,7 @@
 
   // Services
   window.aiService = new window.AIService();
+  window.agentCore = new window.TeemoAgentCore({ aiService: window.aiService });
   const dtService = new window.DingTalkService();
   const yqService = new window.YuqueService();
   const store = new window.SettingsStore();
