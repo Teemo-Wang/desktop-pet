@@ -15,6 +15,8 @@
   const VERSION = 2;
   const VALID_SCOPES = new Set(['global', 'recent', 'project']);
   const VALID_DOMAINS = new Set(['profile', 'recent', 'project']);
+  const MAX_COGNITION_ITEM_CHARS = 420;
+  const MAX_MANUAL_INPUT_CHARS = 12000;
 
   function makeId(prefix) {
     return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
@@ -48,6 +50,55 @@
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 1000);
+  }
+
+  function normalizeManualInput(value) {
+    return String(value == null ? '' : value)
+      .replace(/data:[^\s]+/gi, '[已过滤数据]')
+      .replace(/\r\n?/g, '\n')
+      .trim();
+  }
+
+  function splitParagraph(paragraph) {
+    const text = String(paragraph || '').replace(/\s+/g, ' ').trim();
+    if (!text) return [];
+    if (text.length <= MAX_COGNITION_ITEM_CHARS) return [text];
+
+    const sentences = text.match(/[^。！？!?；;]+[。！？!?；;]?/g) || [text];
+    const chunks = [];
+    let current = '';
+    const flush = () => {
+      if (current) chunks.push(current);
+      current = '';
+    };
+
+    sentences.forEach(sentence => {
+      let remaining = sentence.trim();
+      if (!remaining) return;
+      if (remaining.length > MAX_COGNITION_ITEM_CHARS) {
+        flush();
+        while (remaining.length > MAX_COGNITION_ITEM_CHARS) {
+          chunks.push(remaining.slice(0, MAX_COGNITION_ITEM_CHARS));
+          remaining = remaining.slice(MAX_COGNITION_ITEM_CHARS);
+        }
+        current = remaining;
+        return;
+      }
+      if (current && current.length + remaining.length > MAX_COGNITION_ITEM_CHARS) flush();
+      current += remaining;
+    });
+    flush();
+    return chunks;
+  }
+
+  function splitManualContent(value) {
+    const input = normalizeManualInput(value);
+    if (!input) return [];
+    return input
+      .split(/\n\s*\n+/)
+      .flatMap(splitParagraph)
+      .map(normalizeContent)
+      .filter(Boolean);
   }
 
   function fingerprint(value) {
@@ -110,6 +161,17 @@
     snapshot() { return clone(this.data); }
 
     getStoragePath() { return this.storage.getPath(this.fileName); }
+
+    previewManualContent(value) {
+      const input = normalizeManualInput(value);
+      return {
+        ok: input.length <= MAX_MANUAL_INPUT_CHARS,
+        length: input.length,
+        maxChars: MAX_MANUAL_INPUT_CHARS,
+        itemMaxChars: MAX_COGNITION_ITEM_CHARS,
+        itemCount: input.length <= MAX_MANUAL_INPUT_CHARS ? splitManualContent(input).length : 0,
+      };
+    }
 
     _persist() {
       this.data.version = VERSION;
@@ -502,6 +564,70 @@
       target.collection.push(cognition);
       this._persist();
       return { ok: true, cognition: clone(cognition), observation: clone(observation), snapshot: this._managementSnapshotFromCurrent() };
+    }
+
+    manualCreateBatch(input = {}, options = {}) {
+      const conflict = this._prepareManagementMutation(options.expectedRevision);
+      if (conflict) return conflict;
+      const rawContent = normalizeManualInput(input.content);
+      if (!rawContent) return { ok: false, code: 'COGNITION_EMPTY', message: '认知内容不能为空' };
+      if (rawContent.length > MAX_MANUAL_INPUT_CHARS) {
+        return { ok: false, code: 'COGNITION_TOO_LONG', message: `单次最多输入 ${MAX_MANUAL_INPUT_CHARS} 个字符，请精简后重试` };
+      }
+      if (isSensitiveText(rawContent)) return { ok: false, code: 'COGNITION_SENSITIVE', message: '认知内容疑似包含敏感信息，未保存' };
+
+      const scope = VALID_SCOPES.has(input.scope) ? input.scope : 'global';
+      const target = this._scopeTarget(scope, input.projectId);
+      if (!target) return { ok: false, code: 'PROJECT_REQUIRED', message: '项目认知必须选择项目' };
+
+      const existingKeys = new Set();
+      this._knowledgeCollections().forEach(({ items }) => items.forEach(item => {
+        if (item && item.status !== 'superseded' && item.fingerprint) existingKeys.add(item.fingerprint);
+      }));
+
+      const contents = splitManualContent(rawContent);
+      const pending = [];
+      let duplicateCount = 0;
+      contents.forEach(content => {
+        const key = fingerprint(content);
+        if (!key || existingKeys.has(key)) {
+          duplicateCount += 1;
+          return;
+        }
+        existingKeys.add(key);
+        const observation = this._newObservation({
+          category: input.category,
+          scope,
+          projectId: target.projectId,
+          content,
+          confidence: 1,
+          source: 'user_manual',
+        });
+        pending.push({ observation, cognition: this._newKnowledge(observation, target) });
+      });
+
+      if (!pending.length) {
+        return {
+          ok: false,
+          code: 'COGNITION_DUPLICATE',
+          message: '输入内容均已存在，请编辑或迁移原认知',
+          duplicateCount,
+        };
+      }
+
+      pending.forEach(({ observation, cognition }) => {
+        this.data.observations.push(observation);
+        target.collection.push(cognition);
+      });
+      this._persist();
+      return {
+        ok: true,
+        cognitions: clone(pending.map(item => item.cognition)),
+        observations: clone(pending.map(item => item.observation)),
+        createdCount: pending.length,
+        duplicateCount,
+        snapshot: this._managementSnapshotFromCurrent(),
+      };
     }
 
     updateCognitionEntry(input = {}, options = {}) {

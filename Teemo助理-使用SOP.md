@@ -1,6 +1,6 @@
-# Teemo助理 V1.2.0 使用 SOP
+# Teemo助理 V1.2.1 使用 SOP
 
-> 适用版本：`v1.2.0`
+> 适用版本：`v1.2.1`
 > 产品：Windows Electron 桌面 AI 助手
 > 当前源码：`D:\Teemo助手\Teemo机器人项目\Teemo-source`
 > 更新日期：2026-08-09
@@ -21,7 +21,7 @@ Teemo助理是面向个人设计生产力的桌面 AI 助手，提供多模型�
 C:\Users\Teemo\AppData\Local\Programs\teemo-assistant\Teemo助理.exe
 ```
 
-开始菜单入口：`Teemo助理`。启动后可在设置或关于信息中确认版本为 `v1.2.0`。
+开始菜单入口：`Teemo助理`。启动后可在设置或关于信息中确认版本为 `v1.2.1`。
 
 版本规则：发布标签使用 `vX.Y.Z-*`，界面、package/lockfile 和安装包必须显示同一 `X.Y.Z`。界面通过 Electron `app.getVersion()` 动态读取，不单独硬编码；正式构建会自动执行版本一致性检查。
 
@@ -129,7 +129,7 @@ C:\Users\Teemo\AppData\Roaming\teemo-assistant
 
 - 唯一开发源码是 `Teemo-source`，禁止修改安装目录、`dist`、`app.asar` 或解包产物。
 - 开发前先阅读根目录 `AGENTS.md`，检查分支、工作区状态和相关调用关系。
-- 当前 P0 基线：提交 `219b92a`，标签 `v1.1.6-p0-closed`；P1 封板标签：`v1.2.0-p1-agent-foundation`；当前分支：`Teemo/p1-agent-core`。
+- 当前 P0 基线：提交 `219b92a`，标签 `v1.1.6-p0-closed`；P1 封板标签：`v1.2.0-p1-agent-foundation`；P2-1 封板标签：`v1.2.0-p2.1-cognition-ui`；当前分支：`Teemo/p2-personal-intelligence`。
 - 底层能力优先通过 `AIService`、`TeemoStorageService`、`TeemoFileService` 调用。
 - 修改后至少执行语法检查、受影响功能测试、应用启动检查和 `git diff/status` 检查。
 - 新增文件、节点或需要重命名的项目资产优先使用 `Teemo` 前缀；用户明确指定的文件名除外。

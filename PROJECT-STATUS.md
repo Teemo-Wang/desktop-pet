@@ -1,17 +1,24 @@
 # Teemo助理 — 项目进度与规划
 
-> 文档版本：v1.17 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.2.0（P2 Personal Intelligence IN PROGRESS）**
+> 文档版本：v1.18 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.2.1（P2 Personal Intelligence IN PROGRESS）**
 
 ## 当前状态
 
 - Product：`Teemo助理`
-- Version：`v1.2.0`
+- Version：`v1.2.1`
 - Source：`D:\Teemo助手\Teemo机器人项目\Teemo-source`
 - P0：`CLOSED`
 - P1：`CLOSED / PASS / BLOCKERS: 0`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
 - Current Development：`P2-1 Cognition UI / Memory Center CLOSED / PASS / BLOCKERS: 0`
 - Current Branch：`Teemo/p2-personal-intelligence`
+
+## v1.2.1 维护更新（2026-08-09）
+
+- 修复 Memory Center 手动新增认知在 1,000 字符处静默截断、达到上限后无法继续输入的问题。
+- 单次输入上限调整为 12,000 字符，界面显示实时字符数、超限反馈和预计认知条数。
+- 长内容按段落和句子拆分为不超过 420 字符的认知；批量新增只持久化一次，并保留敏感信息、重复项和 revision 保护。
+- 维护版本标签：`v1.2.1-cognition-input`；P2-1 原恢复标签保持不变，P2-2 仍未开始。
 
 ## P2-1 阶段（2026-08-09，CLOSED / PASS）
 

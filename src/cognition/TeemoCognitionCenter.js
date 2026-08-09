@@ -75,6 +75,8 @@
         editorTitle: get('memoryEditorTitle'),
         editorTip: get('memoryEditorTip'),
         editorContent: get('memoryEditorContent'),
+        editorCount: get('TeemoMemoryEditorCount'),
+        editorSplitHint: get('TeemoMemoryEditorSplitHint'),
         editorCategory: get('memoryEditorCategory'),
         editorScope: get('memoryEditorScope'),
         editorProjectRow: get('memoryEditorProjectRow'),
@@ -111,6 +113,7 @@
       if (this.els.enabled) this.els.enabled.addEventListener('change', () => this._setEnabled(this.els.enabled.checked));
       if (this.els.list) this.els.list.addEventListener('click', event => this._handleListAction(event));
       if (this.els.editorScope) this.els.editorScope.addEventListener('change', () => this._syncProjectRequirement());
+      if (this.els.editorContent) this.els.editorContent.addEventListener('input', () => this._updateEditorMetrics());
       if (this.els.editorCancel) this.els.editorCancel.addEventListener('click', () => this.closeEditor());
       if (this.els.editorSave) this.els.editorSave.addEventListener('click', () => this.saveEditor());
       if (this.els.editor) this.els.editor.addEventListener('click', event => {
@@ -276,8 +279,8 @@
     openCreate() {
       this.editorMode = 'create';
       this.editorTarget = null;
-      this.els.editorTitle.textContent = '添加一条认知';
-      this.els.editorTip.textContent = '这是你的明确输入，将以高可信度保存在本机。';
+      this.els.editorTitle.textContent = '添加认知';
+      this.els.editorTip.textContent = '内容将以高可信度保存在本机；多个段落会自动整理为多条认知。';
       this.els.editorContent.value = '';
       this.els.editorContent.readOnly = false;
       this.els.editorCategory.value = 'preference';
@@ -287,6 +290,7 @@
       this.els.editorProject.value = '';
       this.els.editorError.textContent = '';
       this._syncProjectRequirement();
+      this._updateEditorMetrics();
       this.els.editor.hidden = false;
       this.els.editorContent.focus();
     }
@@ -307,6 +311,7 @@
       this.els.editorProject.value = entry.projectId || '';
       this.els.editorError.textContent = '';
       this._syncProjectRequirement();
+      this._updateEditorMetrics();
       this.els.editor.hidden = false;
       this.els.editorContent.focus();
     }
@@ -327,6 +332,7 @@
       this.els.editorProject.value = entry.projectId || '';
       this.els.editorError.textContent = '';
       this._syncProjectRequirement();
+      this._updateEditorMetrics();
       this.els.editor.hidden = false;
     }
 
@@ -340,6 +346,34 @@
       this.els.editorProjectRow.hidden = this.els.editorScope.value !== 'project';
     }
 
+    _updateEditorMetrics() {
+      if (!this.els.editorContent) return { overLimit: false, length: 0, limit: 0 };
+      const value = String(this.els.editorContent.value || '');
+      const preview = this.editorMode === 'create'
+        && this.service
+        && typeof this.service.previewManualContent === 'function'
+        ? this.service.previewManualContent(value)
+        : null;
+      const limit = preview ? preview.maxChars : 1000;
+      const length = preview ? preview.length : value.length;
+      const overLimit = length > limit;
+
+      if (this.els.editorCount) {
+        this.els.editorCount.textContent = `${length.toLocaleString('zh-CN')} / ${limit.toLocaleString('zh-CN')}`;
+        this.els.editorCount.classList.toggle('over-limit', overLimit);
+        this.els.editorCount.hidden = this.editorMode === 'move';
+      }
+      if (this.els.editorSplitHint) {
+        const itemCount = preview ? preview.itemCount : 0;
+        this.els.editorSplitHint.hidden = this.editorMode !== 'create' || (!overLimit && itemCount <= 1);
+        this.els.editorSplitHint.textContent = overLimit
+          ? `超出上限 ${(length - limit).toLocaleString('zh-CN')} 个字符`
+          : itemCount > 1 ? `预计保存为 ${itemCount} 条认知` : '';
+      }
+      if (this.els.editorSave) this.els.editorSave.disabled = this.busy || overLimit;
+      return { overLimit, length, limit };
+    }
+
     async saveEditor() {
       if (this.busy || !this.snapshot) return;
       const content = this.els.editorContent.value.trim();
@@ -347,13 +381,18 @@
       const projectId = scope === 'project' ? this.els.editorProject.value : null;
       if (!content) return this._editorError('请输入认知内容');
       if (scope === 'project' && !projectId) return this._editorError('请选择认知所属项目');
+      const metrics = this._updateEditorMetrics();
+      if (metrics.overLimit) return this._editorError(`认知内容最多 ${metrics.limit.toLocaleString('zh-CN')} 个字符`);
       this.busy = true;
       this.els.editorSave.disabled = true;
       try {
         let result;
         const options = { expectedRevision: this.snapshot.revision };
         if (this.editorMode === 'create') {
-          result = this.service.manualCreate({ content, scope, projectId, category: this.els.editorCategory.value }, options);
+          const create = typeof this.service.manualCreateBatch === 'function'
+            ? this.service.manualCreateBatch.bind(this.service)
+            : this.service.manualCreate.bind(this.service);
+          result = create({ content, scope, projectId, category: this.els.editorCategory.value }, options);
         } else if (this.editorMode === 'edit') {
           result = this.service.updateCognitionEntry({ ...this.editorTarget, content }, options);
         } else {
@@ -364,12 +403,18 @@
         this.els.editor.hidden = true;
         this._renderProjects();
         this.render();
-        this._setStatus(this.editorMode === 'create' ? '已添加认知' : this.editorMode === 'edit' ? '认知已修改，原依据已保留' : '认知范围已调整');
+        if (this.editorMode === 'create') {
+          const createdCount = Math.max(1, Number(result.createdCount) || 1);
+          const duplicateCount = Math.max(0, Number(result.duplicateCount) || 0);
+          this._setStatus(`已添加 ${createdCount} 条认知${duplicateCount ? `，跳过 ${duplicateCount} 条重复内容` : ''}`);
+        } else {
+          this._setStatus(this.editorMode === 'edit' ? '认知已修改，原依据已保留' : '认知范围已调整');
+        }
       } catch (error) {
         this._editorError(error.message || '保存失败');
       } finally {
         this.busy = false;
-        this.els.editorSave.disabled = false;
+        this._updateEditorMetrics();
       }
     }
 

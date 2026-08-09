@@ -113,6 +113,41 @@ async function main() {
   });
 
   await withTempDir(async dir => {
+    const service = serviceAt(dir);
+    const snapshot = service.getManagementSnapshot();
+    const longContent = [
+      `设计工作与专业方向\n${'偏好清晰的信息层级、明确的品牌识别和可落地的设计方案。'.repeat(24)}`,
+      `工具与创作流程\n${'经常使用 ComfyUI 和设计工具完成视觉探索，并重视流程效率。'.repeat(22)}最终确认信息。`,
+    ].join('\n\n');
+    const preview = service.previewManualContent(longContent);
+    assert.ok(preview.length > 1000);
+    assert.ok(preview.itemCount >= 4);
+
+    const batch = service.manualCreateBatch({ content: longContent, scope: 'global', category: 'preference' }, { expectedRevision: snapshot.revision });
+    assert.equal(batch.ok, true);
+    assert.equal(batch.createdCount, preview.itemCount);
+    assert.equal(batch.snapshot.revision, snapshot.revision + 1, '批量新增只应持久化一次');
+    assert.ok(batch.cognitions.every(item => item.content.length <= preview.itemMaxChars));
+    assert.ok(service.getProfile().some(item => item.content.includes('最终确认信息')));
+
+    const duplicate = service.manualCreateBatch({ content: longContent, scope: 'global', category: 'preference' }, { expectedRevision: batch.snapshot.revision });
+    assert.equal(duplicate.code, 'COGNITION_DUPLICATE');
+    assert.equal(service.getState().revision, batch.snapshot.revision);
+
+    const mixed = service.manualCreateBatch({ content: `${longContent}\n\n新增的独立工作习惯。`, scope: 'global', category: 'workflow' }, { expectedRevision: batch.snapshot.revision });
+    assert.equal(mixed.ok, true);
+    assert.equal(mixed.createdCount, 1);
+    assert.equal(mixed.duplicateCount, preview.itemCount);
+    assert.ok(service.getProfile().some(item => item.content === '新增的独立工作习惯。'));
+
+    const sensitive = service.manualCreateBatch({ content: '个人资料\n\nAPI Key: sk-abcdefghijklmnop', scope: 'global' }, { expectedRevision: mixed.snapshot.revision });
+    assert.equal(sensitive.code, 'COGNITION_SENSITIVE');
+    const tooLong = service.manualCreateBatch({ content: '字'.repeat(preview.maxChars + 1), scope: 'global' }, { expectedRevision: mixed.snapshot.revision });
+    assert.equal(tooLong.code, 'COGNITION_TOO_LONG');
+    assert.equal(service.getState().revision, mixed.snapshot.revision);
+  });
+
+  await withTempDir(async dir => {
     const file = path.join(dir, 'Teemo-cognition.json');
     const invalid = '{ invalid cognition json';
     fs.writeFileSync(file, invalid, 'utf8');

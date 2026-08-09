@@ -332,9 +332,13 @@
 
   <div class="teemo-modal-backdrop" id="memoryEditorModal" hidden>
     <div class="teemo-modal teemo-memory-editor">
-      <h2 id="memoryEditorTitle">添加一条认知</h2>
+      <h2 id="memoryEditorTitle">添加认知</h2>
       <p class="teemo-modal-tip" id="memoryEditorTip"></p>
-      <label><span>认知内容</span><textarea id="memoryEditorContent" maxlength="1000" placeholder="例如：设计方案默认优先考虑简洁、商业化和可落地。"></textarea></label>
+      <label>
+        <span class="teemo-memory-editor-field-head"><span>认知内容</span><span id="TeemoMemoryEditorCount">0 / 12,000</span></span>
+        <textarea id="memoryEditorContent" placeholder="可以输入一条认知，也可以粘贴包含多个段落的个人信息。"></textarea>
+        <small class="teemo-memory-editor-split-hint" id="TeemoMemoryEditorSplitHint" hidden></small>
+      </label>
       <div class="teemo-memory-editor-grid">
         <label><span>类型</span><select id="memoryEditorCategory"><option value="preference">设计偏好</option><option value="workflow">工作习惯</option><option value="goal">长期目标</option><option value="constraint">要求与限制</option><option value="correction">用户纠正</option></select></label>
         <label><span>作用范围</span><select id="memoryEditorScope"><option value="global">长期认知</option><option value="recent">近期认知</option><option value="project">项目认知</option></select></label>

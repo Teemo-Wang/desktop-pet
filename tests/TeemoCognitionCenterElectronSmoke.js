@@ -56,6 +56,22 @@ async function runFlow(window) {
     let card = [...document.querySelectorAll('.teemo-memory-card')].find(item => item.textContent.includes('最近比较喜欢金属材质'));
     if (!card) throw new Error('manual recent cognition missing');
 
+    get('memoryAddButton').click();
+    const longProfile = [
+      '设计工作与专业方向\\n' + '偏好清晰的信息层级、明确的品牌识别和可落地的设计方案。'.repeat(24),
+      '工具与创作流程\\n' + '经常使用 ComfyUI 和设计工具完成视觉探索，并重视流程效率。'.repeat(22) + '最终确认信息。',
+    ].join('\\n\\n');
+    get('memoryEditorContent').value = longProfile;
+    get('memoryEditorContent').dispatchEvent(new Event('input', { bubbles: true }));
+    if (get('memoryEditorContent').value.length <= 1000) throw new Error('long cognition input was truncated');
+    if (!/预计保存为/.test(get('TeemoMemoryEditorSplitHint').textContent)) throw new Error('split preview missing');
+    get('memoryEditorSaveButton').click();
+    await wait(80);
+    if (!get('memoryEditorModal').hidden) throw new Error('long cognition did not save');
+    if (!get('memoryList').textContent.includes('最终确认信息')) throw new Error('tail of long cognition missing');
+
+    card = [...document.querySelectorAll('.teemo-memory-card')].find(item => item.textContent.includes('最近比较喜欢金属材质'));
+    if (!card) throw new Error('recent cognition missing after batch render');
     card.querySelector('[data-memory-action="edit"]').click();
     get('memoryEditorContent').value = '最近偏好高反射金属材质';
     get('memoryEditorSaveButton').click();
@@ -121,7 +137,13 @@ app.whenReady().then(async () => {
       await first.webContents.executeJavaScript(`(async () => {
         document.getElementById('memoryButton').click();
         await new Promise(resolve => setTimeout(resolve, 60));
-        document.querySelector('[data-memory-filter="inactive"]').click();
+        document.getElementById('memoryAddButton').click();
+        const preview = [
+          '个人背景与职业方向\\n' + '专注品牌设计、三维视觉和 AI 创作流程。'.repeat(22),
+          '设计偏好\\n' + '重视清晰的信息层级、品牌识别、商业传播效率和可落地性。'.repeat(22),
+        ].join('\\n\\n');
+        document.getElementById('memoryEditorContent').value = preview;
+        document.getElementById('memoryEditorContent').dispatchEvent(new Event('input', { bubbles: true }));
         await new Promise(resolve => setTimeout(resolve, 30));
       })()`);
       first.showInactive();

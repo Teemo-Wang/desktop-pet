@@ -56,7 +56,11 @@ Schema 从 version 1 兼容升级到 version 2，新增：
 
 ### 手动新增
 
-用户选择长期、近期或项目 scope。项目 scope 必须包含 projectId；新增 Observation 与 Cognition 都标记 `source: user_manual`，confidence 为高可信。相同 fingerprint 已存在 active cognition 时返回 `COGNITION_DUPLICATE`，避免重复注入。
+用户选择长期、近期或项目 scope。项目 scope 必须包含 projectId；新增 Observation 与 Cognition 都标记 `source: user_manual`，confidence 为高可信。
+
+单次手动输入支持最多 12,000 字符。较长内容会优先按空行识别段落，再按句子拆分为不超过 420 字符的独立认知，确保单条保存内容不会在 Context Builder 中被二次截断。界面实时显示字符数和预计生成条数；超过上限时保留完整输入并明确提示，不再在 1,000 字符处静默截断。
+
+批量新增只执行一次持久化和一次 revision 递增。相同 fingerprint 已存在 active cognition 时跳过重复项；整批全部重复时返回 `COGNITION_DUPLICATE`，避免重复注入。敏感信息检查覆盖拆分前的完整输入，命中时整批拒绝保存。
 
 ### 纠正与修改
 
@@ -118,13 +122,13 @@ npm.cmd run test:cognition-management
 npm.cmd run test:cognition-ui-smoke
 ```
 
-Management 测试覆盖读取四类数据、三种手动 scope、编辑历史、supersede、双向 scope migration、缺失 project、敏感信息、revision 并发冲突、开关、最新 Context Builder 和损坏 JSON 不覆盖。
+Management 测试覆盖读取四类数据、三种手动 scope、长文本拆分和单次持久化、重复项跳过、编辑历史、supersede、双向 scope migration、缺失 project、敏感信息、输入上限、revision 并发冲突、开关、最新 Context Builder 和损坏 JSON 不覆盖。
 
 Electron smoke 使用独立 `userData` 和 `TEEMO_ASSISTANT_DATA_DIR`，在真实独立聊天页面中完成：
 
 1. 打开 Cognition Center。
 2. empty state。
-3. 新增 Recent。
+3. 新增 Recent，并验证超过 1,000 字符的长文本完整输入、拆分预览和尾部内容保存。
 4. 修改内容。
 5. 提升为 global。
 6. 查看历史依据。
@@ -158,5 +162,13 @@ Electron smoke 使用独立 `userData` 和 `TEEMO_ASSISTANT_DATA_DIR`，在真�
 - 实现提交：`fa13978 Teemo: add P2-1 cognition center`。
 - 封板提交：`Teemo: close P2-1 cognition center`。
 - 阶段恢复标签：`v1.2.0-p2.1-cognition-ui`。
-- 应用、界面、安装包版本继续为 `1.2.0`，与标签数字前缀一致。
+- P2-1 封板时的应用、界面和安装包版本为 `1.2.0`，与原恢复标签数字前缀一致。
 - P2-2 未开始，等待新的明确任务书。
+
+## 15. v1.2.1 手动输入维护更新
+
+- 维护标签：`v1.2.1-cognition-input`。
+- 修复新增认知在 1,000 字符处静默截断的问题。
+- 支持最多 12,000 字符输入、实时字符计数、超限提示和长内容拆分预览。
+- 长内容拆分、批量单次持久化、重复项跳过、敏感信息整批拒绝和隔离 Electron UI 烟测均已覆盖。
+- P2-1 原恢复标签 `v1.2.0-p2.1-cognition-ui` 保持不变，未进入 P2-2。

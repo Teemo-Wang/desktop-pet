@@ -6,10 +6,15 @@
 - Branch：`Teemo/p2-personal-intelligence`
 - Phase：P2-1 Cognition UI / Memory Center
 - State：`CLOSED / PASS / BLOCKERS: 0`
-- App Version：`v1.2.0`
+- App Version：`v1.2.1`
 - P1 Recovery Tag：`v1.2.0-p1-agent-foundation`
 - P2-1 Recovery Tag：`v1.2.0-p2.1-cognition-ui`
 - Guardrail：P2-1 已封板；没有新的明确任务书时不得进入 P2-2
+
+## 封板后维护
+
+- `v1.2.1` 修复手动新增认知的 1,000 字符静默截断，并支持最多 12,000 字符的长内容自动拆分。
+- P2-1 原恢复标签 `v1.2.0-p2.1-cognition-ui` 不移动；维护标签为 `v1.2.1-cognition-input`。
 
 ## 本阶段已实现
 

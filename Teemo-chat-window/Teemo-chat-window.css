@@ -568,9 +568,14 @@ button { color: inherit; }
 .teemo-memory-editor { width: min(560px, calc(100vw - 40px)); }
 .teemo-memory-editor label { display: flex; min-width: 0; flex-direction: column; gap: 7px; color: #999; font-size: 10px; }
 .teemo-memory-editor textarea,.teemo-memory-editor select { width: 100%; padding: 10px 11px; border: 1px solid var(--border); border-radius: 8px; outline: 0; background: #252525; color: #eee; font: inherit; }
-.teemo-memory-editor textarea { min-height: 104px; resize: vertical; line-height: 1.6; }
+.teemo-memory-editor textarea { min-height: 150px; max-height: min(48vh, 480px); resize: vertical; line-height: 1.6; }
 .teemo-memory-editor textarea:focus,.teemo-memory-editor select:focus { border-color: rgba(77,153,255,.65); }
 .teemo-memory-editor textarea[readonly],.teemo-memory-editor select:disabled { color: #888; background: #202020; }
+.teemo-memory-editor-field-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.teemo-memory-editor-field-head > span:last-child { color: #777; font-variant-numeric: tabular-nums; }
+.teemo-memory-editor-field-head > span:last-child.over-limit { color: #e58b8b; }
+.teemo-memory-editor-split-hint { min-height: 15px; color: #82aeea; font-size: 10px; }
+.teemo-memory-editor-split-hint[hidden] { display: none; }
 .teemo-memory-editor > .teemo-memory-editor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 0; }
 .teemo-memory-editor-project { grid-column: 1 / -1; }
 .teemo-memory-editor-project[hidden] { display: none; }
