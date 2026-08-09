@@ -216,8 +216,21 @@
             </dl>
           </section>
           <section class="teemo-inspiration-sources" aria-labelledby="TeemoInspirationSourcesTitle">
-            <header><span>Sources</span><h2 id="TeemoInspirationSourcesTitle">素材来源</h2></header>
+            <header>
+              <div><span>Sources</span><h2 id="TeemoInspirationSourcesTitle">素材来源</h2></div>
+              <button class="teemo-secondary-button" id="TeemoInspirationAddFolderButton" type="button">添加本地文件夹</button>
+            </header>
             <div id="TeemoInspirationSourceList"></div>
+          </section>
+          <section class="teemo-inspiration-browser" id="TeemoInspirationBrowser" hidden>
+            <header>
+              <div><span>Local Folder</span><h2 id="TeemoInspirationBrowserTitle">本地灵感</h2><p id="TeemoInspirationBrowserPath">/</p></div>
+              <button class="teemo-secondary-button" id="TeemoInspirationBrowserBack" type="button">返回上级</button>
+            </header>
+            <div class="teemo-inspiration-browser-grid">
+              <div class="teemo-inspiration-entry-list" id="TeemoInspirationEntryList"></div>
+              <div class="teemo-inspiration-preview" id="TeemoInspirationPreview"><span>选择支持的图片进行预览</span></div>
+            </div>
           </section>
         </div>
       </main>
@@ -465,6 +478,8 @@
   <script src="../src/inspiration/TeemoInspirationConnectorRegistry.js"></script>
   <script src="../src/inspiration/TeemoInspirationAccessGuard.js"></script>
   <script src="../src/inspiration/TeemoInspirationService.js"></script>
+  <script src="../src/inspiration/TeemoLocalFolderClient.js"></script>
+  <script src="../src/inspiration/TeemoLocalFolderConnector.js"></script>
   <script src="../src/skills/TeemoSkillSpecification.js"></script>
   <script src="../src/skills/TeemoSkillValidator.js"></script>
   <script src="../src/skills/TeemoSkillImporter.js"></script>

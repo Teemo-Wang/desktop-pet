@@ -83,9 +83,10 @@
       return {
         state: this.getState(),
         enabled: this.isEnabled(),
-        sources: this.registry && typeof this.registry.listDefinitions === 'function'
+        connectors: this.registry && typeof this.registry.listDefinitions === 'function'
           ? this.registry.listDefinitions()
           : [],
+        sources: [],
       };
     }
 
@@ -132,6 +133,17 @@
       } catch (error) {
         return { ok: false, error: Contracts.publicError(error) };
       }
+    }
+
+    readLocalFolder(sourceId, operation, request = {}, context = {}) {
+      const id = Contracts.safeText(sourceId, 120);
+      if (!id) return Promise.resolve({ ok: false, error: Contracts.publicError({ code: Contracts.ERROR_CODES.connectorInvalid }) });
+      return this.read('local-folder', operation, { ...Contracts.clone(request), sourceId: id }, {
+        ...context,
+        permissionToolName: 'inspiration_local_folder',
+        permissionResource: `inspiration://local-folder/${encodeURIComponent(id)}`,
+        requiresExecutionAuthorization: true,
+      });
     }
   }
 

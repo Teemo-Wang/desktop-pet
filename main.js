@@ -10,6 +10,9 @@ const TeemoGitService = require('./src/services/TeemoGitService');
 const registerTeemoGitToolIpc = require('./src/tools/git/TeemoGitToolIpc');
 const TeemoExecuteService = require('./src/services/TeemoExecuteService');
 const registerTeemoExecuteToolIpc = require('./src/tools/execute/TeemoExecuteToolIpc');
+const TeemoInspirationSourceService = require('./src/inspiration/TeemoInspirationSourceService');
+const TeemoLocalFolderService = require('./src/inspiration/TeemoLocalFolderService');
+const registerTeemoLocalFolderIpc = require('./src/inspiration/TeemoLocalFolderIpc');
 const dingtalkBridge = require('./dingtalk-bridge');
 const materialBridge = require('./material-bridge');
 
@@ -48,6 +51,32 @@ registerTeemoExecuteToolIpc(ipcMain, teemoExecuteService, {
 function saveLocalAccessRoots(roots) {
   fileService.saveAuthorizedRoots(localAccessFilePath(), roots);
 }
+
+const teemoInspirationSourceService = new TeemoInspirationSourceService({
+  fileService,
+  rootsProvider: loadLocalAccessRoots,
+});
+const teemoLocalFolderService = new TeemoLocalFolderService({
+  fileService,
+  sourceService: teemoInspirationSourceService,
+  rootsProvider: loadLocalAccessRoots,
+});
+registerTeemoLocalFolderIpc(ipcMain, {
+  sourceService: teemoInspirationSourceService,
+  localFolderService: teemoLocalFolderService,
+  permissionService: teemoPermissionService,
+  fileService,
+  rootsProvider: loadLocalAccessRoots,
+  saveRoots: saveLocalAccessRoots,
+  selectFolder: async event => {
+    const owner = BrowserWindow.fromWebContents(event.sender) || chatWindow || mainWindow;
+    const result = await dialog.showOpenDialog(owner, {
+      title: '选择本地灵感文件夹',
+      properties: ['openDirectory'],
+    });
+    return result.canceled || !result.filePaths.length ? null : result.filePaths[0];
+  },
+});
 
 function canonicalLocalPath(filePath) {
   return fileService.canonicalPath(filePath);

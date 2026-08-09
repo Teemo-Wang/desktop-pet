@@ -27,9 +27,10 @@
         toolCallId: Contracts.safeText(context.toolCallId, 120) || makeId(),
         runId: Contracts.safeText(context.runId, 120) || null,
         sessionId: Contracts.safeText(context.sessionId, 120) || null,
-        toolName: `inspiration_${operation}`,
+        toolName: Contracts.safeText(context.permissionToolName, 120) || `inspiration_${operation}`,
         permission: 'read',
-        resource: `inspiration://source/${encodeURIComponent(connectorId)}`,
+        resource: Contracts.safeText(context.permissionResource, 32768) || `inspiration://source/${encodeURIComponent(connectorId)}`,
+        requiresExecutionAuthorization: context.requiresExecutionAuthorization === true,
         reason: `读取灵感来源：${connectorId}`,
       };
     }
@@ -59,7 +60,8 @@
       if (!id || !method) throw Contracts.inspirationError('connectorInvalid', '不支持的只读 Connector 操作');
       if (context.signal && context.signal.aborted) throw Contracts.inspirationError('aborted', '读取已取消');
 
-      const permission = await this._authorize(this._permissionRequest(id, capability, context), context);
+      const permissionRequest = this._permissionRequest(id, capability, context);
+      const permission = await this._authorize(permissionRequest, context);
       if (!permission || permission.decision !== 'allow') {
         const code = permission && permission.decision === 'prompt' ? 'permissionRequired' : 'permissionDenied';
         throw Contracts.inspirationError(code, '灵感来源读取未获授权');
@@ -74,7 +76,9 @@
       try {
         return await connector[method](Contracts.clone(request), {
           signal: context.signal || null,
-          sessionId: Contracts.safeText(context.sessionId, 120) || null,
+          toolCallId: permissionRequest.toolCallId,
+          runId: permissionRequest.runId,
+          sessionId: permissionRequest.sessionId,
         });
       } catch (error) {
         if ((context.signal && context.signal.aborted) || (error && (error.name === 'AbortError' || error.code === 'ABORT_ERR'))) {

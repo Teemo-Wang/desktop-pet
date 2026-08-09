@@ -46,6 +46,16 @@
   const inspirationRegistry = window.TeemoInspirationConnectorRegistry
     ? new window.TeemoInspirationConnectorRegistry()
     : null;
+  const localFolderClient = window.TeemoLocalFolderClient
+    ? new window.TeemoLocalFolderClient({ ipcRenderer })
+    : null;
+  const localFolderConnector = window.TeemoLocalFolderConnector && localFolderClient
+    ? new window.TeemoLocalFolderConnector({ client: localFolderClient })
+    : null;
+  if (inspirationRegistry && localFolderConnector
+    && !(typeof process !== 'undefined' && process.env.TEEMO_INSPIRATION_DISABLE_LOCAL_FOLDER === '1')) {
+    inspirationRegistry.register(localFolderConnector);
+  }
   const inspirationAccessGuard = window.TeemoInspirationAccessGuard && inspirationRegistry
     ? new window.TeemoInspirationAccessGuard({ registry: inspirationRegistry, permissionService: permissionClient })
     : null;
@@ -54,6 +64,7 @@
     : null;
   window.teemoInspirationRegistry = inspirationRegistry;
   window.teemoInspirationService = inspirationService;
+  window.teemoLocalFolderClient = localFolderClient;
   const fileClient = window.TeemoFileClient ? new window.TeemoFileClient({ ipcRenderer }) : null;
   const gitClient = window.TeemoGitClient ? new window.TeemoGitClient({ ipcRenderer }) : null;
   const executeClient = window.TeemoExecuteClient ? new window.TeemoExecuteClient({ ipcRenderer }) : null;
@@ -1721,6 +1732,7 @@
     if (!inspirationCenter && window.TeemoInspirationCenter && inspirationService) {
       inspirationCenter = new window.TeemoInspirationCenter({
         service: inspirationService,
+        sourceClient: localFolderClient,
         onBack: hideInspiration,
       });
     }

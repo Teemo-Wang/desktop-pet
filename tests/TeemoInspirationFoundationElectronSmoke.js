@@ -9,6 +9,7 @@ const isolatedData = path.join(isolatedRoot, 'data');
 fs.mkdirSync(isolatedProfile, { recursive: true });
 fs.mkdirSync(isolatedData, { recursive: true });
 process.env.TEEMO_ASSISTANT_DATA_DIR = isolatedData;
+process.env.TEEMO_INSPIRATION_DISABLE_LOCAL_FOLDER = '1';
 app.setPath('userData', isolatedProfile);
 app.commandLine.appendSwitch('disable-gpu');
 ipcMain.handle('teemo:local-access-list', () => []);

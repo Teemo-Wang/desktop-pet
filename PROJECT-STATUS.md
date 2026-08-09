@@ -1,6 +1,6 @@
 # Teemo助理 — 项目进度与规划
 
-> 文档版本：v1.26 ｜ 更新日期：2026-08-09 ｜ 当前开发版本：**v1.3.0（P3-1 CLOSED / PASS）**
+> 文档版本：v1.27 ｜ 更新日期：2026-08-09 ｜ 当前开发版本：**v1.3.0（P3-2 IMPLEMENTED / WAITING REVIEW）**
 
 ## 当前状态
 
@@ -13,10 +13,22 @@
 - P2：`CLOSED / PASS / BLOCKERS: 0`
 - P3：`IN PROGRESS`
 - P3-1：`CLOSED / PASS / BLOCKERS: 0`
+- P3-2：`IMPLEMENTED / WAITING REVIEW`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
 - P3 Baseline：`cd29e6f` / `v1.2.1-p3-baseline`
-- Current Development：`P3-2 LOCAL FOLDER PLANNING`
+- Current Development：`WAITING FOR GPT P3-2 STRICT REVIEW`
 - Current Branch：`Teemo/p3-personal-inspiration`
+
+## P3-2 阶段（2026-08-09，IMPLEMENTED / WAITING REVIEW）
+
+- 新增只读 Local Folder Connector、独立 `Teemo-inspiration-sources.json` Source Registry、Main Process filesystem service 和 owner-bound IPC Client。
+- Source Registry 不是授权系统；实际读取只复用 P1 authorized roots，并使用 `inspiration://local-folder/<sourceId>` 的 P1 Permission read gate 与一次性 execution authorization。
+- 支持单层目录浏览、实时 metadata 和 PNG/JPEG/WEBP/GIF 按需 preview；默认 100、硬上限 200、depth 16、Source 20、preview 25 MiB。
+- 拒绝 traversal、absolute/drive/UNC/device child path，不跟随 symlink/junction；open/fstat identity/size 与 signature 校验降低 TOCTOU 风险。
+- 移除 Source 不删除文件或撤销 P1 root；撤权后 Source 保留并 fail closed，重新授权必须显式选择原目录。
+- P3-2 三组专项、P3-1 三组、22 组 P1/P2 Node、10 组既有 Electron、32-case benchmark、自动更新、语法、diff、版本和敏感信息检查全部通过。
+- 正式用户数据和真实个人素材未参与测试；详情见 `docs/Teemo-P3-2-LOCAL-FOLDER.md`。
+- 当前不创建 P3-2 close tag、不 remote push、不开始 P3-3，等待 GPT Strict Review。
 
 ## P3-1 阶段（2026-08-09，CLOSED / PASS）
 

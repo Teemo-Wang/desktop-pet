@@ -4,8 +4,8 @@
 
 - Product：Teemo助理
 - Branch：`Teemo/p3-personal-inspiration`
-- Phase：P3-1 Inspiration Foundation
-- State：`CLOSED / PASS / BLOCKERS: 0`
+- Phase：P3-2 Local Folder Connector
+- State：`IMPLEMENTED / WAITING REVIEW`
 - Installed App Version：`v1.2.1`
 - Development App Version：`v1.3.0`
 - P3 Baseline：`cd29e6f` / `v1.2.1-p3-baseline`
@@ -15,24 +15,25 @@
 - P2-3 Recovery Tag：`v1.2.1-p2.3-challenge-mode`
 - P2-4 Recovery Tag：`v1.2.1-p2.4-cognition-intelligence`
 - P2-5 Recovery Tag：`v1.2.1-p2.5-skill-intelligence`
+- P3-1 Recovery Tag：`v1.3.0-p3.1-inspiration-foundation`
 
-## P3-1 已实现
+## P3-2 已实现
 
-- 独立 `Teemo-inspiration-state.json`，默认关闭，revisioned/locked，损坏 fail closed 且不覆盖原字节。
-- 只读 Connector Definition、Registry、Access Guard 和 Service；生产 Registry 为空。
-- Connector 写 capability/方法注册即拒绝；读取必须先通过 P1 Permission Service。
-- 独立聊天新增“我的灵感”最小管理页，不提供任何真实来源或未来功能假按钮。
-- Agent Core 与 Skill/Cognition/Creative/Challenge Context 顺序完全未改，不注入 Inspiration。
-- 三组 P3-1 专项测试通过；测试使用隔离临时 profile，正式用户数据零触碰。
+- 新增 Local Folder Source Registry、Main read-only Service、Connector、Renderer IPC Client 和“我的灵感”来源浏览 UI。
+- Source Registry 只保存 Source 配置，不是 filesystem authorization；唯一授权事实源仍为 P1 authorized roots。
+- 每次读取还要求 source-specific P1 Permission：`inspiration://local-folder/<sourceId>`，并在 Main 消费一次性 execution authorization。
+- 只支持单层、按需、受限的 list/metadata/PNG-JPEG-WEBP-GIF preview；不建立 Metadata Index、Embedding、Search 或 Agent Context。
+- traversal、absolute/UNC/device、symlink/junction、超深、超量、错误 signature、超大 preview 和 TOCTOU replacement 均 fail closed。
+- 三组 P3-2 专项、P3-1 与 P1/P2 全量回归通过；所有 fixture 使用 temp profile/source/roots，正式数据与真实个人素材零触碰。
 
-## 最终验收结果
+## 当前送审证据
 
-1. P3-1 实现与三组专项测试已完成；文档见 `docs/Teemo-P3-1-INSPIRATION-FOUNDATION.md`。
-2. 完整 P1/P2 regression、Electron smoke、benchmark、自动更新、语法、diff 与版本检查已通过。
-3. P3-1 implementation commit 为 `addf2711748dc7804f5c41cb813f71e708921a8a`，提交后工作树 clean。
-4. GPT Strict Review 已确认 `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-2`。
-5. 当前只执行 P3-1 close commit 与 recovery tag；随后获取 P3-2 独立任务书再开始 Local Folder。
+1. P3-2 实现与三组专项测试已完成；文档见 `docs/Teemo-P3-2-LOCAL-FOLDER.md`。
+2. P3-1 三组、P1/P2 22 组 Node、10 组既有 Electron、32-case benchmark、自动更新、语法、diff、版本与敏感信息检查全部通过。
+3. Electron synthetic UI 截图为 2079 x 1256，SHA256 `59853cced44a7a363906e2979477b814bf39fb0a1ef9c91098274bda0d5c86df`，无真实路径、凭据或正式素材。
+4. 当前等待 GPT P3-2 Strict Review；送审前只允许创建 implementation commit，不创建 close tag。
+5. P3-3 Metadata Index 尚未开始，remote push 未执行，正式 v1.2.1 不安装 P3 开发版。
 
 ## 禁止扩展
 
-P3-1 已关闭。除 GPT 已允许的 P3-2 Local Folder 外，当前不得实现 Eagle、NAS、Figma、网页平台、Metadata Index、Semantic Search、Embedding、Vector DB、Image Similarity、Inspiration Context、Taste Signals、Cloud Sync、Multi-Agent 或 GUI Automation。P3-2 必须保持独立提交和 Gate。
+P3-2 等待审阅。当前不得实现 P3-3 Metadata Index、Watcher、Eagle、NAS、Figma、网页平台、Semantic Search、Embedding、Vector DB、Image Similarity、Inspiration Context、Taste Signals、Cloud Sync、Multi-Agent 或 GUI Automation。只有 GPT Gate 明确允许后才能关闭 P3-2 并规划 P3-3。
