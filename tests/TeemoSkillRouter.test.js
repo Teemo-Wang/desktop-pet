@@ -85,20 +85,42 @@ function makeRouter(skills = standardManifests(), tools = []) {
     '使用 Teemo 海报生成 有什么作用？',
     '我想知道，使用 Teemo 海报生成 可以做什么？',
     '使用 Teemo 海报生成 和 Teemo 图片修改对比一下',
+    '如何使用 Teemo 海报生成来生成海报？',
+    '怎么用 Teemo 海报生成来生成海报？',
+    '怎么使用 Teemo 海报生成来生成海报？',
+    '如何调用 Teemo 海报生成来生成海报？',
   ]) {
     assert.equal(Router.isTextExplicitInvocation(question, 'Teemo 海报生成'), false, `meta question must not be explicit: ${question}`);
     assert.equal(route(question).type, 'no_skill');
   }
-  const suppressed = route('不要用海报助手，帮我生成海报');
-  assert.equal(suppressed.type, 'no_skill');
-  assert.ok(suppressed.excluded.some(item => item.skillId === 'poster' && item.code === 'suppressed_by_user'));
+  for (const negative of [
+    '不要用海报助手，帮我生成海报',
+    '我不想用 Teemo 海报生成，帮我生成海报',
+    '我不想使用 Teemo 海报生成，帮我生成海报',
+    '不要再用 Teemo 海报生成，帮我生成海报',
+    '不要再用海报助手，帮我生成海报',
+    '别再用 Teemo 海报生成，帮我生成海报',
+    '这次不用 Teemo 海报生成，帮我生成海报',
+    '先别用 Teemo 海报生成，帮我生成海报',
+  ]) {
+    const suppressed = route(negative);
+    assert.equal(suppressed.type, 'no_skill', `negative mention must suppress: ${negative}`);
+    assert.ok(suppressed.excluded.some(item => item.skillId === 'poster' && item.code === 'suppressed_by_user'));
+  }
   const suppressedExplicitId = env.router.route({
-    text: '不要用海报助手，帮我生成海报',
+    text: '我不想用 Teemo 海报生成，帮我生成海报',
     explicitSkillId: 'poster',
     registrySnapshot: env.registrySnapshot,
   });
   assert.equal(suppressedExplicitId.type, 'no_skill');
   assert.ok(suppressedExplicitId.excluded.some(item => item.skillId === 'poster' && item.code === 'suppressed_by_user'));
+  const questionedExplicitId = env.router.route({
+    text: '如何使用 Teemo 海报生成来生成海报？',
+    explicitSkillId: 'poster',
+    registrySnapshot: env.registrySnapshot,
+  });
+  assert.equal(questionedExplicitId.type, 'no_skill');
+  assert.ok(questionedExplicitId.excluded.some(item => item.skillId === 'poster' && item.code === 'suppressed_by_user'));
 }
 
 {
@@ -126,7 +148,7 @@ function makeRouter(skills = standardManifests(), tools = []) {
   assert.ok(missingToolFollowUp.excluded.some(item => item.skillId === 'hard' && item.code === 'missing_required_tool'));
 
   assert.deepEqual(route({ text: hard.routing.intents[0], sessionId: 'suppressed', ...available }).selectedSkillIds, ['hard']);
-  const suppressedFollowUp = route({ text: `不要用 ${hard.name}，${hard.routing.intents[0]}`, sessionId: 'suppressed', ...available });
+  const suppressedFollowUp = route({ text: `我不想用 ${hard.name}，${hard.routing.intents[0]}`, sessionId: 'suppressed', ...available });
   assert.equal(suppressedFollowUp.type, 'no_skill');
   assert.ok(suppressedFollowUp.excluded.some(item => item.skillId === 'hard' && item.code === 'suppressed_by_user'));
   assert.equal(env.state.get('suppressed'), null);

@@ -35,10 +35,11 @@
     while (index >= 0) {
       const prefix = normalized.slice(Math.max(0, index - 48), index);
       const suffix = normalized.slice(index + target.length, index + target.length + 64);
-      const negative = /(不要|别|不再|不|不用|无需|不需要|禁止|避免)\s*(?:使用|用|按照|调用|启用|选择|切换到)?\s*$/i.test(prefix);
+      const negative = /(?:^|\s)(?:我\s*)?(?:(?:这次|本次|当前|现在|先|暂时|接下来)\s*)?(?:不想(?:再)?|不要(?:再)?|别(?:再)?|不再|不用|不使用|无需|不需要|禁止|避免)\s*(?:使用|用|按照|调用|启用|选择|切换到)?\s*$/i.test(prefix);
+      const questionPrefix = /(?:怎么|如何|怎样)(?:才能|可以)?\s*(?:使用|用|按照|调用|启用|选择|切换到)\s*$/i.test(prefix);
       const metaPrefix = /(解释|说明|介绍|讨论|评价|对比|比较|复述|引用|文档|示例|例子|这句话|那句话|原文|为什么|我想知道)[^。！？]{0,24}(?:使用|用|按照|调用|启用)?\s*$/i.test(prefix);
-      const metaSuffix = /^\s*(?:skill\s*)?(?:(?:可以|能|能够)?\s*(?:做什么|干什么)|有什么作用|有何作用|是什么|什么意思|如何工作|怎么用|为什么|是否|对比|比较|和.{0,36}(?:对比|比较)|与.{0,36}(?:对比|比较)|跟.{0,36}(?:对比|比较))/i.test(suffix);
-      if (negative || metaPrefix || metaSuffix) return true;
+      const metaSuffix = /^\s*(?:skill\s*)?(?:(?:可以|能|能够)?\s*(?:做什么|干什么)|有什么作用|有何作用|是什么|什么意思|(?:怎么|如何|怎样)(?:才能|可以)?\s*(?:使用|用|按照|调用|启用|选择|切换到|工作|生成)?|为什么|是否|对比|比较|和.{0,36}(?:对比|比较)|与.{0,36}(?:对比|比较)|跟.{0,36}(?:对比|比较))/i.test(suffix);
+      if (negative || questionPrefix || metaPrefix || metaSuffix) return true;
       index = normalized.indexOf(target, index + target.length);
     }
     return false;
