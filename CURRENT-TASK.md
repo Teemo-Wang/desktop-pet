@@ -5,7 +5,7 @@
 - Product：Teemo助理
 - Branch：`Teemo/p1-agent-core`
 - Phase：P1 最终总审阅
-- State：P1 总审阅发现的 Git 间接执行 blocker 已修正并通过本地回归，等待“Teemo助手升级”最终复审
+- State：P1 最终复审要求的 Git textconv 显式禁用与恶意测试正在收尾
 - Guardrail：总审阅确认前不进入 P2
 
 ## 已完成
@@ -20,8 +20,8 @@
 
 ## 当前动作
 
-1. 提交 `Teemo: prevent git tools from bypassing execute permission` 安全修正。
-2. 向“Teemo助手升级”发送实现、恶意仓库测试、全量回归、Electron smoke 与 commit hash。
+1. 提交 `Teemo: disable git textconv execution` 安全修正。
+2. 向“Teemo助手升级”发送 textconv marker=0、全量回归、Electron smoke 与 commit hash。
 3. 最终复审通过后创建 close commit、`v1.2.0-p1-agent-foundation` 标签并推送。
 
 ## 禁止扩展

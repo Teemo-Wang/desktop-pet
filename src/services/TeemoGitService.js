@@ -494,7 +494,10 @@ class TeemoGitService {
 
   async _diff(repo, prepared, options) {
     const staged = prepared.args.staged === true;
-    const nameArgs = ['diff', ...(staged ? ['--cached'] : []), '--name-only', '-z', '--'];
+    const nameArgs = [
+      'diff', ...(staged ? ['--cached'] : []),
+      '--no-ext-diff', '--no-textconv', '--name-only', '-z', '--',
+    ];
     if (prepared.snapshot.file) nameArgs.push(prepared.snapshot.file.relative);
     const names = await this._git(repo, nameArgs, options);
     const files = names.stdout.split('\u0000').filter(Boolean);

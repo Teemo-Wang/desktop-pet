@@ -32,6 +32,7 @@
 - 所有正式 Git 调用都经过同一个 Safe Git Invocation Policy；固定 `--no-pager`、禁颜色、禁 external diff/textconv、禁交互凭据提示。
 - 每次调用以命令级配置绑定 Teemo 创建并校验为空的独立 hooks 目录，同时设置 `core.fsmonitor=false`、`commit.gpgSign=false`、清空 credential helper 与 external diff；不修改仓库或用户永久 Git config。
 - `git_stage_files` 在 prepare、授权后 revalidate 和 `git add` 前均以相同 Safe Policy 调用 `git check-attr -z filter`。显式文件的 `filter` 只允许 `unspecified`/`unset`；其他值返回 `GIT_EXTERNAL_FILTER_NOT_ALLOWED`。显式 `git_diff` 与 repo-wide diff 选出文件后也执行同一检查。
+- `git_diff` 的 name-only 探测与内容读取、`git_show` 的 patch 输出都显式传递 `--no-ext-diff --no-textconv`，阻止 `.gitattributes diff=<driver>` 与 `diff.<driver>.textconv` 启动外部程序。`git_log` 只读取固定 metadata format，不请求 patch/diff 输出。
 - 因此 read/write Git Tool 不会通过 repository/user 配置的 hooks、custom `core.hooksPath`、clean/process filter、fsmonitor、commit signing、external diff/textconv 或 credential interaction 间接获得 execute 能力。
 - 环境使用最小允许列表并按 API_KEY/TOKEN/AUTHORIZATION/PASSWORD/SECRET 名称再次过滤。
 - stdout/stderr 均有 byte limit，所有操作有 timeout 与 Abort；Windows 通过内部 `taskkill /T /F` 终止测试进程树，该机制不暴露为 Tool。
@@ -55,7 +56,7 @@
 - 受影响 JavaScript `node --check`：PASS
 - `git diff --check`：PASS
 
-`tests/TeemoGitTools.test.js` 使用临时 repo，覆盖 status/diff/log/show、输出截断、显式 stage、commit 不自动 add、未暂存拒绝、repo/root/pathspec/symlink 边界、文件 TOCTOU、Permission deny、动态 canonical resource、Main owner/direct IPC/replay、abort、timeout、process-tree 清理与 repo identity 替换。新增恶意 repo 断言：普通 hooks、自定义 `core.hooksPath`、commit signing program、fsmonitor program 都不会产生 marker；配置 clean filter 的文件在 stage/diff 前以 `GIT_EXTERNAL_FILTER_NOT_ALLOWED` 拒绝且 marker 为 0。没有对 `Teemo-source` 做 Git 写测试。
+`tests/TeemoGitTools.test.js` 使用临时 repo，覆盖 status/diff/log/show、输出截断、显式 stage、commit 不自动 add、未暂存拒绝、repo/root/pathspec/symlink 边界、文件 TOCTOU、Permission deny、动态 canonical resource、Main owner/direct IPC/replay、abort、timeout、process-tree 清理与 repo identity 替换。新增恶意 repo 断言：普通 hooks、自定义 `core.hooksPath`、commit signing program、fsmonitor program 都不会产生 marker；配置 clean filter 的文件在 stage/diff 前以 `GIT_EXTERNAL_FILTER_NOT_ALLOWED` 拒绝且 marker 为 0；配置 `diff.evil.textconv` 后实际执行 `git_diff`/`git_show` 仍使用原始 diff 且 textconv marker/external start count 为 0。没有对 `Teemo-source` 做 Git 写测试。
 
 Electron 双 renderer 烟测使用：
 

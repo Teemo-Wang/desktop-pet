@@ -341,6 +341,32 @@ async function main() {
   assert.equal(fs.existsSync(fsmonitorMarker), false, 'fsmonitor program must not execute for read or write Git tools');
   assert.equal(fs.existsSync(filterMarker), false, 'Git status must not execute configured clean/process filters');
 
+  fs.writeFileSync(path.join(policyRepo, '.gitattributes'), [
+    'Teemo-filter.txt filter=evil',
+    '*.tc diff=evil',
+    '',
+  ].join('\n'), 'utf8');
+  fs.writeFileSync(path.join(policyRepo, 'Teemo-textconv.tc'), 'textconv baseline\n', 'utf8');
+  await policyService.executePrepared(await policyService.prepareOperation('git_stage_files', {
+    repo: policyRepo, files: ['.gitattributes', 'Teemo-textconv.tc'],
+  }, roots), roots);
+  await policyService.executePrepared(await policyService.prepareOperation('git_commit', {
+    repo: policyRepo, message: 'Teemo textconv baseline',
+  }, roots), roots);
+  const textconvMarker = path.join(sandbox, 'Teemo-textconv.marker');
+  const textconvExecutable = writeMarkerExecutable(sandbox, 'Teemo-fake-textconv', textconvMarker);
+  git(policyRepo, ['config', 'diff.evil.textconv', textconvExecutable]);
+  fs.writeFileSync(path.join(policyRepo, 'Teemo-textconv.tc'), 'textconv changed\n', 'utf8');
+  const safeTextconvDiff = await policyService.executePrepared(await policyService.prepareOperation('git_diff', {
+    repo: policyRepo, staged: false, file: 'Teemo-textconv.tc',
+  }, roots), roots);
+  assert.match(safeTextconvDiff.diff, /textconv changed/);
+  const safeTextconvShow = await policyService.executePrepared(await policyService.prepareOperation('git_show', {
+    repo: policyRepo, revision: 'HEAD', file: 'Teemo-textconv.tc',
+  }, roots), roots);
+  assert.match(safeTextconvShow.output, /textconv baseline/);
+  assert.equal(fs.existsSync(textconvMarker), false, 'git_diff/git_show textconv external process start count must be 0');
+
   const oldRepo = path.join(authorized, 'Teemo-old-repo');
   const replacePrepared = await service.prepareOperation('git_status', { repo }, roots);
   fs.renameSync(repo, oldRepo);
