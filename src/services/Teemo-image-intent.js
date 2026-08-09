@@ -84,7 +84,13 @@
         };
       }
 
-      // AI 模式：先问模型，但最终仍要求“明确出图说法”，避免画面描述误触发生图
+      // AI 模式也只对明确包含出图动作的请求做二次判断。
+      // 普通聊天本来就会被下方的“明确出图”校验否决，无需额外等待一次 AI 请求。
+      if (!looksLikeKeyword(value)) {
+        return { wantImage: false, prompt: '', source: 'local-negative' };
+      }
+
+      // 明确出图时再让 AI 做二次确认并整理意图，避免相似词误触发。
       if (!ai || ai.useMock) {
         return { wantImage: false, prompt: '', source: 'mock' };
       }

@@ -2427,8 +2427,8 @@
     renderHistory();
     const article = document.createElement('article');
     article.className = 'teemo-message assistant';
-    article.innerHTML = '<div class="teemo-message-body teemo-thinking">思考中</div>';
-    article.hidden = true;
+    article.innerHTML = '<div class="teemo-message-body teemo-thinking">正在理解你的需求…</div>';
+    article.hidden = false;
     els.messages.appendChild(article);
     const body = article.querySelector('.teemo-message-body');
     scrollToBottom();
@@ -2439,6 +2439,9 @@
     els.send.title = '停止';
     setStatus('正在处理…');
     let full = '';
+    // 先让浏览器绘制用户消息和助手状态，再开始联网、意图识别等异步预处理。
+    // 避免发送后消息区短暂空白，让用户能立即确认 Teemo 已经开始处理。
+    await new Promise(resolve => requestAnimationFrame(resolve));
     try {
       if (window.teemoWebBrowse && window.teemoWebBrowse.extractUrls(requestText).length) {
         article.hidden = false;
