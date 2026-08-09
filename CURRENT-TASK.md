@@ -5,11 +5,11 @@
 - Product：Teemo助理
 - Branch：`Teemo/p2-personal-intelligence`
 - Phase：P2-2 Agent Creative Profile
-- State：`IMPLEMENTED / WAITING REVIEW`
+- State：`CLOSED / PASS / BLOCKERS: 0`
 - App Version：`v1.2.1`
 - P1 Recovery Tag：`v1.2.0-p1-agent-foundation`
 - P2-1 Recovery Tag：`v1.2.0-p2.1-cognition-ui`
-- Guardrail：P2-2 必须经 GPT 严格审阅后才可 PASS/CLOSED；用户已明确授权审阅通过后自动继续 P2-3、P2-4 和 P2 总验收
+- Guardrail：P2-2 已封板；用户已明确授权继续 P2-3、P2-4 和 P2 总验收，但 P2-3 功能不得混入 P2-2 close commit
 
 ## 封板后维护
 
@@ -29,10 +29,10 @@
 
 1. P2-2 实现和专项隔离测试已完成。
 2. P1/P2-1 全量回归、静态检查、版本检查和完整 diff 审核均已通过。
-3. 实现提交 `095ca4c Teemo: add P2-2 creative profile`；GPT 首轮审阅的 5 个 blocker 已修复并通过专项及全量回归，等待复审。
-4. GPT 审阅前不创建 P2-2 closed tag，不标记 PASS/CLOSED。
-5. 审阅通过并修复全部 blocker 后，按用户授权自动进入 P2-3、P2-4，直至 P2 总验收、构建、安装和重启完成。
+3. 实现提交 `095ca4c`；审阅修复提交 `78f1a8d`；首轮 5 个 blocker 已全部解除。
+4. GPT 复审结论：`PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P2-3`。
+5. 阶段恢复标签：`v1.2.1-p2.2-creative-profile`；接下来按用户授权进入 P2-3。
 
 ## 禁止扩展
 
-P2-2 不提前开发 P2-3、P2-4 或 P3 Inspiration；不增加桌面自动化、Provider Native Tool Calling、Embedding、Vector DB、RAG、素材库 Connector 或 hard delete。后续阶段只在当前阶段经 GPT 审阅通过后启动。
+P2-2 close commit 不开发 P2-3、P2-4 或 P3 Inspiration；不增加桌面自动化、Provider Native Tool Calling、Embedding、Vector DB、RAG、素材库 Connector 或 hard delete。

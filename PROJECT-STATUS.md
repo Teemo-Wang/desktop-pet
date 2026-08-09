@@ -10,18 +10,19 @@
 - P0：`CLOSED`
 - P1：`CLOSED / PASS / BLOCKERS: 0`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
-- Current Development：`P2-2 Agent Creative Profile IMPLEMENTED / WAITING REVIEW`
+- Current Development：`P2-2 Agent Creative Profile CLOSED / PASS / BLOCKERS: 0`
 - Current Branch：`Teemo/p2-personal-intelligence`
 
-## P2-2 阶段（2026-08-09，IMPLEMENTED / WAITING REVIEW）
+## P2-2 阶段（2026-08-09，CLOSED / PASS）
 
 - 新增独立于 Cognition 的版本化 Agent Creative Profile：10 条专业原则、9 个评价维度、权重总和 100，以及 General/Brand/Marketing/UI/3D/Motion 六个 Domain Lens。
 - 新增相关性门控、默认 1,400 字符预算的 Creative Context Builder，并以可选依赖平行接入 Agent Core；普通非设计聊天不注入，失败时独立降级。
 - 约束优先级为当前用户明确要求 > 项目约束 > Skill 规范 > Creative Judgment；GPT、Grok、DeepSeek 共用同一 Provider-neutral Profile。
 - 新增“Teemo 的设计判断”只读页面和独立开关；本地状态仅保存 enabled/version/revision，不保存或学习用户偏好与个人素材。
-- 专项单元、隔离 Electron smoke 和 P1/P2-1 全量回归已通过；GPT 严格复审待完成。详细记录见 `docs/P2-2-CREATIVE-PROFILE.md`。
-- GPT 首轮审阅的恢复点证据、mandatory policy 预算、relevance 边界、损坏状态 fail-safe、流式/跨实例验证 5 个 blocker 已修复；第二轮全量回归通过，当前等待复审。
-- 未实现 P2-3 Challenge/Creative Director、P2-4 Cognition Intelligence Upgrade 或 P3 Personal Inspiration Intelligence；当前不得标记 PASS/CLOSED。
+- 专项单元、隔离 Electron smoke 和 P1/P2-1 全量回归已通过；详细记录见 `docs/P2-2-CREATIVE-PROFILE.md`。
+- GPT 首轮审阅的恢复点证据、mandatory policy 预算、relevance 边界、损坏状态 fail-safe、流式/跨实例验证 5 个 blocker 已修复；第二轮全量回归通过，复审确认全部解除。
+- GPT 复审确认 `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P2-3`；恢复标签为 `v1.2.1-p2.2-creative-profile`。
+- 未实现 P2-3 Challenge/Creative Director、P2-4 Cognition Intelligence Upgrade 或 P3 Personal Inspiration Intelligence；P2-3 将在独立阶段启动。
 
 ## v1.2.1 维护更新（2026-08-09）
 

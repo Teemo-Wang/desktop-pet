@@ -2,7 +2,7 @@
 
 ## v1.2.1 - 2026-08-09
 
-### P2-2 Agent Creative Profile（IMPLEMENTED / WAITING REVIEW）
+### P2-2 Agent Creative Profile（CLOSED / PASS）
 
 - 新增版本化、Provider-neutral 的 Agent Creative Profile，包含 10 条专业原则、9 个评价维度、总和为 100 的默认权重和 6 个 Domain Lens。
 - 新增相关性门控、默认 1,400 字符预算的 Creative Context Builder，与 Cognition 平行接入 Agent Core；失败只独立降级。
@@ -10,7 +10,7 @@
 - 明确 Cognition、Creative Profile 与未来 Personal Inspiration Intelligence 三者事实源独立，以及用户 > 项目 > Skill > Creative Judgment 的约束优先级。
 - 新增 `test:creative-profile`、`test:creative-context` 和隔离 Electron `test:creative-ui-smoke`；P2-2 未修改 package/UI/installer 版本。
 - GPT 首轮严格审阅后收紧：mandatory policy 不受预算裁剪；当前用户意图主导 relevance；损坏 Creative state fail closed；补齐默认 send/stream、附件、实际消息顺序和跨实例回归。
-- 当前等待 P1/P2-1 全量回归与 GPT 严格审阅；审阅前不标记 PASS/CLOSED，不实现 P2-3、P2-4 或 P3。
+- GPT 复审确认 `PASS / BLOCKERS: 0 / REQUIRED_FIXES: 无`；实现提交 `095ca4c`、审阅修复提交 `78f1a8d`，阶段恢复标签为 `v1.2.1-p2.2-creative-profile`。
 
 ## v1.2.0 - 2026-08-09
 
