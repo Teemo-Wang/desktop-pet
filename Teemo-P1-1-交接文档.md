@@ -44,7 +44,7 @@ P0 稳定恢复点：219b92a / v1.1.6-p0-closed
 P1 前产品恢复点：298b5f8 / v1.1.7
 P1-1 阶段恢复点：41a39e0 / v1.1.7-p1.1-agent-core
 当前分支：Teemo/p1-agent-core
-当前 HEAD：41a39e0
+当前 HEAD：5d0cc4e（仅新增本交接文档；P1-1 功能封板点仍为 41a39e0）
 ```
 
 当前分支已推送到 `origin/Teemo/p1-agent-core`，阶段标签已推送到远程并指向 `41a39e0`。当前工作区应保持干净。接手第一步必须执行：
