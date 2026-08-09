@@ -1,6 +1,6 @@
 # Teemo助理 — 项目进度与规划
 
-> 文档版本：v1.19 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.2.1（P2 Personal Intelligence IN PROGRESS）**
+> 文档版本：v1.20 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.2.1（P2 Personal Intelligence IN PROGRESS）**
 
 ## 当前状态
 
@@ -10,8 +10,17 @@
 - P0：`CLOSED`
 - P1：`CLOSED / PASS / BLOCKERS: 0`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
-- Current Development：`P2-2 Agent Creative Profile CLOSED / PASS / BLOCKERS: 0`
+- Current Development：`P2-3 Creative Director / Challenge Mode IMPLEMENTED / WAITING REVIEW`
 - Current Branch：`Teemo/p2-personal-intelligence`
+
+## P2-3 阶段（2026-08-09，IMPLEMENTED / WAITING REVIEW）
+
+- 新增 session-local、runtime-only 的 balanced/challenge 行为层与 light/standard/strong 三档强度；新 session、新窗口和重启默认 balanced，不写磁盘。
+- 新增 deterministic 命令解析、one-shot challenge、session exit 与 one-shot suppression；普通“挑战”文本不切换状态。
+- Agent Core 在 Creative 之后最小接入 Challenge Overlay；mandatory 约束、证据和 Direction Diversity Policy 不受 optional 内容裁剪，失败独立降级。
+- “Teemo 的设计判断”页新增评审模式控制，聊天输入区新增快速状态按钮；Creative OFF/unreadable 时控件禁用并 fail closed。
+- 三套 P2-3 专项测试、隔离 Electron 双窗口/重启 smoke、P1/P2-1/P2-2 全量回归、版本与语法检查均已通过；GPT 严格审阅待完成。详见 `docs/P2-3-CREATIVE-DIRECTOR.md`。
+- 未实现 P2-4、P2-5、P3、Creative Calibration、GUI 自动化或 Multi-Agent；当前不得标记 PASS/CLOSED。
 
 ## P2-2 阶段（2026-08-09，CLOSED / PASS）
 

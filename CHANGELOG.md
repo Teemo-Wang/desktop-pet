@@ -1,5 +1,14 @@
 # Changelog
 
+## P2-3 - 2026-08-09（IMPLEMENTED / WAITING REVIEW）
+
+- 新增 session-local、runtime-only 的 Creative Director 状态：balanced/challenge 与 light/standard/strong，不写磁盘且重启恢复 balanced。
+- 新增确定性 session/one-shot/exit/suppress 命令解析，以及最多 900 字符的 Provider-neutral Challenge Overlay。
+- Challenge mandatory policy 固定用户/项目/Skill 优先级、证据边界和 Direction Diversity Contract；Creative disabled/unreadable 或 Builder 失败时安全降级。
+- 扩展“Teemo 的设计判断”页面和聊天快速状态按钮；双窗口、重启、Creative OFF 和 one-shot 隔离 smoke 通过。
+- Challenge 运行时控制语句在 Cognition Collector 前明确跳过，避免 mode/intensity 指令污染个人认知；普通内容的既有收集规则不变。
+- 新增 `test:creative-director`、`test:challenge-context`、`test:creative-director-ui-smoke`；完整回归、三个 Electron UI smoke、版本与语法检查已通过，版本仍为 1.2.1，等待 GPT 审阅。
+
 ## v1.2.1 - 2026-08-09
 
 ### P2-2 Agent Creative Profile（CLOSED / PASS）

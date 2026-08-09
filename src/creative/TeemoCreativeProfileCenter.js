@@ -18,6 +18,7 @@
     constructor(options = {}) {
       this.service = options.service || null;
       this.onBack = typeof options.onBack === 'function' ? options.onBack : () => {};
+      this.onStateChange = typeof options.onStateChange === 'function' ? options.onStateChange : () => {};
       this.snapshot = null;
       this.selectedDomain = 'general';
       this.busy = false;
@@ -92,6 +93,7 @@
         `).join('');
       }
       this._renderDomains();
+      this.onStateChange(this.snapshot);
     }
 
     _renderDomains() {

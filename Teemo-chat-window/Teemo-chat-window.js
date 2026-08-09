@@ -34,6 +34,14 @@
   const creativeContextBuilder = window.TeemoCreativeContextBuilder && creativeProfileService
     ? new window.TeemoCreativeContextBuilder({ profileService: creativeProfileService })
     : null;
+  const creativeDirectorState = window.TeemoCreativeDirectorSessionState
+    ? new window.TeemoCreativeDirectorSessionState()
+    : null;
+  const challengeContextBuilder = window.TeemoChallengeContextBuilder && creativeDirectorState && creativeProfileService
+    ? new window.TeemoChallengeContextBuilder({ profileService: creativeProfileService, sessionState: creativeDirectorState })
+    : null;
+  window.teemoCreativeDirectorState = creativeDirectorState;
+  window.teemoChallengeContextBuilder = challengeContextBuilder;
   const permissionClient = window.TeemoPermissionClient ? new window.TeemoPermissionClient({ ipcRenderer }) : null;
   const fileClient = window.TeemoFileClient ? new window.TeemoFileClient({ ipcRenderer }) : null;
   const gitClient = window.TeemoGitClient ? new window.TeemoGitClient({ ipcRenderer }) : null;
@@ -59,6 +67,7 @@
     aiService: ai,
     contextBuilder,
     creativeContextBuilder,
+    challengeContextBuilder,
     cognitionCollector,
     toolRegistry,
   }) : null;
@@ -116,6 +125,12 @@
     settingsView: document.getElementById('settingsView'),
     memoryView: document.getElementById('memoryView'),
     creativeView: document.getElementById('TeemoCreativeView'),
+    challengeQuick: document.getElementById('TeemoChallengeQuickButton'),
+    challengeQuickLabel: document.getElementById('TeemoChallengeQuickLabel'),
+    directorBalanced: document.getElementById('TeemoDirectorBalanced'),
+    directorChallenge: document.getElementById('TeemoDirectorChallenge'),
+    directorIntensity: document.getElementById('TeemoDirectorIntensity'),
+    directorStatus: document.getElementById('TeemoDirectorStatus'),
     chatFontSize: document.getElementById('chatFontSize'),
     chatFontSizeValue: document.getElementById('chatFontSizeValue'),
     chatFontPreview: document.getElementById('chatFontPreview'),
@@ -988,9 +1003,83 @@
     });
   }
 
+  function activeDirectorSessionId() {
+    return history.getActive()?.id || null;
+  }
+
+  function directorAvailability() {
+    if (!creativeProfileService) return { available: false, message: 'Teemo 设计判断暂不可用' };
+    try {
+      const snapshot = creativeProfileService.getManagementSnapshot();
+      if (snapshot.state.readError) return { available: false, message: '设计判断状态读取失败，挑战模式已停用' };
+      if (snapshot.state.enabled === false) return { available: false, message: '需要先启用 Teemo 的设计判断' };
+      return { available: true, message: '' };
+    } catch (_) {
+      return { available: false, message: 'Teemo 设计判断暂不可用' };
+    }
+  }
+
+  function updateChallengeUi(runContext = null) {
+    if (!creativeDirectorState) return;
+    const sessionId = activeDirectorSessionId();
+    const availability = directorAvailability();
+    if (!availability.available && creativeDirectorState.getState(sessionId).mode !== 'balanced') {
+      creativeDirectorState.setMode(sessionId, 'balanced', { intensity: 'standard', source: 'default' });
+    }
+    const state = creativeDirectorState.getState(sessionId);
+    const challenge = availability.available && state.mode === 'challenge';
+    const oneShot = Boolean(runContext && runContext.oneShot && runContext.mode === 'challenge');
+    if (els.challengeQuick) {
+      els.challengeQuick.disabled = !availability.available;
+      els.challengeQuick.classList.toggle('active', challenge);
+      els.challengeQuick.classList.toggle('one-shot', oneShot);
+      els.challengeQuick.setAttribute('aria-pressed', challenge ? 'true' : 'false');
+      els.challengeQuick.title = availability.available ? '切换当前对话的设计评审模式' : availability.message;
+    }
+    if (els.challengeQuickLabel) {
+      els.challengeQuickLabel.textContent = oneShot ? '本轮 · 挑战' : (challenge ? `挑战 · ${state.intensity === 'light' ? '轻度' : state.intensity === 'strong' ? '强' : '标准'}` : '常规');
+    }
+    [els.directorBalanced, els.directorChallenge].forEach(button => {
+      if (!button) return;
+      button.disabled = !availability.available;
+      button.classList.toggle('active', button.dataset.directorMode === state.mode);
+    });
+    if (els.directorIntensity) {
+      els.directorIntensity.querySelectorAll('[data-director-intensity]').forEach(button => {
+        button.disabled = !availability.available || !challenge;
+        button.classList.toggle('active', challenge && button.dataset.directorIntensity === state.intensity);
+      });
+    }
+    if (els.directorStatus) {
+      els.directorStatus.textContent = availability.available
+        ? (challenge ? `当前对话：挑战模式 · ${state.intensity === 'light' ? '轻度' : state.intensity === 'strong' ? '强' : '标准'}` : '当前对话：常规判断')
+        : availability.message;
+      els.directorStatus.classList.toggle('error', !availability.available);
+    }
+    if (oneShot) setTimeout(() => updateChallengeUi(), 1400);
+  }
+
+  function setDirectorMode(mode) {
+    if (!creativeDirectorState || !directorAvailability().available) return;
+    const sessionId = activeDirectorSessionId();
+    const result = creativeDirectorState.setMode(sessionId, mode, { intensity: 'standard', source: 'ui' });
+    if (!result.ok) return;
+    updateChallengeUi();
+  }
+
+  function setDirectorIntensity(intensity) {
+    if (!creativeDirectorState || !directorAvailability().available) return;
+    const sessionId = activeDirectorSessionId();
+    if (creativeDirectorState.getState(sessionId).mode !== 'challenge') return;
+    const result = creativeDirectorState.setIntensity(sessionId, intensity, { source: 'ui' });
+    if (!result.ok) return;
+    updateChallengeUi();
+  }
+
   function renderAll() {
     renderHistory();
     renderMessages();
+    updateChallengeUi();
   }
 
   function openRenameDialog() {
@@ -1566,6 +1655,7 @@
       creativeProfileCenter = new window.TeemoCreativeProfileCenter({
         service: creativeProfileService,
         onBack: hideCreativeProfile,
+        onStateChange: updateChallengeUi,
       });
     }
     return creativeProfileCenter;
@@ -2517,6 +2607,7 @@
     els.send.title = '停止';
     setStatus('正在处理…');
     let full = '';
+    let completedChallengeContext = null;
     // 先让浏览器绘制用户消息和助手状态，再开始联网、意图识别等异步预处理。
     // 避免发送后消息区短暂空白，让用户能立即确认 Teemo 已经开始处理。
     await new Promise(resolve => requestAnimationFrame(resolve));
@@ -2746,6 +2837,7 @@
             if (agentResult.error.cancelled) throw new DOMException('已停止生成', 'AbortError');
             throw new Error(agentResult.error.message);
           }
+          completedChallengeContext = agentResult.run && agentResult.run.challengeContext;
           full = agentResult.content;
         } else {
           full = await ai.stream(apiMessages, onChunk, abortController.signal);
@@ -2790,6 +2882,7 @@
       renderHistory();
       scrollToBottom();
       updateContextMeter();
+      updateChallengeUi(completedChallengeContext);
     }
   }
 
@@ -2863,6 +2956,20 @@
   els.settingsBack.addEventListener('click', hideSettings);
   if (els.memoryButton) els.memoryButton.addEventListener('click', showMemory);
   if (els.creativeButton) els.creativeButton.addEventListener('click', showCreativeProfile);
+  if (els.challengeQuick) {
+    els.challengeQuick.addEventListener('click', () => {
+      const state = creativeDirectorState && creativeDirectorState.getState(activeDirectorSessionId());
+      setDirectorMode(state && state.mode === 'challenge' ? 'balanced' : 'challenge');
+    });
+  }
+  if (els.directorBalanced) els.directorBalanced.addEventListener('click', () => setDirectorMode('balanced'));
+  if (els.directorChallenge) els.directorChallenge.addEventListener('click', () => setDirectorMode('challenge'));
+  if (els.directorIntensity) {
+    els.directorIntensity.addEventListener('click', event => {
+      const button = event.target.closest('[data-director-intensity]');
+      if (button) setDirectorIntensity(button.dataset.directorIntensity);
+    });
+  }
   if (els.addLocalAccess) els.addLocalAccess.addEventListener('click', authorizeLocalFolder);
   if (els.checkUpdate) {
     els.checkUpdate.addEventListener('click', async () => {

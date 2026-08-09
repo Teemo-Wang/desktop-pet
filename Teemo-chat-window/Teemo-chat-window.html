@@ -73,6 +73,9 @@
                 <span>支持图片、MP4/MOV、文本、代码、PDF、DOCX</span>
               </div>
               <div class="teemo-composer-right">
+                <button id="TeemoChallengeQuickButton" class="teemo-challenge-quick" type="button" title="切换当前对话的设计评审模式" aria-pressed="false">
+                  <span class="teemo-challenge-quick-icon">◇</span><span id="TeemoChallengeQuickLabel">常规</span>
+                </button>
                 <button id="contextMeter" class="teemo-context-meter" type="button" title="上下文用量" aria-label="上下文用量">
                   <svg viewBox="0 0 36 36" aria-hidden="true">
                     <circle class="teemo-context-meter-track" cx="18" cy="18" r="14" fill="none"></circle>
@@ -138,6 +141,26 @@
           <section class="teemo-creative-distinction">
             <div><span>你的偏好</span><strong>Cognition 了解你喜欢什么</strong><p>例如：你喜欢更极简、更克制的科技视觉。</p></div>
             <div><span>专业判断</span><strong>Creative Profile 判断设计为什么好</strong><p>例如：继续做减法可能削弱品牌识别与记忆点。</p></div>
+          </section>
+          <section class="teemo-director-panel" aria-labelledby="TeemoDirectorTitle">
+            <div class="teemo-director-copy">
+              <span>Creative Director</span>
+              <h2 id="TeemoDirectorTitle">设计评审模式</h2>
+              <p>挑战模式会更主动指出设计风险和惯性，但不会违反你明确的项目要求。</p>
+            </div>
+            <div class="teemo-director-controls">
+              <div class="teemo-segmented" role="group" aria-label="设计评审模式">
+                <button id="TeemoDirectorBalanced" type="button" data-director-mode="balanced">常规判断</button>
+                <button id="TeemoDirectorChallenge" type="button" data-director-mode="challenge">挑战模式</button>
+              </div>
+              <div class="teemo-director-intensity" id="TeemoDirectorIntensity" role="group" aria-label="挑战强度">
+                <span>挑战强度</span>
+                <button type="button" data-director-intensity="light">轻度</button>
+                <button type="button" data-director-intensity="standard">标准</button>
+                <button type="button" data-director-intensity="strong">强</button>
+              </div>
+              <p id="TeemoDirectorStatus" class="teemo-director-status" aria-live="polite"></p>
+            </div>
           </section>
           <div class="teemo-creative-status" id="TeemoCreativeStatus" aria-live="polite"></div>
           <section class="teemo-creative-section">
@@ -414,6 +437,9 @@
   <script src="../src/creative/TeemoCreativeProfileDefaults.js"></script>
   <script src="../src/creative/TeemoCreativeProfileService.js"></script>
   <script src="../src/creative/TeemoCreativeContextBuilder.js"></script>
+  <script src="../src/creative/TeemoCreativeDirectorPolicy.js"></script>
+  <script src="../src/creative/TeemoCreativeDirectorSessionState.js"></script>
+  <script src="../src/creative/TeemoChallengeContextBuilder.js"></script>
   <script src="../src/permissions/TeemoPermissionPrompt.js"></script>
   <script src="../src/permissions/TeemoPermissionClient.js"></script>
   <script src="../src/tools/TeemoToolRegistry.js"></script>

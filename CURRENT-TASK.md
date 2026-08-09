@@ -4,35 +4,36 @@
 
 - Product：Teemo助理
 - Branch：`Teemo/p2-personal-intelligence`
-- Phase：P2-2 Agent Creative Profile
-- State：`CLOSED / PASS / BLOCKERS: 0`
+- Phase：P2-3 Creative Director / Challenge Mode
+- State：`IMPLEMENTED / WAITING REVIEW`
 - App Version：`v1.2.1`
 - P1 Recovery Tag：`v1.2.0-p1-agent-foundation`
 - P2-1 Recovery Tag：`v1.2.0-p2.1-cognition-ui`
-- Guardrail：P2-2 已封板；用户已明确授权继续 P2-3、P2-4 和 P2 总验收，但 P2-3 功能不得混入 P2-2 close commit
+- P2-2 Recovery Tag：`v1.2.1-p2.2-creative-profile`
+- Guardrail：P2-3 必须经 GPT 严格审阅后才可 PASS/CLOSED；不得在 implementation/close commit 混入 P2-4
 
 ## 封板后维护
 
 - `v1.2.1` 修复手动新增认知的 1,000 字符静默截断，并支持最多 12,000 字符的长内容自动拆分。
 - P2-1 原恢复标签 `v1.2.0-p2.1-cognition-ui` 不移动；维护标签为 `v1.2.1-cognition-input`。
 
-## P2-2 已实现
+## P2-3 已实现
 
-- 独立 Default Creative Profile：schema 1 / profile 1.0.0、10 条原则、9 个维度、6 个 Domain Lens
-- 相关性门控和 1,400 字符预算的 Creative Context Builder
-- Agent Core 可选平行注入、Provider-neutral 一致性和失败独立降级
-- 用户 > 项目 > Skill > Creative Judgment 约束优先级
-- “Teemo 的设计判断”只读页面、独立开关和 revision 冲突保护
-- `test:creative-profile`、`test:creative-context` 与隔离 Electron UI smoke
+- Session-local balanced/challenge 与 light/standard/strong
+- deterministic session/one-shot/exit/suppress 命令
+- 900 字符 Challenge Overlay、mandatory policy 与 Direction Diversity Contract
+- Creative disabled/unreadable dependency、Provider-neutral 和失败独立降级
+- 设计判断页 segmented controls 与聊天快速状态按钮
+- `test:creative-director`、`test:challenge-context` 与隔离 Electron UI smoke
 
 ## 当前验收进度
 
-1. P2-2 实现和专项隔离测试已完成。
-2. P1/P2-1 全量回归、静态检查、版本检查和完整 diff 审核均已通过。
-3. 实现提交 `095ca4c`；审阅修复提交 `78f1a8d`；首轮 5 个 blocker 已全部解除。
-4. GPT 复审结论：`PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P2-3`。
-5. 阶段恢复标签：`v1.2.1-p2.2-creative-profile`；接下来按用户授权进入 P2-3。
+1. P2-3 实现和三套专项隔离测试已完成。
+2. P1/P2-1/P2-2 全量回归、三套 Electron UI smoke、静态检查、版本检查和完整 diff 审核已通过。
+3. 待提交 `Teemo: add P2-3 challenge mode` 并发送 86 项报告到 GPT「Teemo助手升级」严格审阅。
+4. GPT 审阅前不创建 P2-3 recovery tag，不标记 PASS/CLOSED。
+5. 审阅通过并修复全部 blocker 后，按用户授权封板并进入 P2-4。
 
 ## 禁止扩展
 
-P2-2 close commit 不开发 P2-3、P2-4 或 P3 Inspiration；不增加桌面自动化、Provider Native Tool Calling、Embedding、Vector DB、RAG、素材库 Connector 或 hard delete。
+P2-3 不开发 P2-4 Cognition Intelligence、P2-5 Skill Router 或 P3 Inspiration；不增加 Creative Calibration、桌面自动化、Provider Native Tool Calling、Embedding、Vector DB、素材库 Connector 或 Multi-Agent。
