@@ -14,7 +14,7 @@ class TeemoResourceMatcher {
       const normalizedPath = localFileProtocol && process.platform === 'win32'
         ? pathname.toLowerCase()
         : pathname;
-      return `${url.protocol.toLowerCase()}//${url.hostname.toLowerCase()}${normalizedPath}`;
+      return `${url.protocol.toLowerCase()}//${url.hostname.toLowerCase()}${normalizedPath}${url.search}`;
     } catch (_) {
       return null;
     }

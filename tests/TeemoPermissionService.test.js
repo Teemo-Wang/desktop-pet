@@ -58,6 +58,21 @@ async function main() {
 
   {
     const service = new TeemoPermissionService();
+    const executeResource = 'exec+file:///D:/Teemo/project?operation=node-script&program=node&script=Teemo-task.js&scriptSha256=aaa';
+    assert.ok(service.grant(permissionRequest({
+      permission: 'execute', resource: executeResource,
+    }), { scope: 'session' }));
+    assert.equal(service.evaluate(permissionRequest({
+      toolCallId: 'execute-exact', permission: 'execute', resource: executeResource,
+    })).decision, 'allow');
+    assert.equal(service.evaluate(permissionRequest({
+      toolCallId: 'execute-changed-hash', permission: 'execute',
+      resource: executeResource.replace('scriptSha256=aaa', 'scriptSha256=bbb'),
+    })).decision, 'prompt', 'execute grants must bind the complete query resource');
+  }
+
+  {
+    const service = new TeemoPermissionService();
     assert.deepEqual(
       service.evaluate(permissionRequest({ permission: 'none' })),
       { decision: 'allow', source: 'none_required' },

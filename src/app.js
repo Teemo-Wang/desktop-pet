@@ -12,11 +12,13 @@
   window.teemoPermissionClient = new window.TeemoPermissionClient({ ipcRenderer });
   window.teemoFileClient = new window.TeemoFileClient({ ipcRenderer });
   window.teemoGitClient = new window.TeemoGitClient({ ipcRenderer });
+  window.teemoExecuteClient = new window.TeemoExecuteClient({ ipcRenderer });
   window.teemoToolRegistry = window.TeemoBuiltinTools.createRegistry({
     permissionService: window.teemoPermissionClient,
   });
   window.TeemoFileTools.register(window.teemoToolRegistry, { fileClient: window.teemoFileClient });
   window.TeemoGitTools.register(window.teemoToolRegistry, { gitClient: window.teemoGitClient });
+  window.TeemoExecuteTools.register(window.teemoToolRegistry, { executeClient: window.teemoExecuteClient });
   window.agentCore = new window.TeemoAgentCore({
     aiService: window.aiService,
     contextBuilder: window.contextBuilder,

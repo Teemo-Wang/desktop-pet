@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+<head><meta charset="UTF-8"><title>Teemo Execute Tools Smoke</title></head>
+<body>
+  <script>window.TeemoPermissionPrompt = { request: () => new Promise(() => {}) };</script>
+  <script src="../../src/permissions/TeemoPermissionClient.js"></script>
+  <script src="../../src/tools/TeemoToolRegistry.js"></script>
+  <script src="../../src/tools/execute/TeemoExecuteClient.js"></script>
+  <script src="../../src/tools/execute/TeemoExecuteTools.js"></script>
+  <script>
+    const { ipcRenderer } = require('electron');
+    const permissionClient = new window.TeemoPermissionClient({ ipcRenderer });
+    const executeClient = new window.TeemoExecuteClient({ ipcRenderer });
+    const registry = new window.TeemoToolRegistry({ permissionService: permissionClient });
+    window.TeemoExecuteTools.register(registry, { executeClient });
+    window.runExecuteTool = (name, args, sessionId = 'execute-smoke-session') => registry.execute(name, args, {
+      runId: `run-${name}-${args.script || args.scriptPath}`,
+      sessionId,
+      step: 1,
+    });
+    window.runAbortedExecuteTool = (name, args) => {
+      const controller = new AbortController();
+      const execution = registry.execute(name, args, {
+        runId: `run-abort-${name}`,
+        sessionId: 'execute-abort-session',
+        step: 1,
+        signal: controller.signal,
+      });
+      setTimeout(() => controller.abort(), 150);
+      return execution;
+    };
+    window.TeemoExecuteToolsSmokeReady = true;
+  </script>
+</body>
+</html>

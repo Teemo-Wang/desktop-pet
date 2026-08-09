@@ -2,6 +2,22 @@
 
 ## v1.1.7 - 2026-08-09
 
+### P1-6 Git + Controlled Execute（本地 Gate PASS，等待 P1 总审阅）
+
+- 新增 4 个只读 Git Tool、显式文件 stage 与 staged-only commit；不存在 destructive/remote Git Tool。
+- 新增 `run_npm_script` 与 Node-only `run_process`；不存在任意 shell、cmd、PowerShell、Python 或任意 executable Tool。
+- Git/Execute 都使用 Main canonical policy、可信动态 Permission Resource、一次性 execution authorization、授权后 TOCTOU 复核与 owner/replay 防护。
+- 所有子进程固定 `shell:false`、参数数组、最小环境、secret filter、输出清洗/上限、timeout、Abort 与 process-tree cleanup。
+- `test:git-tools`、`test:execute` 与 P1-1 至 P1-5 全量回归通过；Git/Execute 双 renderer 隔离烟测及完整应用隔离启动通过。
+- P1-6A 实现提交为 `ecd7bda`；P1-6B 提交与最终 `v1.2.0-p1-agent-foundation` 标签需在总审阅后记录。
+
+### P1-5 Safe File Tools（CLOSED / PASS）
+
+- 新增 4 个 read 与 3 个 write 文件 Tool；写入仅限文本白名单，create 不覆盖，patch 需要 expected hash/唯一匹配，rename 不覆盖且不提供 delete。
+- 使用 Main authorized-root/canonical path、可信 `file:///` Permission Resource、授权后 TOCTOU 复核与 owner/replay 防护。
+- 单元、安全、并发、双 renderer Electron 与完整应用隔离烟测通过。
+- GPT 严格审阅确认 `BLOCKERS: 0`；实现提交为 `0211a40`，恢复标签为 `v1.1.7-p1.5-file-tools`。
+
 ### P1-4 Permission Layer（CLOSED / PASS）
 
 - 新增 Main Process 中央 `TeemoPermissionService`、renderer IPC Client 和最小权限确认 UI。

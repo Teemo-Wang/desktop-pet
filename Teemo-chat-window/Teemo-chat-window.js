@@ -31,6 +31,7 @@
   const permissionClient = window.TeemoPermissionClient ? new window.TeemoPermissionClient({ ipcRenderer }) : null;
   const fileClient = window.TeemoFileClient ? new window.TeemoFileClient({ ipcRenderer }) : null;
   const gitClient = window.TeemoGitClient ? new window.TeemoGitClient({ ipcRenderer }) : null;
+  const executeClient = window.TeemoExecuteClient ? new window.TeemoExecuteClient({ ipcRenderer }) : null;
   const toolRegistry = window.TeemoBuiltinTools ? window.TeemoBuiltinTools.createRegistry({
     permissionService: permissionClient,
   }) : null;
@@ -40,9 +41,13 @@
   if (toolRegistry && window.TeemoGitTools && gitClient) {
     window.TeemoGitTools.register(toolRegistry, { gitClient });
   }
+  if (toolRegistry && window.TeemoExecuteTools && executeClient) {
+    window.TeemoExecuteTools.register(toolRegistry, { executeClient });
+  }
   window.teemoPermissionClient = permissionClient;
   window.teemoFileClient = fileClient;
   window.teemoGitClient = gitClient;
+  window.teemoExecuteClient = executeClient;
   window.teemoToolRegistry = toolRegistry;
   const agentCore = window.TeemoAgentCore ? new window.TeemoAgentCore({
     aiService: ai,

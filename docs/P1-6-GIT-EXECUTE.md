@@ -1,6 +1,6 @@
 # P1-6 Git + Controlled Execute
 
-> 当前状态：P1-6A Git Tools Gate 已通过；P1-6B Controlled Execute 待实现。P1-6 是 P1 最后阶段，完成后必须等待整个 P1 总审阅，不进入 P2。
+> 当前状态：P1-6A Git Tools Gate 与 P1-6B Controlled Execute 本地 Gate 均已通过，正在等待整个 P1 总审阅。P1-6 是 P1 最后阶段，总审阅确认前不进入 P2。
 
 ## P1-6A Git Tools
 
@@ -66,4 +66,53 @@ C:\Users\Teemo\Documents\Codex\2026-08-09\w\work\Teemo-P1-6A-git-smoke-final-202
 
 ## P1-6B Controlled Execute
 
-待实现。生产范围将优先只开放 `run_npm_script`；如果开放 `run_process`，只能执行 Main policy 解析的 Node + authorized-root 内 `.js/.cjs/.mjs`，不得包含 Git、cmd、PowerShell、Python 或任意 executable/shell string。
+正式 Execute Tool 只有：
+
+| Tool | Permission | 边界 |
+|---|---|---|
+| `run_npm_script` | execute | 只运行 authorized project 根 `package.json` 已声明的单个 script |
+| `run_process` | execute | 只运行 Main 解析的可信 Node.js 与 cwd 内单个 `.js/.cjs/.mjs` 文件 |
+
+没有任意 shell Tool，也没有 Git、cmd、PowerShell、Python、网络服务、detached process 或任意 executable 字符串入口。`run_process.executable` 的 Schema 与 Main policy 都只接受 `node` / `node.exe`。
+
+### Execute 权限与 TOCTOU
+
+- cwd/project 先通过既有 `TeemoFileService` authorized-root/realpath containment；Node script 还必须位于 cwd 内且是普通文件。
+- Main 查找 PATH 中的 canonical Node；npm 通过同一 Node 安装目录内的 `npm-cli.js` 启动，避免 Windows 对 `.cmd` 使用 shell。
+- Main 生成可信 `exec+file:///` resource，查询参数绑定 operation、canonical executable、npm CLI（适用时）、npm script 名、`package.json` hash、声明命令 hash，或 Node script 相对路径与 hash。
+- `TeemoResourceMatcher` 保留完整 query；execute session grant 只匹配完全相同的 operation/resource，不会把同 cwd 的另一个脚本或变更后的 hash 一并放行。
+- prepared operation 绑定 renderer owner、toolCallId、run/session、tool、permission 与 resource；真实执行前必须消费中央 Permission Service 的一次性 execution authorization，直接 IPC、错误 owner、伪造 proof 与 replay 都会失败。
+- Permission 后重新解析并逐项比较 cwd、Node/npm canonical identity、package/script identity/hash、声明命令 hash、参数与 resource。任何变化统一返回 `EXECUTION_RESOURCE_CHANGED`，且不会启动进程。
+
+### Process Policy
+
+- 只使用 `spawn(canonicalNode, explicitArgs, { shell:false, detached:false })`；stdin 为 `ignore`，不拼接 shell command。
+- `run_npm_script` 只接受 `package.json.scripts` 中实际存在的名称；参数在 `--` 后传递，并拒绝 shell metacharacters 与控制字符。
+- 环境变量为最小 allowlist，并再次按 API_KEY/TOKEN/AUTHORIZATION/PASSWORD/SECRET 名称过滤；合成 secret 泄漏测试为 PASS。
+- timeout 上限 120 秒；stdout 1 MiB、stderr 256 KiB，达到限制立即终止进程树；输出移除 ANSI 与危险控制字符。
+- Abort、timeout 与 output limit 都会清理完整进程树；Windows 内部使用 `taskkill /T /F`，但该能力不暴露为 Tool。
+- 模型只收到稳定错误码和安全消息，不返回 errno、stack 或未清洗的内部错误。
+
+### P1-6B Gate 结果
+
+- `npm.cmd run test:execute`：PASS
+- `npm.cmd run test:permissions`：PASS（含完整 execute query resource 绑定）
+- `npm.cmd run test:git-tools`：PASS
+- `npm.cmd run test:file-tools`：PASS
+- `npm.cmd run test:tools`：PASS
+- `npm.cmd run test:agent-core`：PASS
+- `npm.cmd run test:cognition`：PASS
+- 受影响 JavaScript `node --check`：PASS
+- `git diff --check`：PASS
+
+`tests/TeemoExecuteTools.test.js` 覆盖 npm/Node 正常执行、未声明脚本、非法 package、非 Node executable、cwd/root/extension 边界、参数限制、package/script TOCTOU、敏感环境过滤、输出清洗与上限、timeout、Abort、process-tree 清理、Definition 权限、Permission deny、Main owner/direct IPC/replay。
+
+Electron 双 renderer 烟测使用：
+
+```text
+C:\Users\Teemo\Documents\Codex\2026-08-09\w\work\Teemo-P1-6B-execute-smoke-final2-20260809
+```
+
+隔离 profile/data 输出 `TEEMO_EXECUTE_TOOLS_ELECTRON_SMOKE_PASS`；验证两个 renderer 的 2 个 Definition 一致、中央精确 session grant、allow-once 第二次重新询问、deny、真实 npm/Node 运行、timeout、abort/late allow，以及 `package.json` 在 Permission 等待期变化后 `EXECUTION_RESOURCE_CHANGED` 且 process starts 不增加。
+
+完整应用使用 `C:\Users\Teemo\Documents\Codex\2026-08-09\w\work\Teemo-P1-6B-app-smoke-20260809` 隔离 profile/data 启动 10 秒，Main Execute Service/IPC 与两套生产 Registry 初始化无新增错误；仅出现既有 CSP 警告与隔离环境缺少语雀配置的预期提示。

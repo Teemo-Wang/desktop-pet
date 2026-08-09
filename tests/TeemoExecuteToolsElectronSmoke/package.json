@@ -1,0 +1,5 @@
+{
+  "name": "teemo-execute-tools-electron-smoke",
+  "private": true,
+  "main": "TeemoExecuteToolsElectronSmoke.js"
+}

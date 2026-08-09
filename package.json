@@ -12,6 +12,7 @@
     "test:permissions": "node tests/TeemoPermissionService.test.js",
     "test:file-tools": "node tests/TeemoFileTools.test.js",
     "test:git-tools": "node tests/TeemoGitTools.test.js",
+    "test:execute": "node tests/TeemoExecuteTools.test.js",
     "dist": "electron-builder --publish never",
     "dist:mac": "electron-builder --mac --publish never",
     "dist:win": "electron-builder --win --publish never",
