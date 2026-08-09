@@ -1,5 +1,7 @@
 # P1-3 Tool Registry
 
+> 阶段状态：`CLOSED / PASS` ｜ GPT 审阅：`BLOCKERS: 0` ｜ 实现提交：`5bed161` ｜ 恢复标签：`v1.1.7-p1.3-tool-registry`
+
 ## 阶段目标与边界
 
 P1-3 把 P1-1 中用于闭环验证的具体 Tool 映射迁移为统一、模型无关的 `TeemoToolRegistry`。本阶段只注册 `echo` 和 `get_agent_runtime_info` 两个纯内存、无副作用 Tool，不包含 Permission、文件、Git、Shell、网络、ComfyUI、Memory、Provider Adapter、并行 Tool Calling 或 Tool UI。
@@ -132,3 +134,15 @@ Registry 和 Agent Core 不记录 arguments 或完整 result 到生产日志。�
 - 当前每个 Step 只允许一个 Tool Request，不支持并行 Tool Calling。
 - metadata 已预留但没有任何 allow/deny 行为；正式 Permission Layer 留给 P1-4。
 - Tool Call 仅在完成后写入 Run；未来实时审计/UI 可增加执行中事件，但不得改变 Registry 的统一入口。
+- P1-4 起权限状态必须由中央 Permission Service 维护；两个 renderer 可以保留独立 Registry 实例，但不能各自维护互不一致的授权状态。
+
+## GPT 封板结论
+
+GPT 逐项对照原 P1-3 任务书后确认：Agent Core/Registry 已解耦，统一 Contract、错误收敛、Provider 独立性、安全边界和 P1-1/P1-2 回归均符合预期；未发现必须留在 P1-3 修复的问题。
+
+```text
+P1-3 Tool Registry
+STATUS: CLOSED
+RESULT: PASS
+BLOCKERS: 0
+```

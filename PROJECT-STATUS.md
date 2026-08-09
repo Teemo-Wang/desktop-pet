@@ -1,6 +1,6 @@
 # Teemo助理 — 项目进度与规划
 
-> 文档版本：v1.6 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.1.7（P1-3 审阅中）**
+> 文档版本：v1.7 ｜ 更新日期：2026-08-09 ｜ 当前应用版本：**v1.1.7（P1-3 已封板）**
 
 ## 当前状态
 
@@ -9,7 +9,7 @@
 - Source：`D:\Teemo助手\Teemo机器人项目\Teemo-source`
 - P0：`CLOSED`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
-- Current Development：`P1-3 Tool Registry implementation complete / awaiting GPT review`
+- Current Development：`P1-3 Tool Registry CLOSED / PASS；下一阶段 P1-4 Permission Layer`
 - Current Branch：`Teemo/p1-agent-core`
 
 ## P0 阶段收尾（2026-08-09）
@@ -41,13 +41,14 @@
 - GPT 首轮审阅指出 active project 模糊偏好和指代迁移两个作用域风险；修正提交 `a0c2f04` 已收紧为“项目内模糊审美默认归项目、仅唯一候选允许迁移”。
 - GPT 最终审阅结论：`P1-2 Teemo Cognition + Context Builder STATUS: CLOSED / RESULT: PASS / BLOCKERS: 0`。
 
-## P1-3 阶段（2026-08-09，审阅中）
+## P1-3 阶段（2026-08-09，CLOSED / PASS）
 
 - 新增模型无关的 `TeemoToolRegistry`，统一注册、Schema 校验、调用编号、受控上下文、Abort 和结果 envelope。
 - `echo` 与 `get_agent_runtime_info` 已迁移到共享内置 Definition 来源；Agent Core 已移除具体 Tool 映射，只依赖注入的 Registry。
 - 桌宠与独立聊天 renderer 启动时各创建一次稳定 Registry，所有 Agent Run 复用；公开 Definitions 不包含 handler 或 metadata。
 - 未增加 Permission、文件、Git、Shell、网络、ComfyUI、Memory 或 Provider Adapter 能力。
-- 详细记录见 `docs/P1-3-TOOL-REGISTRY.md`；当前等待 GPT 审阅，尚未创建 P1-3 CLOSED 标签。
+- GPT 严格审阅确认：`P1-3 Tool Registry STATUS: CLOSED / RESULT: PASS / BLOCKERS: 0`。
+- 详细记录见 `docs/P1-3-TOOL-REGISTRY.md`；阶段实现提交为 `5bed161`，恢复标签为 `v1.1.7-p1.3-tool-registry`。
 
 ### P0 已知风险
 
