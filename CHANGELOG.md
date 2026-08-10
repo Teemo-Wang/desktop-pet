@@ -1,5 +1,11 @@
 # Changelog
 
+## P4 Final Acceptance - 2026-08-10 (CLOSED / PASS)
+- P4-1 Runtime / Screen Awareness, P4-2 Controlled Desktop Actions, and P4-3 Design Tool Adapters / Workflows passed cross-stage final acceptance without adding any feature, Tool, provider flow, desktop adapter, permission scope, filesystem/network capability, version change, installer, installation, or restart.
+- The final suite passed all focused P4 Node/Electron tests plus P1/M1, P2, and P3 regressions using synthetic inputs and isolated profiles only. No real display capture, OS input, ComfyUI/GPU, Provider, formal user data, or output directory was used.
+- External GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P4 Final close commit/tag only; P5 NOT ALLOWED`.
+- Recovery tag: `v1.3.2-p4-final-acceptance`. P5 remains not started and requires its own approved Taskbook.
+
 ## P4-3 Design Tool Adapters / Workflows - 2026-08-10 (CLOSED / PASS)
 - Added one Runtime-only fixed local ComfyUI SDXL adapter. Main Process owns the literal loopback transport, static workflow construction, response validation, P1 one-time execution binding, and owner-local expiring preview.
 - The Runtime UI sends only a bounded local prompt and dimensions. It exposes no endpoint, workflow, model, checkpoint, path, output directory, queue, archive, Chat, Agent, or Provider control.

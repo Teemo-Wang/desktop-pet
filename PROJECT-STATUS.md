@@ -1,5 +1,15 @@
 # Teemo助理 — 项目进度与规划
 
+## P4 Final Acceptance (CLOSED / PASS / BLOCKERS: 0)
+
+- Taskbook: `docs/Teemo-P4-FINAL-ACCEPTANCE.md`.
+- P4-1/P4-2/P4-3 are independently `CLOSED / PASS / BLOCKERS: 0`; P4-3 recovery tag: `v1.3.2-p4.3-design-tool-workflows`.
+- Scope is cross-stage verification and final evidence only. No P4 feature, Tool, provider path, desktop action, ComfyUI control, permission scope, filesystem/network capability, version change, installer, installation, or restart is authorized.
+- External GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES / P5_STARTED: NO`.
+- P4 final verification, focused P4 Node/Electron acceptance, and P1/M1, P2, and P3 regressions passed using synthetic test data only.
+- Final implementation-evidence Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P4 Final close commit/tag only; P5 NOT ALLOWED / P5_STARTED: NO`.
+- P4 is closed under recovery tag `v1.3.2-p4-final-acceptance`. P5 remains `NOT STARTED`; no P5 Taskbook or implementation has been created.
+
 ## P4-1 Runtime / Screen Awareness (CLOSED / PASS)
 
 - P3 Personal Inspiration is `CLOSED / PASS / BLOCKERS: 0`, with recovery tag `v1.3.2-p3-final-acceptance`.
@@ -23,7 +33,7 @@
 - External GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES`.
 - Focused synthetic Node and isolated Chat Window Electron smoke pass with a fake Main transport and synthetic PNG. Deny/missing authorization call transport zero times; allow uses one exact P1 authorization and creates a same-owner expiring preview. P1/M1, P2, P3, P4-1, and P4-2 regressions pass.
 - P4-3 implementation evidence external GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P4 Final Acceptance Taskbook Review only`.
-- P4-3 is closed under recovery tag `v1.3.2-p4.3-design-tool-workflows`. P4 Final Acceptance and P5 remain `NOT STARTED`.
+- P4-3 is closed under recovery tag `v1.3.2-p4.3-design-tool-workflows`. P4 Final Acceptance is later closed after its independent Taskbook and implementation-evidence Strict Reviews; P5 remains `NOT STARTED`.
 
 ## P4-2 Controlled Desktop Actions (CLOSED / PASS / BLOCKERS: 0)
 
@@ -53,7 +63,7 @@
 - Final GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_P3: YES / NEXT_STAGE_ALLOWED: P3 Final close commit/tag only; P4/P5 NOT ALLOWED`.
 - P3 is closed. Recovery tag: `v1.3.2-p3-final-acceptance`. P4/P5 remain not started and require independent approved Taskbooks.
 
-> 文档版本：v1.3.2 ｜ 更新日期：2026-08-10 ｜ 当前开发版本：**v1.3.2（P3 CLOSED / PASS；P4-1/P4-2/P4-3 CLOSED / PASS；P4 Final Taskbook Review）**
+> 文档版本：v1.3.2 ｜ 更新日期：2026-08-10 ｜ 当前开发版本：**v1.3.2（P3 CLOSED / PASS；P4 CLOSED / PASS）**
 
 ## 当前状态
 
@@ -73,7 +83,7 @@
 - P3-6：`CLOSED / PASS / BLOCKERS: 0`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
 - P3 Baseline：`cd29e6f` / `v1.2.1-p3-baseline`
-- Current Development：`P4 Final Acceptance Taskbook Review`
+- Current Development：`P4 CLOSED / PASS; P5 NOT STARTED`
 - Current Branch：`Teemo/p3-personal-inspiration`
 
 P3-3 GPT Strict Review：`PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-4`。

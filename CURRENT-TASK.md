@@ -1,5 +1,15 @@
 # Current Task
 
+## P4 Final Acceptance (CLOSED / PASS / BLOCKERS: 0)
+
+- P4-1/P4-2/P4-3 are independently `CLOSED / PASS / BLOCKERS: 0`; P4-3 recovery tag: `v1.3.2-p4.3-design-tool-workflows`.
+- Taskbook: `docs/Teemo-P4-FINAL-ACCEPTANCE.md`.
+- Scope is final verification/evidence only. It adds no P4 feature, Tool, provider flow, desktop adapter, permission scope, network/filesystem capability, version change, installer, install, or restart.
+- External GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES / P5_STARTED: NO`.
+- P4 final verification, focused P4 Node/Electron acceptance, and P1/M1, P2, and P3 regressions passed using synthetic test data only.
+- Final implementation-evidence Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P4 Final close commit/tag only; P5 NOT ALLOWED / P5_STARTED: NO`.
+- P4 is closed under recovery tag `v1.3.2-p4-final-acceptance`. No P5 Taskbook or P5 implementation has been created or started.
+
 ## P4-3 Design Tool Adapters / Workflows (CLOSED / PASS / BLOCKERS: 0)
 
 - P3 Personal Inspiration is `CLOSED / PASS / BLOCKERS: 0`; recovery tag: `v1.3.2-p3-final-acceptance`.
@@ -16,7 +26,7 @@
 - `comfyui_builtin_render` uses the exact `comfyui://local/teemo-builtin-sdxl/v1` P1 `execute` resource and can only receive a one-time authorization. Prepared work, the authorization, rendering, and its expiring memory preview are bound to the initiating `webContents`.
 - Focused synthetic Node and isolated Chat Window Electron smoke pass. They cover allow/deny, missing execution authorization, owner isolation, expiry/discard, no direct Renderer local-network path, and unchanged ordinary Chat Tool allowlist. P1/M1, P2, P3, P4-1, and P4-2 regressions pass.
 - Implementation evidence external GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P4 Final Acceptance Taskbook Review only`.
-- P4-3 is closed under recovery tag `v1.3.2-p4.3-design-tool-workflows`. P4 Final Acceptance is not started and still requires its own Taskbook Strict Review; P5 remains blocked.
+- P4-3 is closed under recovery tag `v1.3.2-p4.3-design-tool-workflows`. P4 Final Acceptance is later closed after its own Taskbook and implementation-evidence Strict Reviews; P5 remains not started.
 - Taskbook: `docs/Teemo-P4-1-RUNTIME-SCREEN-AWARENESS.md`.
 - P4-1 Taskbook received external GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES`.
 - Synthetic Node and real Chat Window Electron smoke cover allow/deny, missing execution authorization, owner isolation, expiry/discard, no direct renderer capture, and unchanged ordinary Chat Tool allowlist. P1/P2/P3/M1 regressions passed.
@@ -42,8 +52,8 @@
 
 - Product：Teemo助理
 - Branch：`Teemo/p3-personal-inspiration`
-- Phase：P4 Final Acceptance Taskbook Review
-- State：`NOT STARTED`
+- Phase：P4 Closed
+- State：`CLOSED / PASS / BLOCKERS: 0`
 - Installed App Version：`v1.3.2`
 - Development App Version：`v1.3.2`
 - P3 Baseline：`cd29e6f` / `v1.2.1-p3-baseline`
