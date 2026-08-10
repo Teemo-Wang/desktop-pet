@@ -7,6 +7,9 @@ const TeemoPermissionService = require('./src/permissions/TeemoPermissionService
 const registerTeemoPermissionIpc = require('./src/permissions/TeemoPermissionIpc');
 const TeemoScreenService = require('./src/runtime/TeemoScreenService');
 const registerTeemoScreenIpc = require('./src/runtime/TeemoScreenIpc');
+const TeemoDesktopActionService = require('./src/runtime/TeemoDesktopActionService');
+const TeemoWindowsPrimaryClickAdapter = require('./src/runtime/TeemoWindowsPrimaryClickAdapter');
+const registerTeemoDesktopActionIpc = require('./src/runtime/TeemoDesktopActionIpc');
 const registerTeemoFileToolIpc = require('./src/tools/file/TeemoFileToolIpc');
 const TeemoGitService = require('./src/services/TeemoGitService');
 const registerTeemoGitToolIpc = require('./src/tools/git/TeemoGitToolIpc');
@@ -43,6 +46,8 @@ const teemoScreenService = new TeemoScreenService({
   displayProvider: {
     list: () => screen.getAllDisplays().map(display => ({
       nativeId: String(display.id),
+      x: display.bounds.x,
+      y: display.bounds.y,
       width: display.bounds.width,
       height: display.bounds.height,
     })),
@@ -62,9 +67,18 @@ const teemoScreenService = new TeemoScreenService({
     },
   },
 });
+const teemoDesktopActionService = new TeemoDesktopActionService({
+  screenService: teemoScreenService,
+  inputAdapter: new TeemoWindowsPrimaryClickAdapter(),
+});
+const teemoDesktopActionIpc = registerTeemoDesktopActionIpc(ipcMain, {
+  desktopActionService: teemoDesktopActionService,
+  permissionService: teemoPermissionService,
+});
 registerTeemoScreenIpc(ipcMain, {
   screenService: teemoScreenService,
   permissionService: teemoPermissionService,
+  onSnapshotDiscarded: (owner, snapshotId) => teemoDesktopActionIpc.discardSnapshot(owner, snapshotId),
 });
 
 function localAccessFilePath() {

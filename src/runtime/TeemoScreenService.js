@@ -55,13 +55,16 @@ class TeemoScreenService {
 
   _normalizeDisplay(value) {
     const nativeId = safeId(value && value.nativeId, 160);
+    const x = value && value.x == null ? 0 : Number(value && value.x);
+    const y = value && value.y == null ? 0 : Number(value && value.y);
     const width = Number(value && value.width);
     const height = Number(value && value.height);
-    if (!nativeId || !Number.isInteger(width) || !Number.isInteger(height)
+    if (!nativeId || !Number.isInteger(x) || !Number.isInteger(y)
+      || !Number.isInteger(width) || !Number.isInteger(height)
       || width < 1 || height < 1 || width > 16384 || height > 16384) {
       return null;
     }
-    return Object.freeze({ nativeId, width, height });
+    return Object.freeze({ nativeId, x, y, width, height });
   }
 
   async _displays() {
@@ -146,7 +149,7 @@ class TeemoScreenService {
   }
 
   async capture(owner, displayRef) {
-    const { ownerId, entry } = this._reference(owner, displayRef);
+    const { ownerId, reference, entry } = this._reference(owner, displayRef);
     const displays = await this._displays();
     if (!displays.some(display => display.nativeId === entry.nativeId)) {
       throw screenError('SCREEN_DISPLAY_UNAVAILABLE', 'The selected display is no longer available.');
@@ -171,6 +174,7 @@ class TeemoScreenService {
     const entrySnapshot = {
       snapshotId,
       ownerId,
+      displayRef: reference,
       png: Buffer.from(png),
       width,
       height,
@@ -198,6 +202,32 @@ class TeemoScreenService {
       height: snapshot.height,
       expiresAt: new Date(snapshot.expiresAt).toISOString(),
       dataUrl: `data:image/png;base64,${snapshot.png.toString('base64')}`,
+    });
+  }
+
+  async getActionBinding(owner, snapshotId) {
+    this.cleanup();
+    const ownerId = this._ownerId(owner);
+    const id = safeId(snapshotId, 200);
+    const snapshot = this.snapshots.get(id);
+    if (!snapshot || snapshot.ownerId !== ownerId || snapshot.expiresAt <= this.now()) {
+      throw screenError('SCREEN_SNAPSHOT_UNAVAILABLE', 'The local screen preview is unavailable.');
+    }
+    const reference = this.references.get(snapshot.displayRef);
+    if (!reference || reference.ownerId !== ownerId || reference.expiresAt <= this.now()) {
+      throw screenError('SCREEN_REFERENCE_INVALID', 'The selected display reference is unavailable.');
+    }
+    const displays = await this._displays();
+    const display = displays.find(candidate => candidate.nativeId === reference.nativeId);
+    if (!display) {
+      throw screenError('SCREEN_DISPLAY_UNAVAILABLE', 'The selected display is no longer available.');
+    }
+    return Object.freeze({
+      snapshotId: snapshot.snapshotId,
+      displayRef: snapshot.displayRef,
+      nativeId: display.nativeId,
+      bounds: Object.freeze({ x: display.x, y: display.y, width: display.width, height: display.height }),
+      expiresAt: snapshot.expiresAt,
     });
   }
 

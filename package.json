@@ -29,6 +29,8 @@
     "test:chat-tool-calling-ui-smoke": "electron tests/TeemoChatToolCallingElectronSmoke.js",
     "test:screen-awareness": "node tests/TeemoScreenService.test.js",
     "test:screen-awareness-ui-smoke": "electron tests/TeemoScreenElectronSmoke/TeemoScreenElectronSmoke.js",
+    "test:desktop-actions": "node tests/TeemoDesktopActionService.test.js",
+    "test:desktop-actions-ui-smoke": "electron tests/TeemoDesktopActionElectronSmoke.js",
     "test:cognition": "node tests/TeemoCognition.test.js",
     "test:cognition-management": "node tests/TeemoCognitionManagement.test.js",
     "test:cognition-ui-smoke": "electron tests/TeemoCognitionCenterElectronSmoke.js",
@@ -137,8 +139,9 @@
     "electron-reload": "^2.0.0-alpha.1"
   },
   "dependencies": {
-    "ffmpeg-static": "^5.2.0",
     "electron-updater": "^6.3.9",
+    "ffmpeg-static": "^5.2.0",
+    "koffi": "3.1.4",
     "mammoth": "^1.8.0",
     "pdf-parse": "^1.1.1",
     "ws": "^8.21.0"

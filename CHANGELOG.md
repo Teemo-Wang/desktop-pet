@@ -1,5 +1,12 @@
 # Changelog
 
+## P4-2 Controlled Desktop Actions - 2026-08-10 (CLOSED / PASS)
+- Added a local Runtime UI path for a user-selected, explicitly confirmed, one-time primary click from a fresh P4-1 preview. Main Process resolves and revalidates all native display geometry immediately before dispatch.
+- P1 enforces one-time `execute` Permission for `desktop_primary_click`; Renderer has no native display, global-coordinate, or input capability. Provider, Agent Core, ordinary Chat, Tool Calling, Chat history, logs, and persistence receive no desktop-action data.
+- Added synthetic Node and Electron smoke coverage using a fake input adapter. Shell, PowerShell, child process execution, arbitrary program execution, Git, Controlled Execute, keyboard, clipboard, scroll, drag, double-click, P4-3, and delete remain unavailable.
+- External GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P4-3 Taskbook Review only`.
+- Recovery tag: `v1.3.2-p4.2-controlled-desktop-actions`.
+
 ## P4-1 Runtime / Screen Awareness - 2026-08-10 (CLOSED / PASS)
 - Added an explicit, Main Process-only display snapshot foundation with opaque display references, P1 read Permission, one-shot execution authorization, owner-bound IPC, bounded in-memory preview, discard, and expiry.
 - Screen pixels and display metadata do not enter AIService, Provider adapters, Agent Core, ordinary Chat, Tool definitions/results, filesystem persistence, logs, or telemetry. Automated tests inject synthetic display/image data only.

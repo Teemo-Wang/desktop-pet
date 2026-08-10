@@ -45,6 +45,7 @@
   window.teemoChallengeContextBuilder = challengeContextBuilder;
   const permissionClient = window.TeemoPermissionClient ? new window.TeemoPermissionClient({ ipcRenderer }) : null;
   const screenClient = window.TeemoScreenClient ? new window.TeemoScreenClient({ ipcRenderer }) : null;
+  const desktopActionClient = window.TeemoDesktopActionClient ? new window.TeemoDesktopActionClient({ ipcRenderer }) : null;
   const inspirationRegistry = window.TeemoInspirationConnectorRegistry
     ? new window.TeemoInspirationConnectorRegistry()
     : null;
@@ -102,6 +103,7 @@
   // Ordinary chat exposes only P1 file tools. Git and controlled execution stay unavailable.
   window.teemoPermissionClient = permissionClient;
   window.teemoScreenClient = screenClient;
+  window.teemoDesktopActionClient = desktopActionClient;
   window.teemoFileClient = fileClient;
   window.teemoGitClient = gitClient;
   window.teemoExecuteClient = executeClient;
@@ -195,6 +197,8 @@
     runtimeCapture: document.getElementById('TeemoRuntimeCaptureButton'),
     runtimeDiscard: document.getElementById('TeemoRuntimeDiscardButton'),
     runtimePreview: document.getElementById('TeemoRuntimePreview'),
+    runtimePointSummary: document.getElementById('TeemoRuntimePointSummary'),
+    runtimeConfirmClick: document.getElementById('TeemoRuntimeConfirmClickButton'),
     challengeQuick: document.getElementById('TeemoChallengeQuickButton'),
     challengeQuickLabel: document.getElementById('TeemoChallengeQuickLabel'),
     directorBalanced: document.getElementById('TeemoDirectorBalanced'),
@@ -1801,7 +1805,9 @@
   }
 
   let activeScreenSnapshotId = null;
+  let activeScreenPoint = null;
   let screenCapturePending = false;
+  let desktopActionPending = false;
 
   function screenToolCallId() {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -1810,17 +1816,49 @@
     return `screen_capture_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
   }
 
+  function desktopActionToolCallId() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return `desktop_primary_click_${crypto.randomUUID()}`;
+    }
+    return `desktop_primary_click_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+  }
+
   function setRuntimeStatus(message, isError = false) {
     if (!els.runtimeStatus) return;
     els.runtimeStatus.textContent = message || '';
     els.runtimeStatus.classList.toggle('error', !!isError);
   }
 
+  function updateRuntimeControls() {
+    const pending = screenCapturePending || desktopActionPending;
+    if (els.runtimeCapture) els.runtimeCapture.disabled = pending || !els.runtimeDisplay || !els.runtimeDisplay.value;
+    if (els.runtimeDisplay) els.runtimeDisplay.disabled = pending;
+    if (els.runtimeDiscard) els.runtimeDiscard.disabled = pending || !activeScreenSnapshotId;
+    if (els.runtimeConfirmClick) {
+      els.runtimeConfirmClick.disabled = pending || !activeScreenSnapshotId || !activeScreenPoint || !desktopActionClient;
+    }
+  }
+
   function setRuntimePending(pending) {
     screenCapturePending = !!pending;
-    if (els.runtimeCapture) els.runtimeCapture.disabled = screenCapturePending || !els.runtimeDisplay || !els.runtimeDisplay.value;
-    if (els.runtimeDisplay) els.runtimeDisplay.disabled = screenCapturePending;
-    if (els.runtimeDiscard) els.runtimeDiscard.disabled = screenCapturePending || !activeScreenSnapshotId;
+    updateRuntimeControls();
+  }
+
+  function setDesktopActionPending(pending) {
+    desktopActionPending = !!pending;
+    updateRuntimeControls();
+  }
+
+  function setRuntimePoint(point) {
+    activeScreenPoint = point && Number.isFinite(point.x) && Number.isFinite(point.y)
+      ? { x: Math.min(1, Math.max(0, point.x)), y: Math.min(1, Math.max(0, point.y)) }
+      : null;
+    if (els.runtimePointSummary) {
+      els.runtimePointSummary.textContent = activeScreenPoint
+        ? `已选择预览位置：横向 ${(activeScreenPoint.x * 100).toFixed(1)}%，纵向 ${(activeScreenPoint.y * 100).toFixed(1)}%`
+        : '请先选择预览中的一个位置';
+    }
+    updateRuntimeControls();
   }
 
   function clearRuntimePreviewUi() {
@@ -1831,7 +1869,36 @@
       els.runtimePreview.appendChild(empty);
     }
     activeScreenSnapshotId = null;
-    setRuntimePending(screenCapturePending);
+    setRuntimePoint(null);
+    updateRuntimeControls();
+  }
+
+  function renderRuntimePreview(preview) {
+    if (!els.runtimePreview) return;
+    els.runtimePreview.replaceChildren();
+    const imageWrap = document.createElement('div');
+    imageWrap.className = 'teemo-runtime-preview-image';
+    const image = document.createElement('img');
+    image.src = preview.dataUrl;
+    image.alt = '本地屏幕预览';
+    image.addEventListener('click', event => {
+      const rect = image.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const point = {
+        x: (event.clientX - rect.left) / rect.width,
+        y: (event.clientY - rect.top) / rect.height,
+      };
+      setRuntimePoint(point);
+      const marker = imageWrap.querySelector('.teemo-runtime-point-marker') || document.createElement('span');
+      marker.className = 'teemo-runtime-point-marker';
+      marker.style.left = `${activeScreenPoint.x * 100}%`;
+      marker.style.top = `${activeScreenPoint.y * 100}%`;
+      if (!marker.parentNode) imageWrap.appendChild(marker);
+    });
+    imageWrap.appendChild(image);
+    const caption = document.createElement('p');
+    caption.textContent = `${preview.width} × ${preview.height} · 仅保留在当前窗口短时内存中`;
+    els.runtimePreview.append(imageWrap, caption);
   }
 
   async function loadRuntimeDisplays() {
@@ -1897,21 +1964,52 @@
       prepared = null;
       const preview = await screenClient.getPreview(snapshot.snapshotId);
       activeScreenSnapshotId = preview.snapshotId;
-      if (els.runtimePreview) {
-        els.runtimePreview.replaceChildren();
-        const image = document.createElement('img');
-        image.src = preview.dataUrl;
-        image.alt = '本地屏幕预览';
-        const caption = document.createElement('p');
-        caption.textContent = `${preview.width} × ${preview.height} · 仅保留在当前窗口短时内存中`;
-        els.runtimePreview.append(image, caption);
-      }
+      setRuntimePoint(null);
+      renderRuntimePreview(preview);
       setRuntimeStatus('本地预览已获取，未发送给模型。');
     } catch (error) {
       setRuntimeStatus(error.message || '本地预览获取失败。', true);
     } finally {
       if (prepared) await screenClient.release(prepared.preparation).catch(() => {});
       setRuntimePending(false);
+    }
+  }
+
+  async function confirmRuntimePrimaryClick() {
+    if (!desktopActionClient || !permissionClient || !activeScreenSnapshotId || !activeScreenPoint || desktopActionPending) return;
+    let prepared = null;
+    let permissionApproved = false;
+    setDesktopActionPending(true);
+    setRuntimeStatus('正在准备本次一次性主键点击…');
+    try {
+      const toolCallId = desktopActionToolCallId();
+      prepared = await desktopActionClient.prepare(activeScreenSnapshotId, activeScreenPoint, { toolCallId, sessionId: null });
+      const permission = await permissionClient.authorize({
+        toolCallId,
+        runId: null,
+        sessionId: null,
+        toolName: 'desktop_primary_click',
+        permission: 'execute',
+        resource: prepared.resource,
+        requiresExecutionAuthorization: true,
+        reason: prepared.reason,
+      });
+      if (!permission || permission.decision !== 'allow') {
+        setRuntimeStatus('未取得本次主键点击权限。');
+        return;
+      }
+      permissionApproved = true;
+      const result = await desktopActionClient.execute(prepared.preparation);
+      prepared = null;
+      if (!result || result.dispatched !== true) throw new Error('本次主键点击未被发送。');
+      await discardRuntimePreview();
+      setRuntimeStatus('已发送一次主键点击；Teemo 不判断目标应用是否响应。');
+    } catch (error) {
+      setRuntimeStatus(error.message || '本次主键点击未执行。', true);
+    } finally {
+      if (prepared) await desktopActionClient.release(prepared.preparation).catch(() => {});
+      if (permissionApproved && activeScreenSnapshotId) await discardRuntimePreview();
+      setDesktopActionPending(false);
     }
   }
 
@@ -3329,6 +3427,7 @@
   if (els.runtimeBack) els.runtimeBack.addEventListener('click', hideRuntime);
   if (els.runtimeCapture) els.runtimeCapture.addEventListener('click', () => { void captureRuntimePreview(); });
   if (els.runtimeDiscard) els.runtimeDiscard.addEventListener('click', () => { void discardRuntimePreview({ showStatus: true }); });
+  if (els.runtimeConfirmClick) els.runtimeConfirmClick.addEventListener('click', () => { void confirmRuntimePrimaryClick(); });
   if (els.runtimeDisplay) els.runtimeDisplay.addEventListener('change', () => setRuntimePending(screenCapturePending));
   if (els.challengeQuick) {
     els.challengeQuick.addEventListener('click', () => {

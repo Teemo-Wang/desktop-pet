@@ -16,6 +16,9 @@ function safeId(value, maxLength = 160) {
 function registerTeemoScreenIpc(ipcMain, options = {}) {
   const screenService = options.screenService;
   const permissionService = options.permissionService;
+  const onSnapshotDiscarded = typeof options.onSnapshotDiscarded === 'function'
+    ? options.onSnapshotDiscarded
+    : null;
   if (!ipcMain || !screenService || !permissionService) {
     throw new Error('Teemo Screen IPC dependencies are incomplete.');
   }
@@ -132,7 +135,11 @@ function registerTeemoScreenIpc(ipcMain, options = {}) {
   ipcMain.handle(channels.discard, (event, payload = {}) => {
     try {
       bindOwner(event);
-      return { ok: true, discarded: screenService.discard(ownerId(event), payload.snapshotId) };
+      const owner = ownerId(event);
+      const snapshotId = safeId(payload.snapshotId, 200);
+      const discarded = screenService.discard(owner, snapshotId);
+      if (discarded && onSnapshotDiscarded) onSnapshotDiscarded(owner, snapshotId);
+      return { ok: true, discarded };
     } catch (error) {
       return { ok: false, error: publicError(error) };
     }

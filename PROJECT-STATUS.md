@@ -10,9 +10,22 @@
 - No screenshot or display data reaches AIService, Provider adapters, Agent Core, ordinary Chat, Tool definitions/results, persistence, logs, or telemetry. Tests use injected synthetic data only; no real display was captured.
 - `test:screen-awareness` (20 assertions), real Chat Window `test:screen-awareness-ui-smoke` (25 assertions), P1/M1, P2/P3 Node, and P2/P3/M1 Electron regressions passed.
 - Implementation evidence received external GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P4-2 Taskbook Review only`.
-- P4-1 is closed under recovery tag `v1.3.2-p4.1-runtime-screen-awareness`. P4-2 Controlled Desktop Actions may proceed only as a separate Taskbook and external GPT Strict Review; its implementation remains `NOT STARTED`.
+- P4-1 is closed under recovery tag `v1.3.2-p4.1-runtime-screen-awareness`. P4-2 is independently closed under recovery tag `v1.3.2-p4.2-controlled-desktop-actions`; P4-3 may proceed only as a separate Taskbook and external GPT Strict Review.
 - P4-3 Design Tool Adapters / Workflows, P4 Final Acceptance, and P5 remain `NOT STARTED`.
 - Chat Safe File Tools, P1 authorized-root enforcement, M1 restrictions, closed P3 stages, and the version remain unchanged.
+
+## P4-2 Controlled Desktop Actions (CLOSED / PASS / BLOCKERS: 0)
+
+- Taskbook: `docs/Teemo-P4-2-CONTROLLED-DESKTOP-ACTIONS.md`.
+- The proposed P4-2 scope is a single user-confirmed primary click selected from a fresh, owner-bound P4-1 preview. It requires exact P1 one-time `execute` Permission, a Main Process one-shot execution authorization, current display revalidation, and a restricted native input adapter.
+- P4-2 proposes no Provider, Agent Core, ordinary Chat, Tool Calling, Chat allowlist, Shell, PowerShell, Controlled Execute, Git, program execution, keyboard, clipboard, scrolling, drag/drop, double click, workflow, desktop automation, or persistence capability.
+- External GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES`.
+- Implemented only the approved single-primary-click path: a local user selects a normalized point on a fresh P4-1 preview, explicitly confirms, receives one-time P1 `execute` Permission, then Main Process consumes the exact authorization, revalidates the display, and calls the restricted primary-click adapter.
+- `TeemoDesktopActionService`, IPC, and the Windows adapter remain Main Process only. Renderer receives no native display ID, bounds, global coordinate, native input handle, or general input API. Provider/Agent/ordinary Chat desktop calls remain zero.
+- Focused Node/Electron smoke and P4-1, P1/M1, P2, and P3 regressions pass with synthetic display/PNG data and a fake adapter only.
+- Implementation evidence external GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P4-3 Taskbook Review only`.
+- P4-2 is closed under recovery tag `v1.3.2-p4.2-controlled-desktop-actions`.
+- P4-3, P4 Final Acceptance, and P5 remain `NOT STARTED`.
 
 ## P3 Personal Inspiration Final Acceptance (CLOSED / PASS)
 
@@ -29,7 +42,7 @@
 - Final GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_P3: YES / NEXT_STAGE_ALLOWED: P3 Final close commit/tag only; P4/P5 NOT ALLOWED`.
 - P3 is closed. Recovery tag: `v1.3.2-p3-final-acceptance`. P4/P5 remain not started and require independent approved Taskbooks.
 
-> 文档版本：v1.3.2 ｜ 更新日期：2026-08-10 ｜ 当前开发版本：**v1.3.2（P3 CLOSED / PASS；P4-1 CLOSED / PASS；P4-2 Taskbook Gate）**
+> 文档版本：v1.3.2 ｜ 更新日期：2026-08-10 ｜ 当前开发版本：**v1.3.2（P3 CLOSED / PASS；P4-1/P4-2 CLOSED / PASS；P4-3 Taskbook Gate）**
 
 ## 当前状态
 
@@ -49,7 +62,7 @@
 - P3-6：`CLOSED / PASS / BLOCKERS: 0`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
 - P3 Baseline：`cd29e6f` / `v1.2.1-p3-baseline`
-- Current Development：`P4-2 Controlled Desktop Actions Taskbook Gate`
+- Current Development：`P4-3 Design Tool Adapters / Workflows Taskbook Gate`
 - Current Branch：`Teemo/p3-personal-inspiration`
 
 P3-3 GPT Strict Review：`PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-4`。

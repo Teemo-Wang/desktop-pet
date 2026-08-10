@@ -1,12 +1,16 @@
 # Current Task
 
-## P4-2 Controlled Desktop Actions (TASKBOOK GATE / NOT STARTED)
+## P4-3 Design Tool Adapters / Workflows (TASKBOOK GATE / NOT STARTED)
 
 - P3 Personal Inspiration is `CLOSED / PASS / BLOCKERS: 0`; recovery tag: `v1.3.2-p3-final-acceptance`.
 - P4-1 Runtime / Screen Awareness is `CLOSED / PASS / BLOCKERS: 0`. Its implementation evidence received external GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P4-2 Taskbook Review only`.
 - P4-1 closed capability: explicit local display selection, P1 read permission, one-shot Main execution authorization, owner-bound Main capture, bounded in-memory local preview, discard, and expiry. Provider/Agent calls for screen data remain zero.
 - P4-1 used only injected synthetic data in Node and isolated Chat Window Electron smoke. It adds no Provider/Agent screen context, ordinary Chat Tools, desktop actions, mouse/keyboard/clipboard access, filesystem persistence, Shell, PowerShell, Git, Controlled Execute, program execution, delete, or destructive behavior.
-- P4-2 may begin only as its own Taskbook and external GPT Strict Review. P4-2 implementation, P4-3 Design Tool Adapters / Workflows, P4 Final Acceptance, and P5 are not started.
+- P4-2 Taskbook is `docs/Teemo-P4-2-CONTROLLED-DESKTOP-ACTIONS.md`: only a user-confirmed, one-time primary click selected from an owner-bound fresh P4-1 local preview. It is provider/Agent/ordinary-Chat neutral.
+- P4-2 Taskbook external GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES`.
+- P4-2 Controlled Desktop Actions is `CLOSED / PASS / BLOCKERS: 0`; its implementation evidence received external GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P4-3 Taskbook Review only`.
+- P4-2 closed capability: a user-confirmed, one-time primary click selected from a fresh owner-bound P4-1 preview. Main-only validation and P1 `execute` + `once` Permission remain mandatory. Its recovery tag is `v1.3.2-p4.2-controlled-desktop-actions`.
+- P4-3 may begin only with its own Taskbook and external GPT Strict Review. P4-3 implementation, P4 Final Acceptance, and P5 are not started.
 - Taskbook: `docs/Teemo-P4-1-RUNTIME-SCREEN-AWARENESS.md`.
 - P4-1 Taskbook received external GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES`.
 - Synthetic Node and real Chat Window Electron smoke cover allow/deny, missing execution authorization, owner isolation, expiry/discard, no direct renderer capture, and unchanged ordinary Chat Tool allowlist. P1/P2/P3/M1 regressions passed.
@@ -32,7 +36,7 @@
 
 - Product：Teemo助理
 - Branch：`Teemo/p3-personal-inspiration`
-- Phase：P4-2 Controlled Desktop Actions Taskbook Gate
+- Phase：P4-3 Design Tool Adapters / Workflows Taskbook Gate
 - State：`NOT STARTED`
 - Installed App Version：`v1.3.2`
 - Development App Version：`v1.3.2`

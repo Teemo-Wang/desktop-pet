@@ -2,6 +2,7 @@ const TeemoResourceMatcher = require('./TeemoResourceMatcher');
 
 const PERMISSIONS = new Set(['none', 'read', 'write', 'execute']);
 const SCOPES = new Set(['once', 'session', 'resource']);
+const ONE_TIME_EXECUTION_TOOLS = new Set(['desktop_primary_click']);
 
 function makeId(prefix) {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -44,6 +45,8 @@ class TeemoPermissionService {
     };
     if (!request.toolCallId || !request.toolName || !PERMISSIONS.has(permission)) return null;
     if (input.resource != null && !request.resource) return null;
+    if (ONE_TIME_EXECUTION_TOOLS.has(request.toolName)
+      && (request.permission !== 'execute' || request.sessionId !== null || !request.resource)) return null;
     return request;
   }
 
@@ -77,6 +80,9 @@ class TeemoPermissionService {
     const request = this._normalizeRequest(input);
     if (!request) return { decision: 'deny', reason: 'permission_request_invalid', source: 'fail_closed' };
     if (request.permission === 'none') return { decision: 'allow', source: 'none_required' };
+    if (ONE_TIME_EXECUTION_TOOLS.has(request.toolName)) {
+      return { decision: 'prompt', permission: request.permission, source: 'one_time_required' };
+    }
     const grant = this._matchingGrant(request);
     if (grant) {
       return {
@@ -93,6 +99,7 @@ class TeemoPermissionService {
     const request = this._normalizeRequest(input);
     const scope = safeText(options.scope, 20).toLowerCase();
     if (!request || request.permission === 'none' || !SCOPES.has(scope)) return null;
+    if (ONE_TIME_EXECUTION_TOOLS.has(request.toolName) && scope !== 'once') return null;
     if (scope === 'once') {
       return Object.freeze({ scope: 'once', toolCallId: request.toolCallId, source: 'user_once' });
     }
@@ -255,6 +262,9 @@ class TeemoPermissionService {
     }
     const scope = safeText(response.scope, 20).toLowerCase();
     if (!SCOPES.has(scope)) {
+      return this._finishPending(pending, { decision: 'deny', reason: 'invalid_scope', source: 'fail_closed' });
+    }
+    if (ONE_TIME_EXECUTION_TOOLS.has(pending.normalized.toolName) && scope !== 'once') {
       return this._finishPending(pending, { decision: 'deny', reason: 'invalid_scope', source: 'fail_closed' });
     }
     const grant = this.grant(pending.normalized, { scope, source: `user_${scope}` });

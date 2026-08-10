@@ -748,6 +748,17 @@ button { color: inherit; }
 .teemo-runtime-preview { display: flex; min-height: 310px; align-items: center; justify-content: center; flex-direction: column; margin-top: 16px; overflow: hidden; border: 1px dashed #3b3b3b; color: #777; font-size: 10px; text-align: center; }
 .teemo-runtime-preview img { display: block; max-width: 100%; max-height: 520px; object-fit: contain; }
 .teemo-runtime-preview p { margin: 9px 14px; color: #939393; font-size: 9px; }
+.teemo-runtime-preview-image { position: relative; max-width: 100%; line-height: 0; cursor: crosshair; }
+.teemo-runtime-preview-image img { cursor: crosshair; }
+.teemo-runtime-point-marker { position: absolute; width: 16px; height: 16px; border: 2px solid #f4f4f4; border-radius: 50%; background: rgba(91,181,166,.32); box-shadow: 0 0 0 2px rgba(0,0,0,.42); pointer-events: none; transform: translate(-50%,-50%); }
+.teemo-runtime-click { padding: 25px 0 0; }
+.teemo-runtime-click > header { margin-bottom: 12px; }
+.teemo-runtime-click header span { display: block; margin-bottom: 5px; color: #73bfb3; font-size: 9px; text-transform: uppercase; }
+.teemo-runtime-click h2 { margin: 0; font-size: 15px; font-weight: 620; }
+.teemo-runtime-click p { margin: 7px 0 0; color: #7f7f7f; font-size: 10px; line-height: 1.6; }
+.teemo-runtime-click-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.teemo-runtime-click-actions output { min-width: 0; color: #a7a7a7; font-size: 10px; }
+.teemo-runtime-click-actions button { flex: 0 0 auto; min-height: 32px; }
 .teemo-inspiration-index-item dl { display: grid; grid-template-columns: 1.2fr .8fr .7fr 1fr; gap: 8px; margin: 0; }
 .teemo-inspiration-index-item dl > div { min-width: 0; }
 .teemo-inspiration-index-item dt { color: #626262; font-size: 8px; }

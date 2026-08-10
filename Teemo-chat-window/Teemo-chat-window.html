@@ -297,6 +297,13 @@
               <button class="teemo-secondary-button" id="TeemoRuntimeDiscardButton" type="button" disabled>丢弃预览</button>
             </div>
             <div class="teemo-runtime-preview" id="TeemoRuntimePreview"><span>尚未获取本地预览</span></div>
+            <section class="teemo-runtime-click" aria-labelledby="TeemoRuntimeClickTitle">
+              <header><div><span>Controlled action</span><h2 id="TeemoRuntimeClickTitle">一次性主键点击</h2><p>在当前本地预览中选择一个点后，再单独确认执行。</p></div></header>
+              <div class="teemo-runtime-click-actions">
+                <output id="TeemoRuntimePointSummary">请先选择预览中的一个位置</output>
+                <button class="teemo-primary-button" id="TeemoRuntimeConfirmClickButton" type="button" disabled>确认并点击一次</button>
+              </div>
+            </section>
           </section>
         </div>
       </main>
@@ -579,6 +586,7 @@
   <script src="../src/permissions/TeemoPermissionPrompt.js"></script>
   <script src="../src/permissions/TeemoPermissionClient.js"></script>
   <script src="../src/runtime/TeemoScreenClient.js"></script>
+  <script src="../src/runtime/TeemoDesktopActionClient.js"></script>
   <script src="../src/tools/TeemoToolRegistry.js"></script>
   <script src="../src/tools/TeemoBuiltinTools.js"></script>
   <script src="../src/tools/file/TeemoFileClient.js"></script>
