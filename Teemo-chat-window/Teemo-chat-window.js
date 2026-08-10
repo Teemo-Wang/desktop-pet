@@ -140,7 +140,19 @@
   const autonomousExecution = window.TeemoAutonomousExecution && agentCore
     ? new window.TeemoAutonomousExecution({ agentCore, aiService: ai, toolRegistry })
     : null;
+  const upgradeRegistries = window.TeemoUpgradeRegistry && fileClient && gitClient && executeClient
+    ? window.TeemoUpgradeRegistry.create({ permissionService: permissionClient, fileClient, gitClient, executeClient })
+    : null;
+  const controlledSelfUpgrade = window.TeemoControlledSelfUpgrade && upgradeRegistries && agentCore
+    ? new window.TeemoControlledSelfUpgrade({
+      agentCore,
+      aiService: ai,
+      toolRegistry: upgradeRegistries.registry,
+      discoveryRegistry: upgradeRegistries.discoveryRegistry,
+    })
+    : null;
   window.teemoAutonomousExecution = autonomousExecution;
+  window.teemoControlledSelfUpgrade = controlledSelfUpgrade;
   const ruleCapture = window.RuleCaptureService ? new window.RuleCaptureService(skills, ai) : null;
   const comfyui = new window.TeemoComfyUIService(store);
   window.comfyUIService = comfyui;
@@ -1049,6 +1061,15 @@
     cancelled: '已取消',
     timed_out: '已超时',
   };
+  const upgradeTerminalStates = new Set(['succeeded', 'failed', 'blocked', 'cancelled', 'timed_out', 'rolled_back']);
+  const upgradeStateLabels = {
+    pending: '准备受控升级', awaiting_begin_approval: '等待开始确认', validating_baseline: '正在验证干净基线',
+    requesting_manifest: '正在请求精确清单', awaiting_manifest_approval: '等待清单确认',
+    awaiting_patch_confirmation: '等待补丁确认', patching: '正在应用补丁',
+    awaiting_script_confirmation: '等待验证确认', verifying: '正在验证', running: '正在运行',
+    succeeded: '升级已验证，等待外部审查', failed: '升级失败', blocked: '已停止并等待用户处理',
+    cancelled: '已取消', timed_out: '已超时', rolled_back: '已回滚',
+  };
 
   function executionTarget(action) {
     const args = action && action.arguments || {};
@@ -1059,6 +1080,26 @@
   function activeExecution(sessionId) {
     const run = autonomousExecution && autonomousExecution.getLatestRun(sessionId);
     return run && !executionTerminalStates.has(run.state) ? run : null;
+  }
+
+  function activeUpgrade(sessionId) {
+    const run = controlledSelfUpgrade && controlledSelfUpgrade.getLatestRun(sessionId, sessionId);
+    return run && !upgradeTerminalStates.has(run.state) ? run : null;
+  }
+
+  async function chooseUpgradeRoot() {
+    if (!ipcRenderer) return null;
+    const response = await ipcRenderer.invoke('teemo-file-tool:list-roots').catch(() => ({ roots: [] }));
+    const roots = Array.isArray(response && response.roots) ? response.roots : [];
+    const values = roots.map(item => typeof item === 'string' ? item : item.path).filter(Boolean);
+    if (!values.length) {
+      setStatus('请先在设置中授权 Teemo 源码所在文件夹', true);
+      return null;
+    }
+    if (values.length === 1) return values[0];
+    const selected = window.prompt(`选择已授权的 Teemo 源码目录：\n${values.map((value, index) => `${index + 1}. ${value}`).join('\n')}`, '1');
+    const index = Number(selected) - 1;
+    return Number.isInteger(index) && values[index] ? values[index] : null;
   }
 
   function createPlanningArticle(sessionId, planState) {
@@ -1182,6 +1223,66 @@
       setStatus('规划已丢弃');
     });
     actions.append(execute, cancelExecution, revise, discard);
+    const upgradeStatus = document.createElement('p');
+    upgradeStatus.className = 'teemo-plan-execution-status';
+    const latestUpgrade = controlledSelfUpgrade && controlledSelfUpgrade.getLatestRun(sessionId, sessionId);
+    upgradeStatus.textContent = latestUpgrade
+      ? `受控升级状态：${upgradeStateLabels[latestUpgrade.state] || latestUpgrade.state}`
+      : '受控升级状态：尚未开始';
+    const startUpgrade = document.createElement('button');
+    startUpgrade.type = 'button';
+    startUpgrade.textContent = '受控升级';
+    startUpgrade.disabled = !controlledSelfUpgrade || Boolean(activeExecution(sessionId)) || Boolean(activeUpgrade(sessionId));
+    const cancelUpgrade = document.createElement('button');
+    cancelUpgrade.type = 'button';
+    cancelUpgrade.textContent = '取消升级';
+    cancelUpgrade.hidden = !activeUpgrade(sessionId);
+    cancelUpgrade.addEventListener('click', () => {
+      const run = activeUpgrade(sessionId);
+      if (!run) return;
+      controlledSelfUpgrade.cancel(run.runId, sessionId, sessionId);
+      cancelUpgrade.disabled = true;
+      setStatus('正在取消受控升级…');
+    });
+    startUpgrade.addEventListener('click', async () => {
+      const active = history.getActive();
+      if (!active || active.id !== sessionId || !controlledSelfUpgrade || activeExecution(sessionId) || activeUpgrade(sessionId)) return;
+      const repoRoot = await chooseUpgradeRoot();
+      if (!repoRoot) return;
+      startUpgrade.disabled = true;
+      cancelUpgrade.hidden = false;
+      const result = await controlledSelfUpgrade.start({
+        ownerId: sessionId,
+        sessionId,
+        repoRoot,
+        planState,
+        getCurrentOwnerId: () => {
+          const current = history.getActive();
+          return current && current.id || null;
+        },
+        getCurrentSessionId: () => {
+          const current = history.getActive();
+          return current && current.id || null;
+        },
+        getCurrentPlanState: () => planningSessionState && planningSessionState.get(sessionId),
+        requestBeginApproval: () => askConfirm('开始受控升级', '将先验证已授权目录中的 Teemo Git 基线，并且不会开始普通聊天之外的工具。'),
+        requestManifestApproval: manifest => askConfirm('确认不可变升级清单', `文件：${manifest.files.map(item => item.path).join('、')}；验证：${manifest.scripts.join('、')}。批准后清单不可改变。`),
+        requestPatchConfirmation: item => askConfirm(`确认补丁 ${item.index}`, `${item.path}\n基线：${item.baselineSha256}\n目标：${item.postPatchSha256}`),
+        requestScriptConfirmation: item => askConfirm(`确认验证 ${item.index}`, `运行已绑定的 npm 脚本：${item.script}`),
+        onState: run => {
+          upgradeStatus.textContent = `受控升级状态：${upgradeStateLabels[run.state] || run.state}`;
+          const terminal = upgradeTerminalStates.has(run.state);
+          startUpgrade.disabled = !terminal;
+          cancelUpgrade.hidden = terminal;
+        },
+      });
+      cancelUpgrade.hidden = true;
+      startUpgrade.disabled = false;
+      setStatus(result.ok ? '受控升级已验证，正在等待外部 Strict Review' : (result.error && result.error.message || '受控升级已停止'), !result.ok);
+      renderMessages();
+    });
+    actions.append(startUpgrade, cancelUpgrade);
+    body.appendChild(upgradeStatus);
     body.appendChild(actions);
     article.appendChild(body);
     return article;

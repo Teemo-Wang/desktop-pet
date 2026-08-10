@@ -1,5 +1,13 @@
 # Current Task
 
+## P5-3 Controlled Self-Upgrade (CLOSED / PASS / BLOCKERS: 0)
+
+- Taskbook: `docs/Teemo-P5-3-CONTROLLED-SELF-UPGRADE.md`.
+- External GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES / P5_FINAL_STARTED: NO`.
+- P5-3 implementation completed within the approved Taskbook: one owner-controlled, memory-only upgrade session over a clean authorized Teemo repository -> immutable manifest -> existing-file patches through P5-2/P1/Main -> read-only Git verification -> baseline-bound npm verification -> evidence.
+- Initial scope forbids create/delete/rename, package/dependency mutation, Git writes/remotes, arbitrary process/Shell, desktop/ComfyUI, installation/restart, persistence/background execution, recursive self-upgrade, auto-close/tag, and P5 Final Acceptance.
+- P5-2 remains closed under `v1.3.2-p5.2-autonomous-execution-verification`; P5 Final Acceptance remains `NOT STARTED`.
+
 ## P5-2 Autonomous Execution & Verification (CLOSED / PASS / BLOCKERS: 0)
 
 - Taskbook: `docs/Teemo-P5-2-AUTONOMOUS-EXECUTION-VERIFICATION.md`.
@@ -75,8 +83,10 @@
 
 - Product：Teemo助理
 - Branch：`Teemo/p3-personal-inspiration`
-- Phase：P5-2 Autonomous Execution & Verification
-- State：`P5-2 CLOSED / PASS / BLOCKERS: 0; P5-3 NOT STARTED`
+- Phase：P5-3 Controlled Self-Upgrade
+- State：`IMPLEMENTED / WAITING REVIEW; P5 Final Acceptance NOT STARTED`
+- External GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P5 Final Acceptance Taskbook Review only / P5_FINAL_STARTED: NO`.
+- P5-3 is closed under recovery tag `v1.3.2-p5.3-controlled-self-upgrade`; P5 Final Acceptance remains `NOT STARTED`.
 - Installed App Version：`v1.3.2`
 - Development App Version：`v1.3.2`
 - P3 Baseline：`cd29e6f` / `v1.2.1-p3-baseline`

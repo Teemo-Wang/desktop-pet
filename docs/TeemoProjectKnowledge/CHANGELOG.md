@@ -3,7 +3,10 @@
 ## 1.3.2
 
 Current:
-P3 Personal Inspiration is closed with zero blockers after final GPT Strict Review. P3-1 through P3-6 remain closed; final acceptance introduced no new product capability. P4-1 Runtime / Screen Awareness, P4-2 Controlled Desktop Actions, P4-3 Design Tool Adapters / Workflows, and P4 Final Acceptance are closed. P5-1 is closed under `v1.3.2-p5.1-autonomous-planning`; P5-2 passed implementation-evidence Strict Review and is closed under `v1.3.2-p5.2-autonomous-execution-verification`. P5-3/P5 Final Acceptance are not started.
+P3 and P4 are closed. P5-1 is closed under `v1.3.2-p5.1-autonomous-planning`; P5-2 passed implementation-evidence Strict Review and is closed under `v1.3.2-p5.2-autonomous-execution-verification`; P5-3 passed implementation-evidence Strict Review and is closed under `v1.3.2-p5.3-controlled-self-upgrade`. P5 Final Acceptance is not started.
+
+Planned:
+P5-3 Controlled Self-Upgrade Taskbook approves one clean-baseline, owner-controlled, immutable existing-file patch manifest with P5-2/P1/Main execution, read-only Git verification, baseline-bound npm verification, explicit rollback, and external Strict Review. Implementation is allowed only within those bounds.
 
 Added:
 P5-2 Autonomous Execution & Verification implements one explicit, bounded, owner/plan-bound in-memory run using only the existing Safe File Tools through Agent Core, Tool Registry, P1 Permission, File IPC, and Main Process FileService. Exact write confirmation, trusted postcondition verification, finite retry, timeout, cancellation, and fail-closed ownership checks are enforced. Status is `CLOSED / PASS / BLOCKERS: 0`.

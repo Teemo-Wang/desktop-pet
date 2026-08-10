@@ -1,5 +1,12 @@
 # Teemo助理 — 项目进度与规划
 
+## P5-3 Controlled Self-Upgrade (CLOSED / PASS / BLOCKERS: 0)
+
+- Taskbook: `docs/Teemo-P5-3-CONTROLLED-SELF-UPGRADE.md`.
+- External GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES / P5_FINAL_STARTED: NO`.
+- Implementation path completed: clean authorized Teemo source -> P5-1 plan -> immutable owner-approved manifest -> P5-2 exact patch confirmations -> P1/Main file execution -> read-only Git diff/status -> owner-confirmed baseline npm scripts -> bounded evidence. External implementation-evidence Strict Review passed with zero blockers.
+- The initial proposal patches at most 6 existing UTF-8 files and 256 KiB total, runs at most 8 unchanged baseline npm scripts, and never exposes Git writes, arbitrary execution, create/delete/rename, dependency/package mutation, installation/restart, persistence/background work, recursive upgrade, or P5 Final Acceptance.
+
 ## P5-2 Autonomous Execution & Verification (CLOSED / PASS / BLOCKERS: 0)
 
 - Taskbook: `docs/Teemo-P5-2-AUTONOMOUS-EXECUTION-VERIFICATION.md`.
@@ -105,7 +112,8 @@
 - P3-6：`CLOSED / PASS / BLOCKERS: 0`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
 - P3 Baseline：`cd29e6f` / `v1.2.1-p3-baseline`
-- Current Development：`P5-2 Autonomous Execution & Verification CLOSED / PASS; P5-3 NOT STARTED`
+- Current Development：`P5-3 Controlled Self-Upgrade CLOSED / PASS / BLOCKERS: 0; P5 Final Acceptance NOT STARTED`
+- P5-3 recovery tag: `v1.3.2-p5.3-controlled-self-upgrade`; next allowed stage is P5 Final Acceptance Taskbook Review only.
 - Current Branch：`Teemo/p3-personal-inspiration`
 
 P3-3 GPT Strict Review：`PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-4`。
