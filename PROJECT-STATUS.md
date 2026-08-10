@@ -1,15 +1,17 @@
 # Teemo助理 — 项目进度与规划
 
-## P3-6 Agent Uses Inspiration (TASKBOOK REQUIRED)
+## P3-6 Agent Uses Inspiration (CLOSED / PASS)
 
 - Local retrieval is implemented over active P3-3 metadata snapshots with keyword, source, format, orientation, minimum-size, sorting, and bounded pagination filters.
-- Main Process revalidates Source/P1 authorization; P3-2 preview is reused for result selection. Provider calls, Agent Context changes, and source-byte changes are zero.
-- P3-4 Strict Review: PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES. P3-4 close commit/tag is authorized before P3-5 implementation.
+- Main Process revalidates Source/P1 authorization; P3-2 preview is reused for result selection. P3-4 itself makes no provider calls or source-byte changes; P3-6 adds only the approved bounded Agent Context path.
+- P3-4 Strict Review: PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES; P3-4 is closed.
 - External GPT Strict Review: PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES.
-- P3-5 More Inspiration Sources: `CLOSED / PASS / BLOCKERS: 0`; its close commit/tag is authorized after Strict Review approval.
-- P3-6 is planning-only until its independent Taskbook receives Strict Review approval. No P3-6 implementation has started.
+- P3-5 More Inspiration Sources: `CLOSED / PASS / BLOCKERS: 0`; close commit `8d9da07` and recovery tag `v1.3.2-p3.5-eagle-library` are present.
+- P3-6 Taskbook received GPT Strict Review approval: `PASS / BLOCKERS: 0 / IMPLEMENTATION_ALLOWED: YES`.
+- P3-6 Implementation Evidence received GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3 Final Acceptance`.
+- P3-6 is closed. The next allowed work is a separate P3 Final Acceptance Taskbook and Strict Review; P4/P5 remain not started.
 
-> 文档版本：v1.32 ｜ 更新日期：2026-08-10 ｜ 当前开发版本：**v1.3.2（TeemoProjectKnowledge SSOT IMPLEMENTED / WAITING REVIEW）**
+> 文档版本：v1.32 ｜ 更新日期：2026-08-10 ｜ 当前开发版本：**v1.3.2（P3-6 CLOSED / PASS；P3 Final Acceptance Taskbook pending）**
 
 ## 当前状态
 
@@ -26,7 +28,7 @@
 - P3-3：`CLOSED / PASS / BLOCKERS: 0`
 - P3-4：`CLOSED / PASS / BLOCKERS: 0`
 - P3-5：`CLOSED / PASS / BLOCKERS: 0`
-- P3-6：`TASKBOOK REQUIRED`
+- P3-6：`CLOSED / PASS / BLOCKERS: 0`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
 - P3 Baseline：`cd29e6f` / `v1.2.1-p3-baseline`
 - Current Development：`TeemoProjectKnowledge SSOT`
@@ -36,7 +38,7 @@ P3-3 GPT Strict Review：`PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STA
 审阅记录：`docs/Teemo-P3-3-GPT-STRICT-REVIEW.md`。
 P3-3/P3-4 close commit/tag 已创建；P3-5 close commit/tag 已获 Strict Review 授权，等待本次收尾提交，remote push 未执行。
 
-## TeemoProjectKnowledge SSOT（2026-08-10，IMPLEMENTED / WAITING REVIEW）
+## TeemoProjectKnowledge SSOT（2026-08-10，P3-6 CLOSED / PASS）
 
 - 新增唯一 Git 可追踪 Project Knowledge 目录：`docs/TeemoProjectKnowledge/`；`INDEX.md` 是所有 Teemo 自身开发 Agent 的唯一入口，`CURRENT-STATE.md` 是当前状态权威摘要。
 - 固定维护 `ROADMAP.md`、`ARCHITECTURE.md`、`DECISIONS.md`、精简 Project Knowledge `CHANGELOG.md` 与 `HISTORY/`；历史聊天、复制交接与过期 SOP 不再作为当前状态权威源。
@@ -51,7 +53,7 @@ P3-3/P3-4 close commit/tag 已创建；P3-5 close commit/tag 已获 Strict Revie
 - M1 正式能力是位于 P1 authorized root 内的明确真实路径。正常与拒绝路径均经 P1 Permission；Main Process 仍是最终 filesystem authorization boundary。未授权和越界路径 hard deny。
 - 已完成当前 OpenAI-compatible Provider 的 Native Tool Calling Capability Gate，以及普通 Chat `read_file`、`create_directory`、Permission DENY、原始 `tool_call_id` tool-result continuation 的实际验证。
 - 普通 Chat 不暴露 Git Tools、Controlled Execute、任意 Shell/PowerShell、任意程序执行、delete 或 destructive operation。
-- Natural-language authorized-root alias / root grounding 是后续 UX Enhancement，不阻塞 M1；它不得扩大 Provider 可访问的路径范围。P3-3/P3-4 保持关闭，P3-6 未开始。当前权威状态见 `docs/TeemoProjectKnowledge/CURRENT-STATE.md`。
+- Natural-language authorized-root alias / root grounding 是后续 UX Enhancement，不阻塞 M1；它不得扩大 Provider 可访问的路径范围。P3-3/P3-4/P3-5/P3-6 保持关闭，下一步仅限 P3 Final Acceptance。当前权威状态见 `docs/TeemoProjectKnowledge/CURRENT-STATE.md`。
 
 ## P3-3 阶段（2026-08-09，CLOSED / PASS）
 
@@ -62,7 +64,7 @@ P3-3/P3-4 close commit/tag 已创建；P3-5 close commit/tag 已获 Strict Revie
 - 扫描受 source-specific Permission 与一次性 Main execution authorization保护；撤销 P1 root 后隐藏已有 metadata，Source remove 后 index 立即不可访问且安全清理。
 - depth/directories/dirents/items/file/header/shard/disk/global concurrency 均有硬边界；symlink/junction 不跟随，目录边界与 commit 前复核 Source/P1/revision。
 - P3-3/P3-2/P3-1 各 2 组 Node + 1 组 Electron、22/22 P1/P2 Node、9/9 既有 Electron、32/32 benchmark、auto-update、语法、diff 与版本检查全部通过。
-- 未实现 Search、Embedding、Vector、Image Search、NAS、Web Source、Watcher 或 Inspiration Agent Context；P3-6 未开始。
+- 未实现 Search、Embedding、Vector、Image Search、NAS、Web Source 或 Watcher；P3-6 Inspiration Agent Context 已关闭，P3 Final Acceptance 尚未开始。
 - 详情见 `docs/Teemo-P3-3-VISUAL-METADATA-INDEX.md`。
 - GPT Strict Review 返回 `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-4`；已创建 annotated recovery tag `v1.3.0-p3.3-visual-metadata-index`。
 

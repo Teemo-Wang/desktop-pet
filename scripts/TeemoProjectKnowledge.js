@@ -112,9 +112,9 @@ function verify() {
     'P3-5:',
     'CLOSED / PASS',
     'P3-6:',
-    'TASKBOOK REQUIRED',
+    'CLOSED / PASS',
     'Next Allowed Stage:',
-    'P3-6 implementation after its independent approved Taskbook.',
+    'P3 Final Acceptance Taskbook / Strict Review.',
   ];
   for (const claim of requiredStateClaims) {
     if (!state.includes(claim)) {
@@ -131,15 +131,16 @@ function verify() {
 
   const currentTask = fs.readFileSync(path.join(projectRoot, 'CURRENT-TASK.md'), 'utf8');
   const projectStatus = fs.readFileSync(path.join(projectRoot, 'PROJECT-STATUS.md'), 'utf8');
-  const currentMaintenanceClaims = [
+  const currentTaskClaims = [
     'P3-6 Agent Uses Inspiration',
-    'TASKBOOK REQUIRED',
+    'CLOSED / PASS',
+    'P3 Final Acceptance Taskbook',
     'P3-5 More Inspiration Sources',
     'CLOSED / PASS / BLOCKERS: 0',
     'TeemoChatAgentToolCalling',
     'PASS / BLOCKERS: 0',
   ];
-  for (const claim of currentMaintenanceClaims) {
+  for (const claim of currentTaskClaims) {
     if (!currentTask.includes(claim) || !projectStatus.includes(claim)) {
       throw new Error(`Current task/status documents conflict with Project Knowledge: ${claim}`);
     }

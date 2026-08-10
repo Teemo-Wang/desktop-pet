@@ -35,7 +35,7 @@ P3-5:
 `CLOSED / PASS`
 
 P3-6:
-`TASKBOOK REQUIRED`
+`CLOSED / PASS`
 
 Maintenance M1:
 `TeemoChatAgentToolCalling`
@@ -67,19 +67,19 @@ Current Maintenance:
 `TeemoProjectKnowledge SSOT`
 
 Current Stage:
-`P3 Personal Inspiration; P3-6 Agent Uses Inspiration`
+`P3 Personal Inspiration; P3 Final Acceptance pending`
 
 Current Task:
-`P3-6 Agent Uses Inspiration; TASKBOOK REQUIRED`
+`P3 Final Acceptance Taskbook preparation`
 
 Current Blockers:
-`P3-6 independent Taskbook approval pending.`
+`P3 Final Acceptance requires an approved Taskbook and Strict Review.`
 
 Next Allowed Stage:
-`P3-6 implementation after its independent approved Taskbook.`
+`P3 Final Acceptance Taskbook / Strict Review.`
 
 Latest Closed Stage:
-`P3-5 More Inspiration Sources`
+`P3-6 Agent Uses Inspiration`
 
 ## Agent Capability State
 
@@ -87,7 +87,9 @@ The ordinary Chat Native Tool Calling path is provider-neutral and routes compat
 
 P3-4 Retrieval is local-only. It filters active P3-3 metadata snapshots and reuses P3-2 preview. It does not traverse sources for a query, call a provider, mutate source bytes, add Agent Context, or create a second index. P1 authorized roots and Main Process boundaries remain authoritative.
 
-P3-5 Eagle-compatible connector is closed with zero blockers. It is a local-only, read-only source that reuses P3-3 indexing, P3-4 retrieval, P3-2 preview, and P1 authorization. Provider calls remained zero and Eagle source bytes remained unchanged. P3-6 has not started.
+P3-5 Eagle-compatible connector is closed with zero blockers. It is a local-only, read-only source that reuses P3-3 indexing, P3-4 retrieval, P3-2 preview, and P1 authorization. Provider calls remained zero and Eagle source bytes remained unchanged. At the time of P3-5 closure, P3-6 had not started.
+
+P3-6 Agent Uses Inspiration is closed with GPT Strict Review approval. It provides an explicit-request-only, bounded retrieval-to-context path that reuses P3-4 Retrieval, exposes only bounded public metadata as untrusted reference data, keeps Provider and filesystem boundaries provider-neutral, and fails closed for disabled, revoked, removed, corrupt, or unavailable sources. P4 and P5 have not started.
 
 <!-- TEEMO_PROJECT_KNOWLEDGE_AUTO:START -->
 - Version: `1.3.2`
@@ -98,6 +100,6 @@ P3-5 Eagle-compatible connector is closed with zero blockers. It is a local-only
 This is a historical snapshot written when Project Knowledge was last synchronized. Git branch, HEAD, and worktree are real-time engineering facts and must be queried directly during Agent Pre-Flight.
 
 - Branch: `Teemo/p3-personal-inspiration`
-- HEAD: `8d9da07ea5f98c0442a7f795c5b964896c53e588`
-- Worktree: `CLEAN`
+- HEAD: `f47e855b08f4d12b077efda642a6d2a16ea552b3`
+- Worktree: `DIRTY`
 <!-- TEEMO_PROJECT_KNOWLEDGE_AUTO:END -->

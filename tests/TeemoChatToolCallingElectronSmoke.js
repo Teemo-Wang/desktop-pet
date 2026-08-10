@@ -14,6 +14,10 @@ app.whenReady().then(async () => {
       const registered = window.teemoToolRegistry.list().sort();
       if (registered.includes('git_status') || registered.some(name => /^execute_/.test(name))) throw new Error('ordinary chat exposed Git or execute tools');
       if (!registered.includes('read_file') || !registered.includes('create_directory')) throw new Error('ordinary chat file allowlist is incomplete');
+      const safeFileDefinitions = window.TeemoFileTools.createDefinitions({ fileClient: { prepare: async () => ({}), execute: async () => ({}), release: async () => ({}) } });
+      if (safeFileDefinitions.some(definition => /\\bfs\\b/.test(String(definition.handler)) || /\\bfs\\b/.test(String(definition.resolvePermissionResource)))) {
+        throw new Error('Safe File Tool renderer definition directly accesses fs');
+      }
       const registry = new window.TeemoToolRegistry();
       registry.register({ name: 'echo', description: 'safe test', inputSchema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'], additionalProperties: false }, metadata: { permission: 'none' }, handler: async args => ({ text: args.text }) });
       let step = 0;
@@ -25,7 +29,7 @@ app.whenReady().then(async () => {
       const agent = new window.TeemoAgentCore({ aiService: ai, toolRegistry: registry });
       const run = await agent.runNativeTools({ messages: [{ role: 'user', content: 'test' }] });
       if (!run.ok || run.content !== 'smoke complete' || run.run.toolCalls.length !== 1) throw new Error('native Agent Core smoke failed');
-      return { registered, nativeToolRoundTrip: true, rendererDirectFs: /require\\(['\\"]fs['\\"]\\)/.test(document.documentElement.ownerDocument.defaultView.__filename || '') === false };
+      return { registered, nativeToolRoundTrip: true, safeFileToolRendererDirectFs: false, safeFileToolIpcOnly: true };
     })()`);
     console.log(JSON.stringify({ ok: true, formalUserDataTouched: false, result }));
     app.exit(0);

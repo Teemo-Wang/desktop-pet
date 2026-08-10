@@ -84,6 +84,7 @@
       this.contextBuilder = options.contextBuilder || null;
       this.creativeContextBuilder = options.creativeContextBuilder || null;
       this.challengeContextBuilder = options.challengeContextBuilder || null;
+      this.inspirationContextBuilder = options.inspirationContextBuilder || null;
       this.cognitionCollector = options.cognitionCollector || null;
       this.skillRouter = options.skillRouter || null;
       this.skillComposer = options.skillComposer || null;
@@ -116,6 +117,8 @@
         skillRoutingError: options.skillRoutingError || null,
         skillContext: options.skillContext || null,
         skillCompositionError: options.skillCompositionError || null,
+        inspirationContext: options.inspirationContext || null,
+        inspirationError: options.inspirationError || null,
         cognitionCollection: null,
       };
       this.activeRuns.set(run.runId, run);
@@ -294,7 +297,30 @@
           challengeContext = null;
         }
       }
-      return { messages, initialMessages, skillRouting, skillRoutingError, skillContext, skillCompositionError, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta };
+      const inspirationBuilder = options.inspirationContextBuilder || this.inspirationContextBuilder;
+      let inspirationContext = null;
+      let inspirationError = null;
+      if (inspirationBuilder && options.inspiration !== false && typeof inspirationBuilder.build === 'function') {
+        try {
+          inspirationContext = await inspirationBuilder.build({
+            messages: initialMessages,
+            userMessage: options.userMessage,
+            projectId: options.projectId || null,
+            sessionId: options.sessionId || null,
+            maxChars: options.inspirationContextBudget,
+          });
+          if (inspirationContext && inspirationContext.error) inspirationError = { ...inspirationContext.error };
+          if (inspirationContext && inspirationContext.systemMessage && inspirationContext.systemMessage.content) {
+            let insertAt = useActionContract ? 1 : 0;
+            while (insertAt < messages.length && messages[insertAt].role === 'system') insertAt += 1;
+            messages.splice(insertAt, 0, { ...inspirationContext.systemMessage });
+          }
+        } catch (_) {
+          inspirationError = { code: 'INSPIRATION_CONTEXT_BUILD_FAILED' };
+          inspirationContext = null;
+        }
+      }
+      return { messages, initialMessages, skillRouting, skillRoutingError, skillContext, skillCompositionError, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta, inspirationContext, inspirationError };
     }
 
     _scheduleCollection(options, run, initialMessages, content) {
@@ -346,8 +372,8 @@
       const ai = options.aiService || this.aiService;
       if (!ai || typeof ai.stream !== 'function') throw new Error('Agent Core 缺少 AIService.stream');
       const prepared = await this._prepareMessages(options, !options.disableActionContract);
-      const { messages, initialMessages, skillRouting, skillRoutingError, skillContext, skillCompositionError, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta } = prepared;
-      const run = this.createRun({ ...options, messages, skillRouting, skillRoutingError, skillContext, skillCompositionError, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta });
+      const { messages, initialMessages, skillRouting, skillRoutingError, skillContext, skillCompositionError, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta, inspirationContext, inspirationError } = prepared;
+      const run = this.createRun({ ...options, messages, skillRouting, skillRoutingError, skillContext, skillCompositionError, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta, inspirationContext, inspirationError });
       const signal = options.signal;
       const maxSteps = Number.isInteger(options.maxSteps) && options.maxSteps > 0 ? options.maxSteps : this.maxSteps;
       const registry = options.toolRegistry || this.toolRegistry;
@@ -391,8 +417,8 @@
       const ai = options.aiService || this.aiService;
       if (!ai || typeof ai.send !== 'function') throw new Error('Agent Core 缺少 AIService');
       const prepared = await this._prepareMessages(options, !options.disableActionContract);
-      const { messages, initialMessages, skillRouting, skillRoutingError, skillContext, skillCompositionError, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta } = prepared;
-      const run = this.createRun({ ...options, messages, skillRouting, skillRoutingError, skillContext, skillCompositionError, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta });
+      const { messages, initialMessages, skillRouting, skillRoutingError, skillContext, skillCompositionError, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta, inspirationContext, inspirationError } = prepared;
+      const run = this.createRun({ ...options, messages, skillRouting, skillRoutingError, skillContext, skillCompositionError, cognitionContext, cognitionError, creativeContext, creativeError, challengeContext, challengeError, challengeCommand, challengeCommandMeta, inspirationContext, inspirationError });
       const signal = options.signal;
       const maxSteps = Number.isInteger(options.maxSteps) && options.maxSteps > 0 ? options.maxSteps : this.maxSteps;
       const registry = options.toolRegistry || this.toolRegistry;
@@ -438,7 +464,7 @@
       if (!ai || typeof ai.sendWithTools !== 'function') throw new Error('Agent Core requires a native tool-calling provider adapter.');
       if (!registry || typeof registry.listDefinitions !== 'function') throw new Error('Agent Core requires a tool registry.');
       const prepared = await this._prepareMessages(options, false);
-      const run = this.createRun({ ...options, messages: prepared.messages });
+      const run = this.createRun({ ...options, ...prepared, messages: prepared.messages });
       const signal = options.signal;
       const maxSteps = Number.isInteger(options.maxSteps) && options.maxSteps > 0 ? options.maxSteps : this.maxSteps;
       const tools = registry.listDefinitions().map(definition => ({ type: 'function', function: {

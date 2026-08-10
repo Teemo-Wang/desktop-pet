@@ -12,7 +12,13 @@
 - Reused P1 authorized-root and Permission boundaries; traversal, link/junction, containment, and TOCTOU checks fail closed.
 - Provider calls: `0`; Eagle source bytes and formal user data unchanged. GPT Strict Review: `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES`.
 
-## Teemo Project Knowledge SSOT - 2026-08-10（IMPLEMENTED / WAITING REVIEW）
+## P3-6 Agent Uses Inspiration - 2026-08-10 (CLOSED / PASS)
+- Added explicit-request-only, bounded reuse of existing P3-4 local retrieval results as provider-neutral, untrusted Inspiration Context.
+- Generic chat bypasses retrieval; disabled/revoked/unavailable sources fail closed. No absolute paths, source bytes, previews, credentials, or new filesystem permissions enter Provider payloads.
+- Ordinary Chat Safe File Tools remain unchanged; Git, Controlled Execute, Shell, PowerShell, delete, P4, and P5 remain unavailable.
+- GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3 Final Acceptance`.
+
+## Teemo Project Knowledge SSOT - 2026-08-10（P3-6 CLOSED / PASS）
 
 - 新增唯一项目知识目录 `docs/TeemoProjectKnowledge/`，以 `INDEX.md` 为所有 Teemo 自身开发 Agent 的强制入口，`CURRENT-STATE.md` 为当前项目状态权威摘要。
 - 新增 `project:knowledge:sync` 和 `project:knowledge:verify`，同步版本、latest recovery tag 与 Last Verified Git Snapshot；verify 从实时 Git 查询 branch/HEAD/worktree，不要求 tracked 快照永久相等，并验证 Project Knowledge 基础结构。
@@ -25,7 +31,7 @@
 - 普通 Chat Safe File Tool allowlist 为 `list_directory`、`read_file`、`search_files`、`search_text`、`create_file`、`patch_file`、`rename_file` 和 `create_directory`。
 - M1 正式路径契约为 P1 authorized root 内的明确真实路径；未授权、越界和 Permission DENY 均 fail closed。`create_directory` 不覆盖、不删除，且不使用 PowerShell 或 Shell。
 - 已验证当前兼容 Provider 的 Native Tool Calling、普通 Chat `read_file`、`create_directory`、Permission DENY 和保持原始 `tool_call_id` 的第二轮 tool-result continuation。
-- Git Tools、Controlled Execute、任意 Shell/PowerShell、任意程序执行、delete 和 destructive operation 不向普通 Chat 开放。P3-3 未修改，P3-4 已关闭，P3-6 未开始。
+- Git Tools、Controlled Execute、任意 Shell/PowerShell、任意程序执行、delete 和 destructive operation 不向普通 Chat 开放。P3-3 未修改，P3-4/P3-5/P3-6 已关闭。
 - 自然语言 authorized-root alias / root grounding 保留为非阻塞后续 UX Enhancement；当前状态见 `docs/TeemoProjectKnowledge/CURRENT-STATE.md`。
 
 ## P3-3 Visual Metadata Index - 2026-08-10（CLOSED / PASS）

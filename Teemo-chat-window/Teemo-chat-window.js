@@ -21,6 +21,7 @@
   const skills = new window.SkillService();
   const history = new window.ChatHistoryService();
   const ai = new window.AIService();
+  window.teemoAIService = ai;
   const cognitionService = window.TeemoCognitionService ? new window.TeemoCognitionService() : null;
   const cognitionCollector = window.TeemoCognitionCollector && cognitionService
     ? new window.TeemoCognitionCollector({ cognitionService })
@@ -75,6 +76,9 @@
   const inspirationRetrievalClient = window.TeemoInspirationRetrievalClient
     ? new window.TeemoInspirationRetrievalClient({ ipcRenderer })
     : null;
+  const inspirationContextBuilder = window.TeemoInspirationContextBuilder && inspirationRetrievalClient
+    ? new window.TeemoInspirationContextBuilder({ retrievalClient: inspirationRetrievalClient })
+    : null;
   const inspirationService = window.TeemoInspirationService
     ? new window.TeemoInspirationService({ registry: inspirationRegistry, accessGuard: inspirationAccessGuard })
     : null;
@@ -84,6 +88,7 @@
   window.teemoEagleLibraryClient = eagleLibraryClient;
   window.teemoInspirationIndexClient = inspirationIndexClient;
   window.teemoInspirationRetrievalClient = inspirationRetrievalClient;
+  window.teemoInspirationContextBuilder = inspirationContextBuilder;
   const fileClient = window.TeemoFileClient ? new window.TeemoFileClient({ ipcRenderer }) : null;
   const gitClient = window.TeemoGitClient ? new window.TeemoGitClient({ ipcRenderer }) : null;
   const executeClient = window.TeemoExecuteClient ? new window.TeemoExecuteClient({ ipcRenderer }) : null;
@@ -118,6 +123,7 @@
     contextBuilder,
     creativeContextBuilder,
     challengeContextBuilder,
+    inspirationContextBuilder,
     cognitionCollector,
     toolRegistry,
     skillRouter,
@@ -3025,6 +3031,7 @@
             modalities: attachments.length ? [...new Set(attachments.map(attachmentModality))] : ['text'],
             signal: abortController.signal,
             toolRegistry,
+            inspirationContextBuilder,
           });
           if (!agentResult.ok) {
             if (agentResult.error.cancelled) throw new DOMException('已停止生成', 'AbortError');

@@ -12,6 +12,7 @@ process.env.TEEMO_ASSISTANT_DATA_DIR = isolatedData;
 app.setPath('userData', isolatedProfile);
 app.commandLine.appendSwitch('disable-gpu');
 ipcMain.handle('teemo:local-access-list', () => []);
+ipcMain.handle('teemo-file-tool:list-roots', () => ({ ok: true, roots: [] }));
 ipcMain.handle('get-app-version', () => app.getVersion());
 
 const skillsPath = path.join(isolatedData, 'skills.json');
@@ -56,6 +57,7 @@ app.whenReady().then(async () => {
       await wait(80);
       window.comfyUIService.store.setGroup('comfyui', { ...window.comfyUIService.getConfig(), enabled: false });
       window.comfyUIService.configure({ enabled: false });
+      window.teemoAIService.sendWithTools = async () => ({ type: 'final_response', content: 'Skill smoke reply' });
       const input = document.getElementById('messageInput');
       input.value = '生成海报并遵循哈啰品牌';
       input.dispatchEvent(new Event('input', { bubbles: true }));

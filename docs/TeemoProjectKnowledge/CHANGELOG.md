@@ -3,10 +3,14 @@
 ## 1.3.2
 
 Current:
-P3-5 Eagle-compatible local-only read-only connector is closed with zero blockers. P3-6 remains not started and requires an independent Taskbook.
+P3-6 Agent Uses Inspiration is closed with zero blockers after GPT Strict Review. P3 Final Acceptance is the only next P3 work and requires its own approved Taskbook.
 
 Added:
 P3-5 source registration, bounded Eagle metadata indexing, existing retrieval/preview reuse, and fail-closed P1 authorization checks. Provider calls remain zero and source bytes remain unchanged.
+
+P3-6 Taskbook approved by external GPT Strict Review: implementation allowed for explicit, bounded Inspiration Retrieval to Agent Context only.
+
+P3-6 is closed: explicit trigger gate, bounded retrieval reuse, untrusted Inspiration Context, Provider payload redaction, and disabled/revoked fail-closed behavior. GPT Strict Review returned `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES`. P4/P5 remain not started.
 
 Added:
 P3-4 local Inspiration Retrieval over active P3-3 metadata snapshots, with bounded keyword search, filters, sorting, pagination, and existing P3-2 preview reuse.

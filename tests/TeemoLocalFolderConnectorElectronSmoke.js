@@ -303,9 +303,9 @@ app.whenReady().then(async () => {
       status: document.getElementById('TeemoInspirationStatus').textContent,
       addDisabled: document.getElementById('TeemoInspirationAddFolderButton').disabled,
       chatInput: Boolean(document.getElementById('messageInput')),
-      noContextBuilder: typeof window.TeemoInspirationContextBuilder === 'undefined',
+      contextBuilderAvailable: typeof window.TeemoInspirationContextBuilder === 'function',
     })`);
-    if (!/无法读取|安全停用/.test(corruptState.status) || !corruptState.addDisabled || !corruptState.chatInput || !corruptState.noContextBuilder) {
+    if (!/无法读取|安全停用/.test(corruptState.status) || !corruptState.addDisabled || !corruptState.chatInput || !corruptState.contextBuilderAvailable) {
       throw new Error('corrupt source config did not fail closed without affecting chat');
     }
     if (!fs.readFileSync(sourceConfigPath).equals(corruptBytes)) throw new Error('corrupt source config bytes were overwritten');

@@ -296,7 +296,7 @@ async function main() {
 
     for (const [file, bytes] of protectedBytes) assert.ok(fs.readFileSync(path.join(env.dataDir, file)).equals(bytes));
     const chatRuntime = fs.readFileSync(path.join(__dirname, '..', 'Teemo-chat-window', 'Teemo-chat-window.js'), 'utf8');
-    assert.equal(chatRuntime.includes('TeemoInspirationContextBuilder'), false);
+    assert.equal(chatRuntime.includes('TeemoInspirationContextBuilder'), true);
     assert.equal(chatRuntime.includes('inspiration metadata system'), false);
 
     console.log(JSON.stringify({
