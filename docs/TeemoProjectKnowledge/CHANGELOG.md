@@ -3,7 +3,13 @@
 ## 1.3.2
 
 Current:
-P3 Personal Inspiration is closed with zero blockers after final GPT Strict Review. P3-1 through P3-6 remain closed; final acceptance introduced no new product capability. P4-1 Runtime / Screen Awareness, P4-2 Controlled Desktop Actions, and P4-3 Design Tool Adapters / Workflows are independently closed after external GPT implementation-evidence Strict Review returned `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES`. P4 Final Acceptance requires its own Taskbook Strict Review; P5 remains not started.
+P3 Personal Inspiration is closed with zero blockers after final GPT Strict Review. P3-1 through P3-6 remain closed; final acceptance introduced no new product capability. P4-1 Runtime / Screen Awareness, P4-2 Controlled Desktop Actions, P4-3 Design Tool Adapters / Workflows, and P4 Final Acceptance are closed after their independent external GPT Strict Reviews returned `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES`. P4 Final recovery tag: `v1.3.2-p4-final-acceptance`. P5 remains not started.
+
+Added:
+P4 Final Acceptance is a verification-only closure. Focused P4 and P1/M1, P2, and P3 regressions passed with synthetic display/PNG/input/transport data and isolated profiles only. It added no product capability, Tool, provider flow, desktop adapter, permission scope, filesystem/network capability, version change, installer, installation, or restart.
+
+Security:
+P4 retains Main Process boundaries, P1 one-shot permissions, owner-bound expiring memory previews, and the unchanged ordinary Chat Safe File Tool allowlist. P5 implementation remains blocked pending its own approved Taskbook.
 
 Added:
 P4-3 one fixed local Runtime-only ComfyUI SDXL render adapter: fixed Main Process loopback transport, static workflow, exact P1 execute-once permission, owner-bound bounded memory preview, cancellation, discard, and expiry. Provider/Agent/Chat/filesystem paths remain absent. Recovery tag: `v1.3.2-p4.3-design-tool-workflows`.
