@@ -305,6 +305,16 @@
               </div>
             </section>
           </section>
+          <section class="teemo-runtime-comfy" aria-labelledby="TeemoRuntimeComfyTitle">
+            <header><div><span>Local ComfyUI</span><h2 id="TeemoRuntimeComfyTitle">固定 SDXL 本地渲染</h2><p>仅提交提示词与画布尺寸到本机 ComfyUI。每次渲染都需要单独的一次性执行确认。</p></div></header>
+            <div class="teemo-runtime-comfy-controls">
+              <label><span>提示词</span><textarea id="TeemoRuntimeComfyPrompt" maxlength="1200" rows="3" placeholder="描述要生成的设计画面"></textarea></label>
+              <label><span>画布尺寸</span><select id="TeemoRuntimeComfySize" aria-label="选择画布尺寸"><option value="1024x1024">1024 × 1024</option><option value="768x768">768 × 768</option><option value="512x512">512 × 512</option><option value="1024x768">1024 × 768</option><option value="768x1024">768 × 1024</option></select></label>
+              <div class="teemo-runtime-comfy-actions"><button class="teemo-primary-button" id="TeemoRuntimeComfyRenderButton" type="button">确认并渲染</button><button class="teemo-secondary-button" id="TeemoRuntimeComfyCancelButton" type="button" disabled>取消</button><button class="teemo-secondary-button" id="TeemoRuntimeComfyDiscardButton" type="button" disabled>丢弃结果</button></div>
+            </div>
+            <div class="teemo-runtime-comfy-status" id="TeemoRuntimeComfyStatus" aria-live="polite"></div>
+            <div class="teemo-runtime-comfy-preview" id="TeemoRuntimeComfyPreview"><span>尚未生成本地预览</span></div>
+          </section>
         </div>
       </main>
 
@@ -587,6 +597,7 @@
   <script src="../src/permissions/TeemoPermissionClient.js"></script>
   <script src="../src/runtime/TeemoScreenClient.js"></script>
   <script src="../src/runtime/TeemoDesktopActionClient.js"></script>
+  <script src="../src/runtime/TeemoComfyWorkflowClient.js"></script>
   <script src="../src/tools/TeemoToolRegistry.js"></script>
   <script src="../src/tools/TeemoBuiltinTools.js"></script>
   <script src="../src/tools/file/TeemoFileClient.js"></script>

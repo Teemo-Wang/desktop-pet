@@ -1,5 +1,12 @@
 # Changelog
 
+## P4-3 Design Tool Adapters / Workflows - 2026-08-10 (CLOSED / PASS)
+- Added one Runtime-only fixed local ComfyUI SDXL adapter. Main Process owns the literal loopback transport, static workflow construction, response validation, P1 one-time execution binding, and owner-local expiring preview.
+- The Runtime UI sends only a bounded local prompt and dimensions. It exposes no endpoint, workflow, model, checkpoint, path, output directory, queue, archive, Chat, Agent, or Provider control.
+- Added synthetic Node and isolated Electron smoke coverage with a fake transport and PNG. No real ComfyUI/GPU, provider, formal user settings, user output, filesystem, screen capture, or desktop input is used in tests.
+- External GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P4 Final Acceptance Taskbook Review only`.
+- Recovery tag: `v1.3.2-p4.3-design-tool-workflows`. P4 Final Acceptance and P5 are not started; no version bump, installer build/install, or restart was performed.
+
 ## P4-2 Controlled Desktop Actions - 2026-08-10 (CLOSED / PASS)
 - Added a local Runtime UI path for a user-selected, explicitly confirmed, one-time primary click from a fresh P4-1 preview. Main Process resolves and revalidates all native display geometry immediately before dispatch.
 - P1 enforces one-time `execute` Permission for `desktop_primary_click`; Renderer has no native display, global-coordinate, or input capability. Provider, Agent Core, ordinary Chat, Tool Calling, Chat history, logs, and persistence receive no desktop-action data.

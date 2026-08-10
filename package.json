@@ -31,6 +31,8 @@
     "test:screen-awareness-ui-smoke": "electron tests/TeemoScreenElectronSmoke/TeemoScreenElectronSmoke.js",
     "test:desktop-actions": "node tests/TeemoDesktopActionService.test.js",
     "test:desktop-actions-ui-smoke": "electron tests/TeemoDesktopActionElectronSmoke.js",
+    "test:comfy-workflow": "node tests/TeemoComfyWorkflowService.test.js",
+    "test:comfy-workflow-ui-smoke": "electron tests/TeemoComfyWorkflowElectronSmoke.js",
     "test:cognition": "node tests/TeemoCognition.test.js",
     "test:cognition-management": "node tests/TeemoCognitionManagement.test.js",
     "test:cognition-ui-smoke": "electron tests/TeemoCognitionCenterElectronSmoke.js",

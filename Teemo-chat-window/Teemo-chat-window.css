@@ -759,6 +759,25 @@ button { color: inherit; }
 .teemo-runtime-click-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 .teemo-runtime-click-actions output { min-width: 0; color: #a7a7a7; font-size: 10px; }
 .teemo-runtime-click-actions button { flex: 0 0 auto; min-height: 32px; }
+/* P4-3 fixed local ComfyUI adapter. This panel intentionally exposes no endpoint, workflow, model, or path control. */
+.teemo-runtime-comfy { padding: 28px 0 0; }
+.teemo-runtime-comfy > header { margin-bottom: 12px; }
+.teemo-runtime-comfy header span { display: block; margin-bottom: 5px; color: #b18fdb; font-size: 9px; text-transform: uppercase; }
+.teemo-runtime-comfy h2 { margin: 0; font-size: 15px; font-weight: 620; }
+.teemo-runtime-comfy p { margin: 7px 0 0; color: #7f7f7f; font-size: 10px; line-height: 1.6; }
+.teemo-runtime-comfy-controls { display: grid; grid-template-columns: minmax(0, 1fr) 170px; gap: 10px; padding: 15px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.teemo-runtime-comfy-controls label { display: grid; min-width: 0; gap: 5px; }
+.teemo-runtime-comfy-controls label > span { color: #7c7c7c; font-size: 9px; }
+.teemo-runtime-comfy-controls textarea,.teemo-runtime-comfy-controls select { width: 100%; box-sizing: border-box; border: 1px solid #3b3b3b; border-radius: 6px; outline: 0; background: #1d1d1d; color: #d8d8d8; padding: 8px 9px; font: inherit; font-size: 11px; }
+.teemo-runtime-comfy-controls textarea { min-height: 70px; max-height: 150px; resize: vertical; line-height: 1.5; }
+.teemo-runtime-comfy-controls textarea:focus,.teemo-runtime-comfy-controls select:focus { border-color: rgba(177,143,219,.68); }
+.teemo-runtime-comfy-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
+.teemo-runtime-comfy-actions button { min-height: 32px; }
+.teemo-runtime-comfy-status { min-height: 22px; padding: 7px 1px 3px; color: #80c8a8; font-size: 10px; }
+.teemo-runtime-comfy-status.error { color: #e58b8b; }
+.teemo-runtime-comfy-preview { display: flex; min-height: 220px; align-items: center; justify-content: center; flex-direction: column; margin-top: 8px; overflow: hidden; border: 1px dashed #3b3b3b; color: #777; font-size: 10px; text-align: center; }
+.teemo-runtime-comfy-preview img { display: block; max-width: 100%; max-height: 520px; object-fit: contain; }
+.teemo-runtime-comfy-preview p { margin: 9px 14px; color: #939393; font-size: 9px; }
 .teemo-inspiration-index-item dl { display: grid; grid-template-columns: 1.2fr .8fr .7fr 1fr; gap: 8px; margin: 0; }
 .teemo-inspiration-index-item dl > div { min-width: 0; }
 .teemo-inspiration-index-item dt { color: #626262; font-size: 8px; }

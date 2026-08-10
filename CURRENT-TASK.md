@@ -1,6 +1,6 @@
 # Current Task
 
-## P4-3 Design Tool Adapters / Workflows (TASKBOOK GATE / NOT STARTED)
+## P4-3 Design Tool Adapters / Workflows (CLOSED / PASS / BLOCKERS: 0)
 
 - P3 Personal Inspiration is `CLOSED / PASS / BLOCKERS: 0`; recovery tag: `v1.3.2-p3-final-acceptance`.
 - P4-1 Runtime / Screen Awareness is `CLOSED / PASS / BLOCKERS: 0`. Its implementation evidence received external GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P4-2 Taskbook Review only`.
@@ -10,7 +10,13 @@
 - P4-2 Taskbook external GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES`.
 - P4-2 Controlled Desktop Actions is `CLOSED / PASS / BLOCKERS: 0`; its implementation evidence received external GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P4-3 Taskbook Review only`.
 - P4-2 closed capability: a user-confirmed, one-time primary click selected from a fresh owner-bound P4-1 preview. Main-only validation and P1 `execute` + `once` Permission remain mandatory. Its recovery tag is `v1.3.2-p4.2-controlled-desktop-actions`.
-- P4-3 may begin only with its own Taskbook and external GPT Strict Review. P4-3 implementation, P4 Final Acceptance, and P5 are not started.
+- P4-3 Taskbook: `docs/Teemo-P4-3-DESIGN-TOOL-WORKFLOWS.md`. It authorizes one Main-only fixed local ComfyUI built-in render adapter, per-request P1 `execute` + `once` permission, and owner-bound bounded memory preview.
+- P4-3 external GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES`. P4-3 implementation is authorized only within this Taskbook; P4 Final Acceptance and P5 are not started.
+- Implemented the approved single Runtime-only adapter: `teemo_comfyui_builtin_sdxl`. Its Main Process loopback transport is fixed to `http://127.0.0.1:8188`; Main builds the static SDXL workflow with the reviewed RTX 4070 Ti 12GB profile. Renderer can submit only a bounded local prompt and bounded dimensions.
+- `comfyui_builtin_render` uses the exact `comfyui://local/teemo-builtin-sdxl/v1` P1 `execute` resource and can only receive a one-time authorization. Prepared work, the authorization, rendering, and its expiring memory preview are bound to the initiating `webContents`.
+- Focused synthetic Node and isolated Chat Window Electron smoke pass. They cover allow/deny, missing execution authorization, owner isolation, expiry/discard, no direct Renderer local-network path, and unchanged ordinary Chat Tool allowlist. P1/M1, P2, P3, P4-1, and P4-2 regressions pass.
+- Implementation evidence external GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P4 Final Acceptance Taskbook Review only`.
+- P4-3 is closed under recovery tag `v1.3.2-p4.3-design-tool-workflows`. P4 Final Acceptance is not started and still requires its own Taskbook Strict Review; P5 remains blocked.
 - Taskbook: `docs/Teemo-P4-1-RUNTIME-SCREEN-AWARENESS.md`.
 - P4-1 Taskbook received external GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES`.
 - Synthetic Node and real Chat Window Electron smoke cover allow/deny, missing execution authorization, owner isolation, expiry/discard, no direct renderer capture, and unchanged ordinary Chat Tool allowlist. P1/P2/P3/M1 regressions passed.
@@ -36,7 +42,7 @@
 
 - Product：Teemo助理
 - Branch：`Teemo/p3-personal-inspiration`
-- Phase：P4-3 Design Tool Adapters / Workflows Taskbook Gate
+- Phase：P4 Final Acceptance Taskbook Review
 - State：`NOT STARTED`
 - Installed App Version：`v1.3.2`
 - Development App Version：`v1.3.2`

@@ -14,6 +14,17 @@
 - P4-3 Design Tool Adapters / Workflows, P4 Final Acceptance, and P5 remain `NOT STARTED`.
 - Chat Safe File Tools, P1 authorized-root enforcement, M1 restrictions, closed P3 stages, and the version remain unchanged.
 
+## P4-3 Design Tool Adapters / Workflows (CLOSED / PASS / BLOCKERS: 0)
+
+- Taskbook: `docs/Teemo-P4-3-DESIGN-TOOL-WORKFLOWS.md`.
+- Implemented scope: one explicit local Runtime action using one fixed local ComfyUI built-in SDXL workflow. The adapter is Main Process only, loopback-only, static-workflow-only, P1 `execute` + `once` only, and returns only a bounded owner-local memory preview.
+- `TeemoComfyWorkflowService` and its owner-bound IPC/client only accept a UTF-8 bounded prompt and dimensions. Main owns the literal `127.0.0.1:8188` transport, redirect rejection, bounded response validation, static built-in workflow, operation lifecycle, and result bytes. The Runtime panel exposes no endpoint, workflow, model, checkpoint, path, queue, archive, or general ComfyUI control.
+- The adapter accepts no arbitrary workflow JSON, model/checkpoint, output path, local/remote URL, proxy, filesystem access, desktop input, ordinary Chat Tool, Provider, Agent, background workflow, or result persistence capability.
+- External GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES`.
+- Focused synthetic Node and isolated Chat Window Electron smoke pass with a fake Main transport and synthetic PNG. Deny/missing authorization call transport zero times; allow uses one exact P1 authorization and creates a same-owner expiring preview. P1/M1, P2, P3, P4-1, and P4-2 regressions pass.
+- P4-3 implementation evidence external GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P4 Final Acceptance Taskbook Review only`.
+- P4-3 is closed under recovery tag `v1.3.2-p4.3-design-tool-workflows`. P4 Final Acceptance and P5 remain `NOT STARTED`.
+
 ## P4-2 Controlled Desktop Actions (CLOSED / PASS / BLOCKERS: 0)
 
 - Taskbook: `docs/Teemo-P4-2-CONTROLLED-DESKTOP-ACTIONS.md`.
@@ -42,7 +53,7 @@
 - Final GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_P3: YES / NEXT_STAGE_ALLOWED: P3 Final close commit/tag only; P4/P5 NOT ALLOWED`.
 - P3 is closed. Recovery tag: `v1.3.2-p3-final-acceptance`. P4/P5 remain not started and require independent approved Taskbooks.
 
-> 文档版本：v1.3.2 ｜ 更新日期：2026-08-10 ｜ 当前开发版本：**v1.3.2（P3 CLOSED / PASS；P4-1/P4-2 CLOSED / PASS；P4-3 Taskbook Gate）**
+> 文档版本：v1.3.2 ｜ 更新日期：2026-08-10 ｜ 当前开发版本：**v1.3.2（P3 CLOSED / PASS；P4-1/P4-2/P4-3 CLOSED / PASS；P4 Final Taskbook Review）**
 
 ## 当前状态
 
@@ -62,7 +73,7 @@
 - P3-6：`CLOSED / PASS / BLOCKERS: 0`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
 - P3 Baseline：`cd29e6f` / `v1.2.1-p3-baseline`
-- Current Development：`P4-3 Design Tool Adapters / Workflows Taskbook Gate`
+- Current Development：`P4 Final Acceptance Taskbook Review`
 - Current Branch：`Teemo/p3-personal-inspiration`
 
 P3-3 GPT Strict Review：`PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-4`。

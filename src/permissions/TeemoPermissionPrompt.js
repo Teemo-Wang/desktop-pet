@@ -60,7 +60,7 @@
       ['允许一次', { decision: 'allow', scope: 'once' }, '#3b3b40'],
       ['本会话允许', { decision: 'allow', scope: 'session' }, '#3478f6'],
     ];
-    if (item.request.toolName === 'desktop_primary_click') buttons.pop();
+    if (item.request.toolName === 'desktop_primary_click' || item.request.toolName === 'comfyui_builtin_render') buttons.pop();
     for (const [label, response, background] of buttons) {
       const button = document.createElement('button');
       button.type = 'button';

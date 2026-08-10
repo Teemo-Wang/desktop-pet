@@ -2,7 +2,7 @@ const TeemoResourceMatcher = require('./TeemoResourceMatcher');
 
 const PERMISSIONS = new Set(['none', 'read', 'write', 'execute']);
 const SCOPES = new Set(['once', 'session', 'resource']);
-const ONE_TIME_EXECUTION_TOOLS = new Set(['desktop_primary_click']);
+const ONE_TIME_EXECUTION_TOOLS = new Set(['desktop_primary_click', 'comfyui_builtin_render']);
 
 function makeId(prefix) {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {

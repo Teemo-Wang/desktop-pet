@@ -46,6 +46,7 @@
   const permissionClient = window.TeemoPermissionClient ? new window.TeemoPermissionClient({ ipcRenderer }) : null;
   const screenClient = window.TeemoScreenClient ? new window.TeemoScreenClient({ ipcRenderer }) : null;
   const desktopActionClient = window.TeemoDesktopActionClient ? new window.TeemoDesktopActionClient({ ipcRenderer }) : null;
+  const comfyWorkflowClient = window.TeemoComfyWorkflowClient ? new window.TeemoComfyWorkflowClient({ ipcRenderer }) : null;
   const inspirationRegistry = window.TeemoInspirationConnectorRegistry
     ? new window.TeemoInspirationConnectorRegistry()
     : null;
@@ -104,6 +105,7 @@
   window.teemoPermissionClient = permissionClient;
   window.teemoScreenClient = screenClient;
   window.teemoDesktopActionClient = desktopActionClient;
+  window.teemoComfyWorkflowClient = comfyWorkflowClient;
   window.teemoFileClient = fileClient;
   window.teemoGitClient = gitClient;
   window.teemoExecuteClient = executeClient;
@@ -199,6 +201,13 @@
     runtimePreview: document.getElementById('TeemoRuntimePreview'),
     runtimePointSummary: document.getElementById('TeemoRuntimePointSummary'),
     runtimeConfirmClick: document.getElementById('TeemoRuntimeConfirmClickButton'),
+    runtimeComfyPrompt: document.getElementById('TeemoRuntimeComfyPrompt'),
+    runtimeComfySize: document.getElementById('TeemoRuntimeComfySize'),
+    runtimeComfyRender: document.getElementById('TeemoRuntimeComfyRenderButton'),
+    runtimeComfyCancel: document.getElementById('TeemoRuntimeComfyCancelButton'),
+    runtimeComfyDiscard: document.getElementById('TeemoRuntimeComfyDiscardButton'),
+    runtimeComfyStatus: document.getElementById('TeemoRuntimeComfyStatus'),
+    runtimeComfyPreview: document.getElementById('TeemoRuntimeComfyPreview'),
     challengeQuick: document.getElementById('TeemoChallengeQuickButton'),
     challengeQuickLabel: document.getElementById('TeemoChallengeQuickLabel'),
     directorBalanced: document.getElementById('TeemoDirectorBalanced'),
@@ -1808,6 +1817,10 @@
   let activeScreenPoint = null;
   let screenCapturePending = false;
   let desktopActionPending = false;
+  let activeComfyPreviewId = null;
+  let activeComfyPreparation = null;
+  let activeComfyAbortController = null;
+  let comfyRenderPending = false;
 
   function screenToolCallId() {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -1823,10 +1836,23 @@
     return `desktop_primary_click_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
   }
 
+  function comfyWorkflowToolCallId() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return `comfyui_builtin_render_${crypto.randomUUID()}`;
+    }
+    return `comfyui_builtin_render_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+  }
+
   function setRuntimeStatus(message, isError = false) {
     if (!els.runtimeStatus) return;
     els.runtimeStatus.textContent = message || '';
     els.runtimeStatus.classList.toggle('error', !!isError);
+  }
+
+  function setComfyRuntimeStatus(message, isError = false) {
+    if (!els.runtimeComfyStatus) return;
+    els.runtimeComfyStatus.textContent = message || '';
+    els.runtimeComfyStatus.classList.toggle('error', !!isError);
   }
 
   function updateRuntimeControls() {
@@ -1839,6 +1865,15 @@
     }
   }
 
+  function updateComfyRuntimeControls() {
+    const hasPrompt = !!(els.runtimeComfyPrompt && els.runtimeComfyPrompt.value.trim());
+    if (els.runtimeComfyPrompt) els.runtimeComfyPrompt.disabled = comfyRenderPending;
+    if (els.runtimeComfySize) els.runtimeComfySize.disabled = comfyRenderPending;
+    if (els.runtimeComfyRender) els.runtimeComfyRender.disabled = comfyRenderPending || !comfyWorkflowClient || !permissionClient || !hasPrompt;
+    if (els.runtimeComfyCancel) els.runtimeComfyCancel.disabled = !comfyRenderPending || !activeComfyPreparation;
+    if (els.runtimeComfyDiscard) els.runtimeComfyDiscard.disabled = comfyRenderPending || !activeComfyPreviewId;
+  }
+
   function setRuntimePending(pending) {
     screenCapturePending = !!pending;
     updateRuntimeControls();
@@ -1847,6 +1882,11 @@
   function setDesktopActionPending(pending) {
     desktopActionPending = !!pending;
     updateRuntimeControls();
+  }
+
+  function setComfyRenderPending(pending) {
+    comfyRenderPending = !!pending;
+    updateComfyRuntimeControls();
   }
 
   function setRuntimePoint(point) {
@@ -2025,6 +2065,107 @@
     }
   }
 
+  function clearComfyPreviewUi() {
+    if (els.runtimeComfyPreview) {
+      els.runtimeComfyPreview.replaceChildren();
+      const empty = document.createElement('span');
+      empty.textContent = '尚未生成本地预览';
+      els.runtimeComfyPreview.appendChild(empty);
+    }
+    activeComfyPreviewId = null;
+    updateComfyRuntimeControls();
+  }
+
+  function renderComfyPreview(preview) {
+    if (!els.runtimeComfyPreview) return;
+    els.runtimeComfyPreview.replaceChildren();
+    const image = document.createElement('img');
+    image.src = preview.dataUrl;
+    image.alt = '本地 ComfyUI 预览';
+    const caption = document.createElement('p');
+    caption.textContent = '仅保留在当前窗口短时内存中；Teemo 不保存或归档该结果。';
+    els.runtimeComfyPreview.append(image, caption);
+  }
+
+  function selectedComfyDimensions() {
+    const match = String(els.runtimeComfySize && els.runtimeComfySize.value || '').match(/^(512|576|640|704|768|832|896|960|1024)x(512|576|640|704|768|832|896|960|1024)$/);
+    return match ? { width: Number(match[1]), height: Number(match[2]) } : null;
+  }
+
+  async function startComfyRuntimeRender() {
+    if (!comfyWorkflowClient || !permissionClient || comfyRenderPending) return;
+    const dimensions = selectedComfyDimensions();
+    const prompt = els.runtimeComfyPrompt && els.runtimeComfyPrompt.value || '';
+    if (!dimensions || !prompt.trim()) {
+      setComfyRuntimeStatus('请输入提示词并选择有效画布尺寸。', true);
+      updateComfyRuntimeControls();
+      return;
+    }
+    let prepared = null;
+    const abortController = new AbortController();
+    activeComfyAbortController = abortController;
+    setComfyRenderPending(true);
+    setComfyRuntimeStatus('正在准备固定本地 ComfyUI 工作流…');
+    try {
+      const toolCallId = comfyWorkflowToolCallId();
+      prepared = await comfyWorkflowClient.prepare({ prompt, ...dimensions }, { toolCallId, sessionId: null });
+      activeComfyPreparation = prepared;
+      updateComfyRuntimeControls();
+      const permission = await permissionClient.authorize({
+        toolCallId,
+        runId: null,
+        sessionId: null,
+        toolName: 'comfyui_builtin_render',
+        permission: 'execute',
+        resource: prepared.resource,
+        requiresExecutionAuthorization: true,
+        reason: prepared.reason,
+      }, { signal: abortController.signal });
+      if (!permission || permission.decision !== 'allow') {
+        setComfyRuntimeStatus(abortController.signal.aborted ? '已取消本次本地渲染。' : '未取得本次本地渲染权限。', !abortController.signal.aborted);
+        return;
+      }
+      setComfyRuntimeStatus('正在通过固定本机 ComfyUI 工作流渲染…');
+      const result = await comfyWorkflowClient.execute(prepared.preparation);
+      prepared = null;
+      activeComfyPreparation = null;
+      const preview = await comfyWorkflowClient.getPreview(result.previewId);
+      activeComfyPreviewId = preview.previewId;
+      renderComfyPreview(preview);
+      setComfyRuntimeStatus('本地渲染已完成；结果未发送给模型，也未由 Teemo 保存。');
+    } catch (error) {
+      const cancelled = abortController.signal.aborted || (error && error.code === 'COMFYUI_CANCELLED');
+      setComfyRuntimeStatus(cancelled ? '已取消本次本地渲染。' : (error.message || '本地渲染未执行。'), !cancelled);
+    } finally {
+      if (prepared) await comfyWorkflowClient.release(prepared.preparation).catch(() => {});
+      if (activeComfyPreparation === prepared) activeComfyPreparation = null;
+      if (activeComfyAbortController === abortController) activeComfyAbortController = null;
+      setComfyRenderPending(false);
+    }
+  }
+
+  async function cancelComfyRuntimeRender(options = {}) {
+    const prepared = activeComfyPreparation;
+    if (activeComfyAbortController) activeComfyAbortController.abort();
+    if (prepared && comfyWorkflowClient) await comfyWorkflowClient.release(prepared.preparation).catch(() => {});
+    if (activeComfyPreparation === prepared) activeComfyPreparation = null;
+    updateComfyRuntimeControls();
+    if (options.showStatus) setComfyRuntimeStatus('正在取消本次本地渲染…');
+  }
+
+  async function discardComfyRuntimePreview(options = {}) {
+    if (comfyRenderPending) await cancelComfyRuntimeRender();
+    const previewId = activeComfyPreviewId;
+    clearComfyPreviewUi();
+    if (!previewId || !comfyWorkflowClient) return;
+    try {
+      await comfyWorkflowClient.discard(previewId);
+      if (options.showStatus) setComfyRuntimeStatus('本地渲染结果已丢弃。');
+    } catch (error) {
+      if (options.showStatus) setComfyRuntimeStatus(error.message || '本地渲染结果清除失败。', true);
+    }
+  }
+
   function showRuntime() {
     els.chatView.hidden = true;
     els.settingsView.hidden = true;
@@ -2032,6 +2173,7 @@
     if (els.creativeView) els.creativeView.hidden = true;
     if (els.inspirationView) els.inspirationView.hidden = true;
     if (els.runtimeView) els.runtimeView.hidden = false;
+    updateComfyRuntimeControls();
     void loadRuntimeDisplays();
   }
 
@@ -2043,6 +2185,7 @@
     els.settingsView.hidden = true;
     els.chatView.hidden = false;
     void discardRuntimePreview();
+    void discardComfyRuntimePreview();
     renderAll();
     els.input.focus();
   }
@@ -3429,6 +3572,10 @@
   if (els.runtimeDiscard) els.runtimeDiscard.addEventListener('click', () => { void discardRuntimePreview({ showStatus: true }); });
   if (els.runtimeConfirmClick) els.runtimeConfirmClick.addEventListener('click', () => { void confirmRuntimePrimaryClick(); });
   if (els.runtimeDisplay) els.runtimeDisplay.addEventListener('change', () => setRuntimePending(screenCapturePending));
+  if (els.runtimeComfyPrompt) els.runtimeComfyPrompt.addEventListener('input', updateComfyRuntimeControls);
+  if (els.runtimeComfyRender) els.runtimeComfyRender.addEventListener('click', () => { void startComfyRuntimeRender(); });
+  if (els.runtimeComfyCancel) els.runtimeComfyCancel.addEventListener('click', () => { void cancelComfyRuntimeRender({ showStatus: true }); });
+  if (els.runtimeComfyDiscard) els.runtimeComfyDiscard.addEventListener('click', () => { void discardComfyRuntimePreview({ showStatus: true }); });
   if (els.challengeQuick) {
     els.challengeQuick.addEventListener('click', () => {
       const state = creativeDirectorState && creativeDirectorState.getState(activeDirectorSessionId());

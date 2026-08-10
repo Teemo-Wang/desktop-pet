@@ -10,6 +10,8 @@ const registerTeemoScreenIpc = require('./src/runtime/TeemoScreenIpc');
 const TeemoDesktopActionService = require('./src/runtime/TeemoDesktopActionService');
 const TeemoWindowsPrimaryClickAdapter = require('./src/runtime/TeemoWindowsPrimaryClickAdapter');
 const registerTeemoDesktopActionIpc = require('./src/runtime/TeemoDesktopActionIpc');
+const TeemoComfyWorkflowService = require('./src/runtime/TeemoComfyWorkflowService');
+const registerTeemoComfyWorkflowIpc = require('./src/runtime/TeemoComfyWorkflowIpc');
 const registerTeemoFileToolIpc = require('./src/tools/file/TeemoFileToolIpc');
 const TeemoGitService = require('./src/services/TeemoGitService');
 const registerTeemoGitToolIpc = require('./src/tools/git/TeemoGitToolIpc');
@@ -79,6 +81,13 @@ registerTeemoScreenIpc(ipcMain, {
   screenService: teemoScreenService,
   permissionService: teemoPermissionService,
   onSnapshotDiscarded: (owner, snapshotId) => teemoDesktopActionIpc.discardSnapshot(owner, snapshotId),
+});
+const teemoComfyWorkflowService = new TeemoComfyWorkflowService({
+  transport: new TeemoComfyWorkflowService.TeemoComfyLoopbackTransport(),
+});
+registerTeemoComfyWorkflowIpc(ipcMain, {
+  workflowService: teemoComfyWorkflowService,
+  permissionService: teemoPermissionService,
 });
 
 function localAccessFilePath() {
