@@ -67,3 +67,20 @@ Teemo Project Knowledge verification and Agent Pre-Flight
 
 Status:
 `ACTIVE`
+
+## D-2026-08-10-05
+
+Date:
+`2026-08-10`
+
+Decision:
+P4-3 permits only one explicit Runtime-local ComfyUI adapter with a fixed Main Process loopback endpoint and static workflow.
+
+Reason:
+Provide a bounded design-tool workflow without turning Teemo into a general ComfyUI, network, filesystem, Chat, Agent, or desktop-automation client.
+
+Scope:
+P4-3 Design Tool Adapters / Workflows
+
+Status:
+`ACTIVE`

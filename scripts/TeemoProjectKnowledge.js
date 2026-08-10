@@ -116,9 +116,9 @@ function verify() {
     'P3-6:',
     'CLOSED / PASS',
     'P4:',
-    'P4-1 / P4-2 CLOSED / PASS / BLOCKERS: 0',
+    'P4-1 / P4-2 / P4-3 CLOSED / PASS / BLOCKERS: 0',
     'Next Allowed Stage:',
-    'P4-3 Taskbook Strict Review only; P4-3 implementation remains blocked.',
+    'P4 Final Acceptance Taskbook design and external GPT Strict Review only; implementation remains blocked.',
   ];
   for (const claim of requiredStateClaims) {
     if (!state.includes(claim)) {
@@ -143,6 +143,8 @@ function verify() {
     'P4-2 Controlled Desktop Actions',
     'CAN_CLOSE_AND_TAG: YES',
     'Teemo-P4-2-CONTROLLED-DESKTOP-ACTIONS.md',
+    'P4-3 Design Tool Adapters / Workflows',
+    'Teemo-P4-3-DESIGN-TOOL-WORKFLOWS.md',
     'P3 Personal Inspiration Final Acceptance',
     'CLOSED / PASS',
     'CAN_CLOSE_P3: YES',

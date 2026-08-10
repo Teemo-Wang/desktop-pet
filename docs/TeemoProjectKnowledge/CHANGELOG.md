@@ -3,7 +3,13 @@
 ## 1.3.2
 
 Current:
-P3 Personal Inspiration is closed with zero blockers after final GPT Strict Review. P3-1 through P3-6 remain closed; final acceptance introduced no new product capability. P4-1 Runtime / Screen Awareness and P4-2 Controlled Desktop Actions are independently closed after external GPT implementation-evidence Strict Review returned `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES`. P4-3 is at its independent Taskbook gate; P4-3/P4 Final Acceptance/P5 implementation remains not started.
+P3 Personal Inspiration is closed with zero blockers after final GPT Strict Review. P3-1 through P3-6 remain closed; final acceptance introduced no new product capability. P4-1 Runtime / Screen Awareness, P4-2 Controlled Desktop Actions, and P4-3 Design Tool Adapters / Workflows are independently closed after external GPT implementation-evidence Strict Review returned `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES`. P4 Final Acceptance requires its own Taskbook Strict Review; P5 remains not started.
+
+Added:
+P4-3 one fixed local Runtime-only ComfyUI SDXL render adapter: fixed Main Process loopback transport, static workflow, exact P1 execute-once permission, owner-bound bounded memory preview, cancellation, discard, and expiry. Provider/Agent/Chat/filesystem paths remain absent. Recovery tag: `v1.3.2-p4.3-design-tool-workflows`.
+
+Security:
+P4-3 adds no general ComfyUI client, workflow/model/endpoint/path control, remote networking, output archive, Chat Tool, Shell, PowerShell, program execution, Git, Controlled Execute, delete, desktop input, P4 Final, or P5 capability.
 
 Added:
 P4-1 explicit local-only screen awareness: opaque display references, P1 read permission, one-shot Main execution authorization, Main Process screen-only capture, owner-bound bounded in-memory preview, discard, and expiry. Screen data has no Provider/Agent/persistence path and automated tests use synthetic data only.
