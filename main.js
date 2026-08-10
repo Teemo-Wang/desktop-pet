@@ -16,6 +16,10 @@ const TeemoLocalFolderService = require('./src/inspiration/TeemoLocalFolderServi
 const registerTeemoLocalFolderIpc = require('./src/inspiration/TeemoLocalFolderIpc');
 const TeemoInspirationIndexStorage = require('./src/inspiration/TeemoInspirationIndexStorage');
 const TeemoLocalFolderIndexScanner = require('./src/inspiration/TeemoLocalFolderIndexScanner');
+const TeemoEagleLibraryIndexScanner = require('./src/inspiration/TeemoEagleLibraryIndexScanner');
+const TeemoEagleLibraryService = require('./src/inspiration/TeemoEagleLibraryService');
+const registerTeemoEagleLibraryIpc = require('./src/inspiration/TeemoEagleLibraryIpc');
+const TeemoInspirationIndexRouter = require('./src/inspiration/TeemoInspirationIndexRouter');
 const TeemoInspirationIndexService = require('./src/inspiration/TeemoInspirationIndexService');
 const registerTeemoInspirationIndexIpc = require('./src/inspiration/TeemoInspirationIndexIpc');
 const TeemoInspirationRetrievalService = require('./src/inspiration/TeemoInspirationRetrievalService');
@@ -75,9 +79,24 @@ const teemoLocalFolderIndexScanner = new TeemoLocalFolderIndexScanner({
   sourceService: teemoInspirationSourceService,
   rootsProvider: loadLocalAccessRoots,
 });
+const teemoEagleLibraryIndexScanner = new TeemoEagleLibraryIndexScanner({
+  fileService,
+  sourceService: teemoInspirationSourceService,
+  rootsProvider: loadLocalAccessRoots,
+});
+const teemoInspirationIndexRouter = new TeemoInspirationIndexRouter({
+  sourceService: teemoInspirationSourceService,
+  localFolderScanner: teemoLocalFolderIndexScanner,
+  eagleLibraryScanner: teemoEagleLibraryIndexScanner,
+});
 const teemoInspirationIndexService = new TeemoInspirationIndexService({
   storage: teemoInspirationIndexStorage,
-  scanner: teemoLocalFolderIndexScanner,
+  scanner: teemoInspirationIndexRouter,
+});
+const teemoEagleLibraryService = new TeemoEagleLibraryService({
+  fileService,
+  sourceService: teemoInspirationSourceService,
+  scanner: teemoEagleLibraryIndexScanner,
 });
 const teemoInspirationRetrievalService = new TeemoInspirationRetrievalService({
   indexService: teemoInspirationIndexService,
@@ -89,6 +108,7 @@ registerTeemoInspirationRetrievalIpc(ipcMain, {
 });
 registerTeemoInspirationIndexIpc(ipcMain, {
   indexService: teemoInspirationIndexService,
+  sourceService: teemoInspirationSourceService,
   permissionService: teemoPermissionService,
   inspirationStateService: teemoInspirationStateService,
 });
@@ -105,6 +125,21 @@ registerTeemoLocalFolderIpc(ipcMain, {
     const result = await dialog.showOpenDialog(owner, {
       title: '选择本地灵感文件夹',
       properties: ['openDirectory'],
+    });
+    return result.canceled || !result.filePaths.length ? null : result.filePaths[0];
+  },
+});
+registerTeemoEagleLibraryIpc(ipcMain, {
+  sourceService: teemoInspirationSourceService,
+  eagleLibraryService: teemoEagleLibraryService,
+  permissionService: teemoPermissionService,
+  fileService,
+  rootsProvider: loadLocalAccessRoots,
+  saveRoots: saveLocalAccessRoots,
+  selectFolder: async event => {
+    const owner = BrowserWindow.fromWebContents(event.sender) || chatWindow || mainWindow;
+    const result = await dialog.showOpenDialog(owner, {
+      title: '选择 Eagle-compatible 灵感库', properties: ['openDirectory'],
     });
     return result.canceled || !result.filePaths.length ? null : result.filePaths[0];
   },

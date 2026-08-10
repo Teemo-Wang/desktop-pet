@@ -57,13 +57,15 @@
       const id = Contracts.safeText(sourceId, 120);
       if (!id) throw Contracts.inspirationError('requestInvalid', '灵感索引请求无效');
       if (context.signal && context.signal.aborted) throw Contracts.inspirationError('aborted', '索引已取消');
+      const sourceKind = context.sourceKind === 'eagle_library' ? 'eagle_library' : 'local_folder';
+      const resourceType = sourceKind === 'eagle_library' ? 'eagle-library' : 'local-folder';
       const request = {
         toolCallId: Contracts.safeText(context.toolCallId, 120) || makeId(),
         runId: Contracts.safeText(context.runId, 120) || null,
         sessionId: Contracts.safeText(context.sessionId, 120) || null,
         toolName: 'inspiration_metadata_index',
         permission: 'read',
-        resource: `inspiration://local-folder/${encodeURIComponent(id)}`,
+        resource: `inspiration://${resourceType}/${encodeURIComponent(id)}`,
         requiresExecutionAuthorization: true,
         reason: `建立本地灵感素材索引：${id}`,
       };

@@ -147,6 +147,7 @@ class TeemoInspirationIndexService {
       const committed = this.storage.commitSourceSnapshot({
         scanId: active.scanId,
         sourceId: id,
+        sourceKind: sourceContext.source.kind,
         sourceRegistryRevision: sourceContext.sourceRegistryRevision,
         mode,
         items: result.items,

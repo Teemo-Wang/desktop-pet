@@ -17,6 +17,7 @@ const HASH_PATTERN = /^[0-9a-f]{64}$/i;
 const SHARD_PATTERN = /^sources\/([0-9a-f-]{36})\.(\d+)\.jsonl$/i;
 const INDEX_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
 const INDEX_MIMES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+const SOURCE_KINDS = new Set(['local_folder', 'eagle_library']);
 
 class TeemoInspirationIndexError extends Error {
   constructor(code, message) {
@@ -68,7 +69,7 @@ function validManifest(value) {
   const shardFiles = new Set();
   for (const [sourceId, entry] of Object.entries(value.sources)) {
     if (!UUID_PATTERN.test(sourceId) || !entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
-    if (entry.sourceId !== sourceId || entry.sourceKind !== 'local_folder') return false;
+    if (entry.sourceId !== sourceId || !SOURCE_KINDS.has(entry.sourceKind)) return false;
     if (!validCount(entry.indexRevision) || entry.indexRevision < 1 || !validCount(entry.sourceRegistryRevision)) return false;
     const shardMatch = SHARD_PATTERN.exec(String(entry.shardFile || ''));
     if (!shardMatch || shardMatch[1].toLowerCase() !== sourceId.toLowerCase()
@@ -115,7 +116,7 @@ function pathKeyFor(relativePath, platform = process.platform) {
 function validItem(item, expectedSourceId = null) {
   if (!item || typeof item !== 'object' || Array.isArray(item) || item.schemaVersion !== SCHEMA_VERSION) return false;
   if (!UUID_PATTERN.test(String(item.sourceId || '')) || (expectedSourceId && item.sourceId !== expectedSourceId)) return false;
-  if (item.sourceKind !== 'local_folder' || !HASH_PATTERN.test(String(item.itemId || ''))) return false;
+  if (!SOURCE_KINDS.has(item.sourceKind) || !HASH_PATTERN.test(String(item.itemId || ''))) return false;
   if (!validRelativePath(item.relativePath) || !validRelativePath(item.pathKey)
     || item.relativePath.includes('\\') || item.pathKey.includes('\\')
     || item.pathKey !== pathKeyFor(item.relativePath)) return false;
@@ -317,7 +318,7 @@ class TeemoInspirationIndexStorage {
         const now = this.clock().toISOString();
         const entry = {
           sourceId,
-          sourceKind: 'local_folder',
+          sourceKind: SOURCE_KINDS.has(input.sourceKind) ? input.sourceKind : 'local_folder',
           indexRevision: nextIndexRevision,
           sourceRegistryRevision: input.sourceRegistryRevision,
           shardFile,
@@ -405,6 +406,7 @@ TeemoInspirationIndexStorage.MAX_SOURCE_SHARD_BYTES = MAX_SOURCE_SHARD_BYTES;
 TeemoInspirationIndexStorage.MAX_COMMITTED_INDEX_BYTES = MAX_COMMITTED_INDEX_BYTES;
 TeemoInspirationIndexStorage.MAX_ITEMS_PER_SOURCE = MAX_ITEMS_PER_SOURCE;
 TeemoInspirationIndexStorage.MAX_ITEMS_PROFILE = MAX_ITEMS_PROFILE;
+TeemoInspirationIndexStorage.SOURCE_KINDS = SOURCE_KINDS;
 TeemoInspirationIndexStorage.itemIdFor = itemIdFor;
 TeemoInspirationIndexStorage.metadataFingerprintFor = metadataFingerprintFor;
 TeemoInspirationIndexStorage.pathKeyFor = pathKeyFor;

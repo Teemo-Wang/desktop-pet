@@ -145,6 +145,17 @@
         requiresExecutionAuthorization: true,
       });
     }
+
+    readEagleLibrary(sourceId, operation, request = {}, context = {}) {
+      const id = Contracts.safeText(sourceId, 120);
+      if (!id) return Promise.resolve({ ok: false, error: Contracts.publicError({ code: Contracts.ERROR_CODES.connectorInvalid }) });
+      return this.read('eagle-library', operation, { ...Contracts.clone(request), sourceId: id }, {
+        ...context,
+        permissionToolName: 'inspiration_eagle_library',
+        permissionResource: `inspiration://eagle-library/${encodeURIComponent(id)}`,
+        requiresExecutionAuthorization: true,
+      });
+    }
   }
 
   TeemoInspirationService.STATE_FILE = STATE_FILE;

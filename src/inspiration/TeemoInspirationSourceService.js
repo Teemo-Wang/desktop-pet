@@ -6,6 +6,7 @@ const TeemoStorageService = require('../services/TeemoStorageService');
 const SOURCE_FILE = 'Teemo-inspiration-sources.json';
 const SCHEMA_VERSION = 1;
 const MAX_SOURCES = 20;
+const SOURCE_KINDS = Object.freeze(['local_folder', 'eagle_library']);
 
 class TeemoInspirationSourceError extends Error {
   constructor(code, message) {
@@ -35,7 +36,7 @@ function validIso(value) {
 function validSource(source) {
   return Boolean(source && typeof source === 'object' && !Array.isArray(source)
     && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(source.sourceId || ''))
-    && source.kind === 'local_folder'
+    && SOURCE_KINDS.includes(source.kind)
     && typeof source.displayName === 'string' && source.displayName.trim()
     && source.displayName.length <= 100
     && path.isAbsolute(String(source.rootPath || ''))
@@ -127,8 +128,17 @@ class TeemoInspirationSourceService {
   }
 
   addLocalFolder(input = {}, options = {}) {
+    return this._addSource('local_folder', input, options);
+  }
+
+  addEagleLibrary(input = {}, options = {}) {
+    return this._addSource('eagle_library', input, options);
+  }
+
+  _addSource(kind, input = {}, options = {}) {
     const canonicalRoot = this._canonicalAuthorizedRoot(input.rootPath);
-    const displayName = String(input.displayName || path.basename(canonicalRoot) || '本地灵感').trim().slice(0, 100);
+    const fallbackName = kind === 'eagle_library' ? 'Eagle 灵感库' : '本地灵感';
+    const displayName = String(input.displayName || path.basename(canonicalRoot) || fallbackName).trim().slice(0, 100);
     if (!displayName) fail('INSPIRATION_SOURCE_INVALID', '灵感来源名称不能为空');
     const expectedRevision = options.expectedRevision == null ? null : Number(options.expectedRevision);
     const locked = this.storage.withFileLock(this.fileName, () => {
@@ -145,7 +155,7 @@ class TeemoInspirationSourceService {
       const now = this.clock().toISOString();
       const source = {
         sourceId: this.idFactory(),
-        kind: 'local_folder',
+        kind,
         displayName,
         rootPath: checkedRoot,
         createdAt: now,
@@ -188,5 +198,6 @@ class TeemoInspirationSourceService {
 TeemoInspirationSourceService.SOURCE_FILE = SOURCE_FILE;
 TeemoInspirationSourceService.SCHEMA_VERSION = SCHEMA_VERSION;
 TeemoInspirationSourceService.MAX_SOURCES = MAX_SOURCES;
+TeemoInspirationSourceService.SOURCE_KINDS = SOURCE_KINDS;
 TeemoInspirationSourceService.TeemoInspirationSourceError = TeemoInspirationSourceError;
 module.exports = TeemoInspirationSourceService;

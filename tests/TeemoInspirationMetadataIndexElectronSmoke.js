@@ -97,7 +97,7 @@ const indexScanner = new TeemoLocalFolderIndexScanner({
   },
 });
 const indexService = new TeemoInspirationIndexService({ storage: indexStorage, scanner: indexScanner });
-registerTeemoInspirationIndexIpc(ipcMain, { indexService, permissionService, inspirationStateService });
+registerTeemoInspirationIndexIpc(ipcMain, { indexService, sourceService, permissionService, inspirationStateService });
 registerTeemoLocalFolderIpc(ipcMain, {
   sourceService,
   localFolderService,

@@ -58,7 +58,7 @@ const indexService = new TeemoInspirationIndexService({
   scanner: new TeemoLocalFolderIndexScanner({ fileService, sourceService, rootsProvider: () => authorizedRoots }),
 });
 const retrievalService = new TeemoInspirationRetrievalService({ indexService, sourceService, inspirationStateService });
-registerTeemoInspirationIndexIpc(ipcMain, { indexService, permissionService, inspirationStateService });
+registerTeemoInspirationIndexIpc(ipcMain, { indexService, sourceService, permissionService, inspirationStateService });
 registerTeemoInspirationRetrievalIpc(ipcMain, { retrievalService });
 registerTeemoLocalFolderIpc(ipcMain, {
   sourceService, localFolderService, indexService, permissionService, fileService,

@@ -2,8 +2,11 @@
 
 ## 1.3.2
 
-Closed:
-P3-4 Inspiration Retrieval passed Strict Review with zero blockers. P3-5 requires an independent approved Taskbook.
+Current:
+P3-5 Eagle-compatible local-only read-only connector is closed with zero blockers. P3-6 remains not started and requires an independent Taskbook.
+
+Added:
+P3-5 source registration, bounded Eagle metadata indexing, existing retrieval/preview reuse, and fail-closed P1 authorization checks. Provider calls remain zero and source bytes remain unchanged.
 
 Added:
 P3-4 local Inspiration Retrieval over active P3-3 metadata snapshots, with bounded keyword search, filters, sorting, pagination, and existing P3-2 preview reuse.

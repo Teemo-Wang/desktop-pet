@@ -21,6 +21,8 @@
     "test:inspiration-index-ui-smoke": "electron tests/TeemoInspirationMetadataIndexElectronSmoke.js",
     "test:inspiration-retrieval": "node tests/TeemoInspirationRetrieval.test.js",
     "test:inspiration-retrieval-ui-smoke": "electron tests/TeemoInspirationRetrievalElectronSmoke.js",
+    "test:eagle-library": "node tests/TeemoEagleLibraryConnector.test.js",
+    "test:eagle-library-ui-smoke": "electron tests/TeemoEagleLibraryElectronSmoke.js",
     "test:agent-core": "node tests/TeemoAgentCore.test.js",
     "test:chat-tool-calling-ui-smoke": "electron tests/TeemoChatToolCallingElectronSmoke.js",
     "test:cognition": "node tests/TeemoCognition.test.js",

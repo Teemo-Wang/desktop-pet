@@ -5,14 +5,19 @@
 - Main Process revalidates Source/P1 authorization; revoked, removed, corrupt, unindexed, and disabled sources fail closed.
 - Results reuse P3-2 preview. No provider calls, source mutation, Agent Context injection, close commit, or recovery tag.
 - GPT Strict Review: `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-5`.
-- P3-5 More Inspiration Sources requires an independent approved Taskbook.
+- P3-5 More Inspiration Sources Taskbook received external GPT Strict Review approval; implementation is allowed within its Eagle-compatible read-only scope.
+
+## P3-5 More Inspiration Sources - 2026-08-10 (CLOSED / PASS)
+- Added an Eagle-compatible local-only, read-only connector with source registration, bounded metadata indexing, retrieval, and existing preview reuse.
+- Reused P1 authorized-root and Permission boundaries; traversal, link/junction, containment, and TOCTOU checks fail closed.
+- Provider calls: `0`; Eagle source bytes and formal user data unchanged. GPT Strict Review: `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES`.
 
 ## Teemo Project Knowledge SSOT - 2026-08-10（IMPLEMENTED / WAITING REVIEW）
 
 - 新增唯一项目知识目录 `docs/TeemoProjectKnowledge/`，以 `INDEX.md` 为所有 Teemo 自身开发 Agent 的强制入口，`CURRENT-STATE.md` 为当前项目状态权威摘要。
 - 新增 `project:knowledge:sync` 和 `project:knowledge:verify`，同步版本、latest recovery tag 与 Last Verified Git Snapshot；verify 从实时 Git 查询 branch/HEAD/worktree，不要求 tracked 快照永久相等，并验证 Project Knowledge 基础结构。
 - `AGENTS.md` 现强制统一 Pre-Flight/Post-Flight：开工先读取 Project Knowledge，完成后 sync/verify PASS 才能提交 Implementation Evidence。
-- 未实现 Vector DB、Embedding、Semantic Search、Cloud Sync、Agent Memory、P3-4、Desktop Automation 或后台 daemon；未创建 close commit/tag。
+- 未实现 Vector DB、Embedding、Semantic Search、Cloud Sync、Agent Memory、P3-6、Desktop Automation 或后台 daemon；P3-5 已关闭，P3-6 仍需独立 Taskbook。
 
 ## TeemoChatAgentToolCalling Maintenance M1 - 2026-08-10（PASS / BLOCKERS: 0）
 
@@ -20,7 +25,7 @@
 - 普通 Chat Safe File Tool allowlist 为 `list_directory`、`read_file`、`search_files`、`search_text`、`create_file`、`patch_file`、`rename_file` 和 `create_directory`。
 - M1 正式路径契约为 P1 authorized root 内的明确真实路径；未授权、越界和 Permission DENY 均 fail closed。`create_directory` 不覆盖、不删除，且不使用 PowerShell 或 Shell。
 - 已验证当前兼容 Provider 的 Native Tool Calling、普通 Chat `read_file`、`create_directory`、Permission DENY 和保持原始 `tool_call_id` 的第二轮 tool-result continuation。
-- Git Tools、Controlled Execute、任意 Shell/PowerShell、任意程序执行、delete 和 destructive operation 不向普通 Chat 开放。P3-3 未修改，P3-4 未开始。
+- Git Tools、Controlled Execute、任意 Shell/PowerShell、任意程序执行、delete 和 destructive operation 不向普通 Chat 开放。P3-3 未修改，P3-4 已关闭，P3-6 未开始。
 - 自然语言 authorized-root alias / root grounding 保留为非阻塞后续 UX Enhancement；当前状态见 `docs/TeemoProjectKnowledge/CURRENT-STATE.md`。
 
 ## P3-3 Visual Metadata Index - 2026-08-10（CLOSED / PASS）
@@ -30,7 +35,7 @@
 - PNG/JPEG/WEBP/GIF 只读取最多 1 MiB header以确认 MIME/dimensions；不完整 decode、不计算 source content hash、不修改 Source。
 - 继续复用 P1 authorized roots 与 `inspiration://local-folder/<sourceId>` read Permission；撤权后隐藏已有 metadata。
 - P3 三阶段专项、22/22 P1/P2 Node、9/9 既有 Electron、32/32 benchmark、auto-update、语法、diff 与版本检查全部通过；等待 GPT Strict Review。
-- 未实现 Search、Embedding、Vector、Image Search、Eagle、NAS、Web、Watcher 或 Inspiration Agent Context；P3-4 未开始。
+- P3-3 closure scope did not implement Search、Embedding、Vector、Image Search、Eagle、NAS、Web、Watcher 或 Inspiration Agent Context；subsequent P3-4/P3-5 work is recorded above.
 - GPT Strict Review：`PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-4`。
 - 已创建 close commit 和 annotated recovery tag：`v1.3.0-p3.3-visual-metadata-index`；remote push 未执行。
 

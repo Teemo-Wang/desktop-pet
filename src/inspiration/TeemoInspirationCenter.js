@@ -8,6 +8,7 @@
     constructor(options = {}) {
       this.service = options.service || null;
       this.sourceClient = options.sourceClient || null;
+      this.eagleLibraryClient = options.eagleLibraryClient || null;
       this.indexClient = options.indexClient || null;
       this.retrievalClient = options.retrievalClient || null;
       this.onBack = typeof options.onBack === 'function' ? options.onBack : () => {};
@@ -21,6 +22,7 @@
         sourceCount: get('TeemoInspirationSourceCount'),
         sourceList: get('TeemoInspirationSourceList'),
         addFolder: get('TeemoInspirationAddFolderButton'),
+        addEagle: get('TeemoInspirationAddEagleButton'),
         indexReset: get('TeemoInspirationIndexResetButton'),
         indexPanel: get('TeemoInspirationIndexPanel'),
         indexTitle: get('TeemoInspirationIndexTitle'),
@@ -70,6 +72,7 @@
       if (this.els.refresh) this.els.refresh.addEventListener('click', () => this.refresh('状态已刷新'));
       if (this.els.enabled) this.els.enabled.addEventListener('change', () => this._setEnabled(this.els.enabled.checked));
       if (this.els.addFolder) this.els.addFolder.addEventListener('click', () => this._addFolder());
+      if (this.els.addEagle) this.els.addEagle.addEventListener('click', () => this._addEagleLibrary());
       if (this.els.indexReset) this.els.indexReset.addEventListener('click', () => this._resetCorruptIndex());
       if (this.els.indexClose) this.els.indexClose.addEventListener('click', () => this._closeIndex());
       if (this.els.indexPrevious) this.els.indexPrevious.addEventListener('click', () => this._changeIndexPage(-1));
@@ -109,6 +112,8 @@
           sourceStateError: sourceSnapshot.stateError || null,
           indexState: sourceSnapshot.indexState || null,
           localFolderAvailable,
+          eagleLibraryAvailable: Array.isArray(base.connectors)
+            && base.connectors.some(connector => connector.connectorId === 'eagle-library'),
         };
         this.render();
         this._renderSearchSources();
@@ -138,6 +143,10 @@
       if (this.els.addFolder) {
         this.els.addFolder.hidden = !this.snapshot.localFolderAvailable;
         this.els.addFolder.disabled = this.busy || !enabled || Boolean(this.snapshot.sourceStateError);
+      }
+      if (this.els.addEagle) {
+        this.els.addEagle.hidden = !this.snapshot.eagleLibraryAvailable;
+        this.els.addEagle.disabled = this.busy || !enabled || Boolean(this.snapshot.sourceStateError);
       }
       if (this.els.indexReset) {
         this.els.indexReset.hidden = !indexUnreadable;
@@ -254,7 +263,7 @@
       return `<div class="teemo-inspiration-source" data-source-id="${this._escape(source.sourceId)}">
         <div class="teemo-inspiration-source-copy">
           <strong>${this._escape(source.displayName)}</strong>
-          <span>本地文件夹 · ${this._escape(source.folderName || '')}</span>
+          <span>${source.kind === 'eagle_library' ? 'Eagle-compatible 灵感库' : '本地文件夹'} · ${this._escape(source.folderName || '')}</span>
           <small data-index-state="${this._escape(index.status)}">${this._escape(this._indexStatusText(index, source.status))}</small>
         </div>
         <div class="teemo-inspiration-source-actions">
@@ -348,6 +357,23 @@
       }
     }
 
+    async _addEagleLibrary() {
+      if (this.busy || !this.snapshot || !this.eagleLibraryClient) return;
+      this.busy = true;
+      this.render();
+      try {
+        const result = await this.eagleLibraryClient.selectAndAdd({ expectedRevision: this.snapshot.sourceRevision });
+        if (result.canceled) return;
+        await this.refresh('已添加 Eagle-compatible 灵感库');
+      } catch (error) {
+        await this.refresh();
+        this._setStatus(error && error.message ? error.message : '添加 Eagle 灵感库失败', true);
+      } finally {
+        this.busy = false;
+        this.render();
+      }
+    }
+
     async _removeSource(sourceId) {
       if (this.busy || !this.snapshot || !this.sourceClient) return;
       const accepted = typeof window === 'undefined' || typeof window.confirm !== 'function'
@@ -373,11 +399,14 @@
     }
 
     async _reauthorize(sourceId) {
-      if (this.busy || !this.sourceClient) return;
+      if (this.busy || !this.snapshot) return;
+      const source = (this.snapshot.sources || []).find(item => item.sourceId === sourceId);
+      const client = source && source.kind === 'eagle_library' ? this.eagleLibraryClient : this.sourceClient;
+      if (!client || typeof client.reauthorize !== 'function') return;
       this.busy = true;
       this.render();
       try {
-        const result = await this.sourceClient.reauthorize(sourceId);
+        const result = await client.reauthorize(sourceId);
         if (!result.canceled) await this.refresh('本地灵感来源已重新授权');
       } catch (error) {
         await this.refresh();
@@ -395,8 +424,10 @@
       this.busy = true;
       this.indexProgress = { entriesInspected: 0, indexed: 0 };
       let lastRender = 0;
+      const source = (this.snapshot.sources || []).find(item => item.sourceId === sourceId);
       const operation = this.indexClient.startScan(sourceId, mode, {
         sessionId: 'inspiration-center',
+        sourceKind: source && source.kind === 'eagle_library' ? 'eagle_library' : 'local_folder',
         onProgress: progress => {
           this.indexProgress = progress;
           if (Date.now() - lastRender >= 100) {
@@ -554,7 +585,7 @@
       this.render();
       if (this.els.entryList) this.els.entryList.innerHTML = '<div class="teemo-inspiration-browser-loading">正在读取...</div>';
       try {
-        const result = await this.service.readLocalFolder(this.activeSourceId, 'list_items', {
+        const result = await this._readSource('list_items', {
           relativeDirectory: this.activeDirectory,
           limit: 100,
         }, { sessionId: 'inspiration-center' });
@@ -601,7 +632,7 @@
       this.render();
       if (this.els.preview) this.els.preview.innerHTML = '<span>正在读取预览...</span>';
       try {
-        const result = await this.service.readLocalFolder(this.activeSourceId, 'preview', { relativePath }, { sessionId: 'inspiration-center' });
+        const result = await this._readSource('preview', { relativePath });
         if (!result.ok) throw Object.assign(new Error(result.error.message), { code: result.error.code });
         if (this.els.preview) this.els.preview.innerHTML = `<img alt="本地灵感预览" src="data:${this._escape(result.data.mimeType)};base64,${result.data.dataBase64}"><p>${this._escape(relativePath.split('/').pop())}</p>`;
         this._setStatus('');
@@ -613,6 +644,14 @@
         this.busy = false;
         this.render();
       }
+    }
+
+    _readSource(operation, request) {
+      const source = (this.snapshot && this.snapshot.sources || []).find(item => item.sourceId === this.activeSourceId);
+      if (source && source.kind === 'eagle_library' && this.service && typeof this.service.readEagleLibrary === 'function') {
+        return this.service.readEagleLibrary(this.activeSourceId, operation, request, { sessionId: 'inspiration-center' });
+      }
+      return this.service.readLocalFolder(this.activeSourceId, operation, request, { sessionId: 'inspiration-center' });
     }
 
     _formatBytes(value) {
@@ -656,6 +695,7 @@
           sourceRevision: this.snapshot.sourceRevision,
           sourceStateError: this.snapshot.sourceStateError,
           localFolderAvailable: this.snapshot.localFolderAvailable,
+          eagleLibraryAvailable: this.snapshot.eagleLibraryAvailable,
         };
         this.render();
         this._setStatus(enabled ? '灵感基础能力已启用' : '灵感基础能力已停用');

@@ -78,6 +78,7 @@
             toolCallId: requestId,
             runId: context.runId || null,
             sessionId: context.sessionId || null,
+            sourceKind: context.sourceKind || 'local_folder',
           });
           if (cancelled || controller.signal.aborted) {
             await this._invoke(CHANNELS.discardAuthorization, { toolCallId: requestId });
@@ -90,6 +91,7 @@
             toolCallId: authorization.toolCallId,
             runId: authorization.runId,
             sessionId: authorization.sessionId,
+            sourceKind: context.sourceKind || 'local_folder',
           });
           if (!result || !result.ok) throw safeError(result && result.error);
           return result.data;

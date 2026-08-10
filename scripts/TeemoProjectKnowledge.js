@@ -109,8 +109,12 @@ function verify() {
     'CLOSED / PASS',
     'P3-4:',
     'CLOSED / PASS',
+    'P3-5:',
+    'CLOSED / PASS',
+    'P3-6:',
+    'TASKBOOK REQUIRED',
     'Next Allowed Stage:',
-    'P3-5 implementation after its own approved Taskbook.',
+    'P3-6 implementation after its independent approved Taskbook.',
   ];
   for (const claim of requiredStateClaims) {
     if (!state.includes(claim)) {
@@ -128,8 +132,10 @@ function verify() {
   const currentTask = fs.readFileSync(path.join(projectRoot, 'CURRENT-TASK.md'), 'utf8');
   const projectStatus = fs.readFileSync(path.join(projectRoot, 'PROJECT-STATUS.md'), 'utf8');
   const currentMaintenanceClaims = [
-    'P3-5 More Inspiration Sources',
+    'P3-6 Agent Uses Inspiration',
     'TASKBOOK REQUIRED',
+    'P3-5 More Inspiration Sources',
+    'CLOSED / PASS / BLOCKERS: 0',
     'TeemoChatAgentToolCalling',
     'PASS / BLOCKERS: 0',
   ];

@@ -1,12 +1,14 @@
 # Current Task
 
-## P3-5 More Inspiration Sources (TASKBOOK REQUIRED)
+## P3-6 Agent Uses Inspiration (TASKBOOK REQUIRED)
 
 - Active P3-3 metadata snapshots now support local keyword retrieval, source/format/orientation/size filters, newest/oldest/name sorting, and pagination capped at 100 items.
 - Results are returned through Main Process retrieval IPC and reuse the existing P3-2 preview path. Revoked, removed, corrupt, unindexed, or disabled sources fail closed.
 - No provider calls, source mutation, Agent Context injection, watcher, second index, Shell, or new filesystem authorization was added.
 - P3-4 Strict Review: PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES. P3-4 close commit/tag is authorized before P3-5 implementation.
-- P3-5 is planning-only until its independent Taskbook is approved. P3-6 remains not started.
+- External GPT Strict Review: PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES.
+- P3-5 More Inspiration Sources: `CLOSED / PASS / BLOCKERS: 0`; close commit/tag is authorized after Strict Review.
+- P3-6 is planning-only until its independent Taskbook receives Strict Review approval. No P3-6 implementation has started.
 
 ## 当前阶段
 
@@ -33,7 +35,7 @@
 - `CURRENT-STATE.md` 负责权威当前摘要；`ROADMAP.md`、`ARCHITECTURE.md`、`DECISIONS.md`、精简 `CHANGELOG.md` 与 `HISTORY/` 按固定职责维护。
 - 新增 `project:knowledge:sync` 和 `project:knowledge:verify`；同步版本、latest recovery tag 与 Last Verified Git Snapshot，验证 Project Knowledge 文件结构、版本一致性和状态文档一致性。Git branch/HEAD/worktree 由 Pre-Flight 直接查询，不要求与 tracked 文档永久相等。
 - 根目录 `AGENTS.md` 已加入统一 Pre-Flight 与 Post-Flight：先读 Project Knowledge，修改后必须 sync/verify PASS 才能提交 Implementation Evidence。
-- 本任务不修改 P3-3，不启动 P3-4，不创建 close commit/tag，等待 Strict Review。
+- P3-5 已通过 Strict Review 并关闭；本任务不启动 P3-6，直到其独立 Taskbook 获批。
 
 ## TeemoChatAgentToolCalling M1（PASS / BLOCKERS: 0）
 
@@ -43,7 +45,7 @@
 - 普通 Chat 不开放 Git Tools、Controlled Execute、任意 Shell/PowerShell、任意程序执行、delete 或其他 destructive operation。
 - 已完成真实 Provider 的 `read_file` 与 `create_directory` 正常链路，以及 Permission DENY 无文件系统变化验证；`tool_call_id` 以原值作为 `role: tool` 结果回传后继续第二轮 Provider 回复。
 - Natural-language authorized-root alias / root grounding 仍可作为后续 UX Enhancement；它不属于 M1 关闭前的阻塞项，模型不得借此获得未授权路径。
-- P3-3 保持既有关闭状态，P3-4 仍未开始。M1 当前已通过 Gate；详细当前事实见 `docs/TeemoProjectKnowledge/CURRENT-STATE.md`。
+- P3-3 与 P3-4 保持既有关闭状态。M1 当前已通过 Gate；详细当前事实见 `docs/TeemoProjectKnowledge/CURRENT-STATE.md`。
 
 ## P3-3 已实现
 
@@ -52,7 +54,7 @@
 - Source identity 复用 P3 sourceId；itemId 使用 sourceId + normalized relative path；rename 为 remove + add。
 - Build/Refresh/Rebuild 使用 `inspiration://local-folder/<sourceId>` read Permission 和一次性 `inspiration_metadata_index` execution authorization。
 - 支持增量 metadata reuse、进度、取消、timeout、stale writer、显式 corruption rebuild、授权撤销隐藏和 Source removal cleanup。
-- 没有 Search、Embedding、Vector、Image Search、Eagle、NAS、Web、Watcher 或 Agent Context；P3-4 未开始。
+- 没有 Search、Embedding、Vector、Image Search、NAS、Web、Watcher 或 Agent Context；P3-6 未开始。
 
 ## 当前送审证据
 
@@ -60,9 +62,9 @@
 2. P3-3/P3-2/P3-1 各 2 Node + 1 Electron、P1/P2 22/22 Node、9/9 既有 Electron、32/32 benchmark、auto-update、版本、syntax、diff 与 sensitive scan 全部通过。
 3. Electron synthetic UI 截图为 2199 x 1316，SHA256 `0c05187d0039e5f43604c54fc93bde5525706db107be884281a57d75def42ba7`，无真实路径、凭据或正式素材。
 4. 全部文件将由唯一 implementation commit `Teemo: add P3-3 visual metadata index` 固化；实际 hash 在最终 Evidence 中报告。
-5. GPT Strict Review 已返回 `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-4`；P3-3 已封板并创建 close commit/tag，P3-4 仍未开始。
+5. P3-3 GPT Strict Review 已返回 `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-4`；P3-3/P3-4 已封板并创建 close commit/tag。
 6. remote push 未执行，正式 v1.2.1 不安装或重启 P3 开发版。
 
 ## 禁止扩展
 
-P3-3 已 `CLOSED / PASS / BLOCKERS: 0`；P3-4 尚未开始，仍禁止 Watcher、Eagle、NAS、Figma、网页平台、Search、Embedding、Vector DB、Image Similarity、Inspiration Context、Taste Signals、Cloud Sync、Multi-Agent 或 GUI Automation。
+P3-3/P3-4 已 `CLOSED / PASS / BLOCKERS: 0`；P3-5 仅允许已批准的 Eagle-compatible 本地只读连接器。P3-6 尚未开始，仍禁止 Watcher、NAS、Figma、网页平台、Search、Embedding、Vector DB、Image Similarity、Inspiration Context、Taste Signals、Cloud Sync、Multi-Agent 或 GUI Automation。

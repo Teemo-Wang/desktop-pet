@@ -3,9 +3,10 @@ const TeemoInspirationIndexClient = require('./TeemoInspirationIndexClient');
 
 function registerTeemoInspirationIndexIpc(ipcMain, options = {}) {
   const indexService = options.indexService;
+  const sourceService = options.sourceService;
   const permissionService = options.permissionService;
   const inspirationStateService = options.inspirationStateService || null;
-  if (!ipcMain || !indexService || !permissionService) {
+  if (!ipcMain || !indexService || !sourceService || !permissionService) {
     throw new Error('Teemo Inspiration Index IPC dependencies are incomplete.');
   }
   const channels = TeemoInspirationIndexClient.CHANNELS;
@@ -42,13 +43,22 @@ function registerTeemoInspirationIndexIpc(ipcMain, options = {}) {
     const toolCallId = TeemoInspirationContracts.safeText(payload.toolCallId, 120);
     const runId = payload.runId == null ? null : TeemoInspirationContracts.safeText(payload.runId, 120);
     const sessionId = payload.sessionId == null ? null : TeemoInspirationContracts.safeText(payload.sessionId, 120);
+    const sourceKind = TeemoInspirationContracts.safeText(payload.sourceKind, 32);
     if (!requestId || !sourceId || !['build', 'refresh', 'rebuild'].includes(mode) || operations.has(requestId)) {
       return { ok: false, error: TeemoInspirationContracts.publicError({ code: 'INSPIRATION_REQUEST_INVALID' }) };
     }
     if (!inspirationEnabled()) {
       return { ok: false, error: TeemoInspirationContracts.publicError({ code: 'INSPIRATION_DISABLED' }) };
     }
-    const resource = `inspiration://local-folder/${encodeURIComponent(sourceId)}`;
+    let trustedSource;
+    try { trustedSource = sourceService.getSource(sourceId); }
+    catch (error) { return { ok: false, error: TeemoInspirationContracts.publicError(error) }; }
+    if (!['local_folder', 'eagle_library'].includes(trustedSource.kind)
+      || sourceKind !== trustedSource.kind) {
+      return { ok: false, error: TeemoInspirationContracts.publicError({ code: 'INSPIRATION_PERMISSION_DENIED' }) };
+    }
+    const resourceType = trustedSource.kind === 'eagle_library' ? 'eagle-library' : 'local-folder';
+    const resource = `inspiration://${resourceType}/${encodeURIComponent(sourceId)}`;
     if (!permissionService.consumeExecutionAuthorization({
       toolCallId,
       runId,

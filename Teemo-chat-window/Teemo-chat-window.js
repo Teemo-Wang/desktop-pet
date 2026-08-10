@@ -48,6 +48,9 @@
     : null;
   const localFolderClient = window.TeemoLocalFolderClient
     ? new window.TeemoLocalFolderClient({ ipcRenderer })
+      : null;
+  const eagleLibraryClient = window.TeemoEagleLibraryClient
+    ? new window.TeemoEagleLibraryClient({ ipcRenderer })
     : null;
   const localFolderConnector = window.TeemoLocalFolderConnector && localFolderClient
     ? new window.TeemoLocalFolderConnector({ client: localFolderClient })
@@ -55,6 +58,13 @@
   if (inspirationRegistry && localFolderConnector
     && !(typeof process !== 'undefined' && process.env.TEEMO_INSPIRATION_DISABLE_LOCAL_FOLDER === '1')) {
     inspirationRegistry.register(localFolderConnector);
+  }
+  const eagleLibraryConnector = window.TeemoEagleLibraryConnector && eagleLibraryClient
+    ? new window.TeemoEagleLibraryConnector({ client: eagleLibraryClient })
+    : null;
+  if (inspirationRegistry && eagleLibraryConnector
+    && !(typeof process !== 'undefined' && process.env.TEEMO_INSPIRATION_DISABLE_EAGLE === '1')) {
+    inspirationRegistry.register(eagleLibraryConnector);
   }
   const inspirationAccessGuard = window.TeemoInspirationAccessGuard && inspirationRegistry
     ? new window.TeemoInspirationAccessGuard({ registry: inspirationRegistry, permissionService: permissionClient })
@@ -71,6 +81,7 @@
   window.teemoInspirationRegistry = inspirationRegistry;
   window.teemoInspirationService = inspirationService;
   window.teemoLocalFolderClient = localFolderClient;
+  window.teemoEagleLibraryClient = eagleLibraryClient;
   window.teemoInspirationIndexClient = inspirationIndexClient;
   window.teemoInspirationRetrievalClient = inspirationRetrievalClient;
   const fileClient = window.TeemoFileClient ? new window.TeemoFileClient({ ipcRenderer }) : null;
@@ -1736,6 +1747,7 @@
       inspirationCenter = new window.TeemoInspirationCenter({
         service: inspirationService,
         sourceClient: localFolderClient,
+        eagleLibraryClient,
         indexClient: inspirationIndexClient,
         retrievalClient: inspirationRetrievalClient,
         onBack: hideInspiration,
