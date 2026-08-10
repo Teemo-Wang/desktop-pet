@@ -4,12 +4,15 @@
  * through TeemoToolRegistry; filesystem, shell, Git and network tools are absent.
  */
 (function (root, factory) {
-  const AgentCore = factory();
+  const PlanningContract = root && root.TeemoPlanningContract
+    ? root.TeemoPlanningContract
+    : (typeof module === 'object' && module.exports ? require('../planning/TeemoPlanningContract') : null);
+  const AgentCore = factory(PlanningContract);
   // Electron renderer exposes CommonJS and window at the same time.
   if (root) root.TeemoAgentCore = AgentCore;
   if (typeof window !== 'undefined') window.TeemoAgentCore = AgentCore;
   if (typeof module === 'object' && module.exports) module.exports = AgentCore;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (PlanningContract) {
   const TERMINAL = new Set(['completed', 'cancelled', 'failed']);
 
   function makeId(prefix) {
@@ -491,6 +494,50 @@
       } catch (error) {
         run.status = error.name === 'AbortError' || error.code === 'AGENT_CANCELLED' ? 'cancelled' : 'failed';
         run.error = { code: error.code || 'AGENT_ERROR', message: error.message || 'Agent execution failed.' };
+        run.finishedAt = new Date().toISOString();
+        return { ok: false, run, error: { ...run.error, cancelled: run.status === 'cancelled' } };
+      } finally {
+        if (TERMINAL.has(run.status)) this.activeRuns.delete(run.runId);
+      }
+    }
+
+    async runPlanning(options = {}) {
+      const ai = options.aiService || this.aiService;
+      if (!PlanningContract) throw new Error('Agent Core requires TeemoPlanningContract.');
+      if (!ai || typeof ai.sendPlanning !== 'function') throw new Error('Agent Core requires a planning-capable AIService adapter.');
+      if (options.toolRegistry || options.tools) {
+        const error = new Error('Planning runs cannot receive tools or a Tool Registry.');
+        error.code = 'PLANNING_TOOLS_FORBIDDEN';
+        return { ok: false, run: null, error: { code: error.code, message: error.message, cancelled: false } };
+      }
+      const initialMessages = Array.isArray(options.messages) ? options.messages.map(message => ({ ...message })) : [];
+      let goal = options.goal;
+      if (goal == null) {
+        for (let index = initialMessages.length - 1; index >= 0; index -= 1) {
+          if (initialMessages[index] && initialMessages[index].role === 'user') { goal = initialMessages[index].content; break; }
+        }
+      }
+      const goalCheck = PlanningContract.validateGoal(goal);
+      const messages = [{ role: 'system', content: PlanningContract.RESPONSE_INSTRUCTIONS }, ...initialMessages];
+      const run = this.createRun({ ...options, messages });
+      run.planning = true;
+      run.status = 'thinking';
+      try {
+        if (!goalCheck.ok) throw Object.assign(new Error(goalCheck.error.message), { code: goalCheck.error.code });
+        const response = await ai.sendPlanning(messages, { signal: options.signal, timeout: options.timeout });
+        if (response && Array.isArray(response.tool_calls) && response.tool_calls.length) {
+          throw Object.assign(new Error('Planning provider returned unexpected tool calls.'), { code: 'PLANNING_UNEXPECTED_TOOL_CALL' });
+        }
+        const content = response && typeof response.content === 'string' ? response.content : '';
+        const validated = PlanningContract.parseResponse(content, { goal: goalCheck.value });
+        if (!validated.ok) throw Object.assign(new Error(validated.error.message), { code: validated.error.code });
+        run.plan = validated.plan;
+        run.status = 'completed';
+        run.finishedAt = new Date().toISOString();
+        return { ok: true, run, plan: validated.plan };
+      } catch (error) {
+        run.status = error.name === 'AbortError' || error.code === 'AGENT_CANCELLED' ? 'cancelled' : 'failed';
+        run.error = { code: error.code || 'PLANNING_FAILED', message: error.message || 'Planning failed.' };
         run.finishedAt = new Date().toISOString();
         return { ok: false, run, error: { ...run.error, cancelled: run.status === 'cancelled' } };
       } finally {

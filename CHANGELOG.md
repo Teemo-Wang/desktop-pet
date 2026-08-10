@@ -1,5 +1,10 @@
 # Changelog
 
+## P5-1 Autonomous Planning - 2026-08-10 (CLOSED / PASS)
+- Added an explicit planning-only Chat path with a provider-neutral request that omits Tool definitions and rejects unexpected provider tool calls before the Agent tool loop.
+- Plans are bounded, untrusted, session-local data with proposed/blocked steps only; revision and discard never execute Tools, request Permission, access filesystem/desktop, or persist plan state.
+- Added isolated Node and Electron smoke coverage. External GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES`. Recovery tag: `v1.3.2-p5.1-autonomous-planning`. P5-2/P5-3 remain not started; version remains `1.3.2`.
+
 ## P4 Final Acceptance - 2026-08-10 (CLOSED / PASS)
 - P4-1 Runtime / Screen Awareness, P4-2 Controlled Desktop Actions, and P4-3 Design Tool Adapters / Workflows passed cross-stage final acceptance without adding any feature, Tool, provider flow, desktop adapter, permission scope, filesystem/network capability, version change, installer, installation, or restart.
 - The final suite passed all focused P4 Node/Electron tests plus P1/M1, P2, and P3 regressions using synthetic inputs and isolated profiles only. No real display capture, OS input, ComfyUI/GPU, Provider, formal user data, or output directory was used.
@@ -278,3 +283,5 @@
 
 - 当前依赖树 `npm ci` 报告 11 项 audit vulnerabilities（10 high、1 critical），后续单独处理。
 - 旧兼容模块和外围存储逻辑暂未删除或完全迁移。
+- P5-1 Autonomous Planning is implemented and waiting for external GPT Strict Review. Explicit planning produces bounded, session-local proposed plans through a provider-neutral no-Tool request; plan data is never executed or persisted.
+- P5-2 Autonomous Execution / Verification and P5-3 Controlled Self-Upgrade remain not started. Version remains `1.3.2`; no installer build, installation, restart, close commit, or tag was created.

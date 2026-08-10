@@ -117,10 +117,12 @@ function verify() {
     'CLOSED / PASS',
     'P4:',
     'CLOSED / PASS / BLOCKERS: 0',
+    'P5:',
+    'P5-1 CLOSED / PASS / BLOCKERS: 0',
     'Next Allowed Stage:',
-    'P5 Taskbook design and external GPT Strict Review only; P5 implementation remains blocked.',
+    'P5-2 Taskbook design and external GPT Strict Review only; P5-2/P5-3 implementation remains blocked.',
     'Latest Closed Stage:',
-    'P4 Final Acceptance',
+    'P5-1 Autonomous Planning',
   ];
   for (const claim of requiredStateClaims) {
     if (!state.includes(claim)) {
@@ -150,6 +152,8 @@ function verify() {
     'P4 Final Acceptance',
     'Teemo-P4-FINAL-ACCEPTANCE.md',
     'v1.3.2-p4-final-acceptance',
+    'P5-1 Autonomous Planning',
+    'Teemo-P5-1-AUTONOMOUS-PLANNING.md',
     'P3 Personal Inspiration Final Acceptance',
     'CLOSED / PASS',
     'CAN_CLOSE_P3: YES',

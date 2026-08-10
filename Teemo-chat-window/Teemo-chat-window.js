@@ -21,7 +21,9 @@
   const skills = new window.SkillService();
   const history = new window.ChatHistoryService();
   const ai = new window.AIService();
+  const planningSessionState = window.TeemoPlanningSessionState ? new window.TeemoPlanningSessionState() : null;
   window.teemoAIService = ai;
+  window.teemoPlanningSessionState = planningSessionState;
   const cognitionService = window.TeemoCognitionService ? new window.TeemoCognitionService() : null;
   const cognitionCollector = window.TeemoCognitionCollector && cognitionService
     ? new window.TeemoCognitionCollector({ cognitionService })
@@ -158,6 +160,7 @@
     send: document.getElementById('sendButton'),
     upload: document.getElementById('uploadButton'),
     localDocument: document.getElementById('localDocumentButton'),
+    planningButton: document.getElementById('TeemoPlanningButton'),
     fileInput: document.getElementById('fileInput'),
     dropZone: document.getElementById('dropZone'),
     attachments: document.getElementById('attachmentList'),
@@ -293,6 +296,7 @@
   let pendingFiles = [];
   let sending = false;
   let abortController = null;
+  let planningMode = false;
   let dragDepth = 0;
   let selectedSkillId = null;
   let creatingSkill = false;
@@ -826,12 +830,14 @@
         if (event.target.closest('[data-delete], [data-pin], [data-move], .teemo-history-move-menu')) return;
         closeHistoryMoveMenus();
         history.setActive(item.dataset.session);
+        setPlanningMode(false);
         renderAll();
       });
       item.addEventListener('dblclick', event => {
         if (event.target.closest('[data-delete], [data-pin], [data-move], .teemo-history-move-menu')) return;
         event.preventDefault();
         history.setActive(item.dataset.session);
+        setPlanningMode(false);
         openRenameDialog();
       });
     });
@@ -1002,6 +1008,91 @@
     els.contextMeter.setAttribute('aria-label', tip);
   }
 
+  function setPlanningMode(enabled) {
+    planningMode = Boolean(enabled);
+    if (!els.planningButton) return;
+    els.planningButton.setAttribute('aria-pressed', planningMode ? 'true' : 'false');
+    els.planningButton.title = planningMode
+      ? '本次输入将只生成计划；再次点击取消规划模式'
+      : '仅为本次输入生成计划，不会执行任何操作';
+  }
+
+  function appendPlanList(container, title, values) {
+    if (!Array.isArray(values) || !values.length) return;
+    const heading = document.createElement('h4');
+    heading.textContent = title;
+    container.appendChild(heading);
+    const list = document.createElement('ul');
+    values.forEach(value => {
+      const item = document.createElement('li');
+      item.textContent = value;
+      list.appendChild(item);
+    });
+    container.appendChild(list);
+  }
+
+  function createPlanningArticle(sessionId, planState) {
+    if (!planState || !planState.plan) return null;
+    const plan = planState.plan;
+    const article = document.createElement('article');
+    article.className = 'teemo-message assistant teemo-plan-message';
+    const body = document.createElement('div');
+    body.className = 'teemo-message-body teemo-plan-view';
+    const heading = document.createElement('h3');
+    heading.textContent = '本次规划（仅供当前会话参考）';
+    body.appendChild(heading);
+    const goal = document.createElement('p');
+    goal.textContent = plan.goal;
+    body.appendChild(goal);
+    appendPlanList(body, '前提', plan.assumptions);
+    appendPlanList(body, '约束', plan.constraints);
+    const stepsHeading = document.createElement('h4');
+    stepsHeading.textContent = '建议步骤';
+    body.appendChild(stepsHeading);
+    const steps = document.createElement('ol');
+    plan.steps.forEach(step => {
+      const item = document.createElement('li');
+      item.textContent = `${step.title}: ${step.description}`;
+      if (step.status === 'blocked') {
+        const status = document.createElement('span');
+        status.className = 'teemo-plan-step-status';
+        status.textContent = '（待确认）';
+        item.appendChild(document.createTextNode(' '));
+        item.appendChild(status);
+      }
+      steps.appendChild(item);
+    });
+    body.appendChild(steps);
+    appendPlanList(body, '风险', plan.risks);
+    appendPlanList(body, '成功标准', plan.successCriteria);
+    const actions = document.createElement('div');
+    actions.className = 'teemo-plan-actions';
+    const revise = document.createElement('button');
+    revise.type = 'button';
+    revise.textContent = '修订规划';
+    revise.addEventListener('click', () => {
+      const active = history.getActive();
+      if (!active || active.id !== sessionId) return;
+      els.input.value = plan.goal;
+      resizeInput();
+      setPlanningMode(true);
+      els.input.focus();
+      setStatus('已载入规划目标，可修订后重新生成');
+    });
+    const discard = document.createElement('button');
+    discard.type = 'button';
+    discard.textContent = '丢弃规划';
+    discard.addEventListener('click', () => {
+      planningSessionState.discard(sessionId);
+      renderMessages();
+      setStatus('规划已丢弃');
+    });
+    actions.append(revise, discard);
+    body.appendChild(actions);
+    article.appendChild(body);
+    return article;
+  }
+
   function renderMessages() {
     const active = ensureSession();
     els.title.textContent = active.title || '新对话';
@@ -1027,6 +1118,9 @@
     if (window.Markdown && window.Markdown.bindCopyButtons) {
       window.Markdown.bindCopyButtons(els.messages);
     }
+    const planState = planningSessionState && planningSessionState.get(active.id);
+    const planArticle = createPlanningArticle(active.id, planState);
+    if (planArticle) els.messages.appendChild(planArticle);
     scrollToBottom(false);
     updateContextMeter();
   }
@@ -3199,12 +3293,17 @@
     }
     refreshModelConfig();
     const text = els.input.value.trim();
-    if (!pendingFiles.some(file => file.state === 'ready')) {
+    const planningRequest = planningMode;
+    if (!planningRequest && !pendingFiles.some(file => file.state === 'ready')) {
       const attached = await attachLocalDocumentFromText(text);
       if (!attached) return;
     }
     const readyFiles = pendingFiles.filter(file => file.state === 'ready');
     if (!text && !readyFiles.length) return;
+    if (planningRequest && readyFiles.length) {
+      setStatus('规划请求不接受附件，请仅输入目标文字', true);
+      return;
+    }
     if (pendingFiles.some(file => file.state === 'reading')) {
       setStatus('请等待文件读取完成', true);
       return;
@@ -3223,7 +3322,7 @@
     history.addMessage('user', displayText);
     renderMessages();
 
-    const assistant = history.addMessage('assistant', '');
+    const assistant = planningRequest ? null : history.addMessage('assistant', '');
     renderHistory();
     const article = document.createElement('article');
     article.className = 'teemo-message assistant';
@@ -3244,6 +3343,38 @@
     // 避免发送后消息区短暂空白，让用户能立即确认 Teemo 已经开始处理。
     await new Promise(resolve => requestAnimationFrame(resolve));
     try {
+      if (planningRequest) {
+        const activePlanningSession = history.getActive();
+        // Planning receives the explicit goal only, never prior Chat/attachment content.
+        const planningMessages = [{ role: 'user', content: requestText }];
+        const planningResult = await agentCore.runPlanning({
+          messages: planningMessages,
+          goal: requestText,
+          sessionId: activePlanningSession && activePlanningSession.id || null,
+          aiService: ai,
+          signal: abortController.signal,
+        });
+        if (!planningResult.ok) {
+          if (planningResult.error.cancelled) throw new DOMException('已停止生成', 'AbortError');
+          throw new Error(planningResult.error.message);
+        }
+        const ownerId = activePlanningSession && activePlanningSession.id;
+        const existing = planningSessionState && planningSessionState.get(ownerId);
+        const saved = planningSessionState && (existing
+          ? planningSessionState.revise(ownerId, planningResult.plan)
+          : planningSessionState.set(ownerId, planningResult.plan));
+        if (!saved || !saved.ok) throw new Error('Planning session state is unavailable.');
+        setPlanningMode(false);
+        const planArticle = createPlanningArticle(ownerId, saved.value);
+        if (planArticle) {
+          els.messages.appendChild(planArticle);
+          scrollToBottom();
+        }
+        body.remove();
+        article.remove();
+        setStatus(existing ? '规划已修订' : '规划已生成');
+        return;
+      }
       if (window.teemoWebBrowse && window.teemoWebBrowse.extractUrls(requestText).length) {
         article.hidden = false;
         body.classList.remove('teemo-thinking');
@@ -3452,7 +3583,7 @@
           full = await ai.stream(apiMessages, onChunk, abortController.signal);
         }
       }
-      if (!useImageGen) {
+      if (!planningRequest && !useImageGen) {
         assistant.content = window.TeemoMessageSanitize
           ? window.TeemoMessageSanitize.stripForApi(full || '模型没有返回内容')
           : stripDataUrls(full || '模型没有返回内容');
@@ -3464,8 +3595,10 @@
             : stripDataUrls(full);
         }
       }
-      history.updateLastMessage(assistant.content);
-      history.flush();
+      if (!planningRequest) {
+        history.updateLastMessage(assistant.content);
+        history.flush();
+      }
       body.classList.remove('teemo-thinking');
       body.innerHTML = window.Markdown.render(full || assistant.content);
       if (useImageGen) bindThumbnailOpen(body, assistant.content);
@@ -3477,9 +3610,13 @@
       article.hidden = false;
       const stopped = abortController && abortController.signal.aborted;
       const errorText = stopped ? (full || '已停止生成') : `⚠️ ${error.message || '请求失败'}`;
-      assistant.content = errorText;
-      history.updateLastMessage(errorText);
-      history.flush();
+      if (!planningRequest) {
+        assistant.content = errorText;
+        history.updateLastMessage(errorText);
+        history.flush();
+      } else {
+        setPlanningMode(false);
+      }
       body.classList.remove('teemo-thinking');
       body.innerHTML = window.Markdown.render(errorText);
       setStatus(stopped ? '已停止' : '回复失败', !stopped);
@@ -3537,6 +3674,7 @@
 
   els.newChat.addEventListener('click', () => {
     history.create(systemPrompt);
+    setPlanningMode(false);
     pendingFiles = [];
     renderAttachments();
     renderAll();
@@ -3545,8 +3683,10 @@
   });
   els.clearChat.addEventListener('click', () => {
     const active = history.getActive();
+    if (active && planningSessionState) planningSessionState.discard(active.id);
     if (active) history.remove(active.id);
     history.create(systemPrompt);
+    setPlanningMode(false);
     renderAll();
     setStatus('当前对话已清空');
   });
@@ -3561,6 +3701,11 @@
     if (event.key === 'Enter') saveRename();
     if (event.key === 'Escape') closeRenameDialog();
   });
+  if (els.planningButton) {
+    els.planningButton.addEventListener('click', () => {
+      if (!sending) setPlanningMode(!planningMode);
+    });
+  }
   els.settingsButton.addEventListener('click', showSettings);
   els.settingsBack.addEventListener('click', hideSettings);
   if (els.memoryButton) els.memoryButton.addEventListener('click', showMemory);

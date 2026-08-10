@@ -1,5 +1,13 @@
 # Teemo助理 — 项目进度与规划
 
+## P5-1 Autonomous Planning (CLOSED / PASS / BLOCKERS: 0)
+
+- Taskbook: `docs/Teemo-P5-1-AUTONOMOUS-PLANNING.md`.
+- Scope is explicit planning only: bounded session-local plan creation, revision, and discard. It adds no Tool execution, P1 Permission request, filesystem, desktop, ComfyUI, Shell, program execution, Git, Controlled Execute, delete, self-upgrade, background run, or autonomous execution.
+- External GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES / P5_2_STARTED: NO / P5_3_STARTED: NO`.
+- External GPT Strict Review of implementation evidence: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / P5_2_STARTED: NO / P5_3_STARTED: NO`.
+- P5-1 is closed under recovery tag `v1.3.2-p5.1-autonomous-planning`. P5-2, P5-3, and P5 Final Acceptance remain `NOT STARTED` and require separate Taskbooks.
+
 ## P4 Final Acceptance (CLOSED / PASS / BLOCKERS: 0)
 
 - Taskbook: `docs/Teemo-P4-FINAL-ACCEPTANCE.md`.
@@ -8,7 +16,7 @@
 - External GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES / P5_STARTED: NO`.
 - P4 final verification, focused P4 Node/Electron acceptance, and P1/M1, P2, and P3 regressions passed using synthetic test data only.
 - Final implementation-evidence Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P4 Final close commit/tag only; P5 NOT ALLOWED / P5_STARTED: NO`.
-- P4 is closed under recovery tag `v1.3.2-p4-final-acceptance`. P5 remains `NOT STARTED`; no P5 Taskbook or implementation has been created.
+- P4 is closed under recovery tag `v1.3.2-p4-final-acceptance`. P5-1 is later closed under its own recovery tag; P5-2/P5-3 remain not started.
 
 ## P4-1 Runtime / Screen Awareness (CLOSED / PASS)
 
@@ -63,7 +71,7 @@
 - Final GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_P3: YES / NEXT_STAGE_ALLOWED: P3 Final close commit/tag only; P4/P5 NOT ALLOWED`.
 - P3 is closed. Recovery tag: `v1.3.2-p3-final-acceptance`. P4/P5 remain not started and require independent approved Taskbooks.
 
-> 文档版本：v1.3.2 ｜ 更新日期：2026-08-10 ｜ 当前开发版本：**v1.3.2（P3 CLOSED / PASS；P4 CLOSED / PASS）**
+> 文档版本：v1.3.2 ｜ 更新日期：2026-08-10 ｜ 当前开发版本：**v1.3.2（P3 CLOSED / PASS；P4 CLOSED / PASS；P5-1 CLOSED / PASS）**
 
 ## 当前状态
 
@@ -83,7 +91,7 @@
 - P3-6：`CLOSED / PASS / BLOCKERS: 0`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
 - P3 Baseline：`cd29e6f` / `v1.2.1-p3-baseline`
-- Current Development：`P4 CLOSED / PASS; P5 NOT STARTED`
+- Current Development：`P5-1 Autonomous Planning CLOSED / PASS; P5-2 NOT STARTED`
 - Current Branch：`Teemo/p3-personal-inspiration`
 
 P3-3 GPT Strict Review：`PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-4`。

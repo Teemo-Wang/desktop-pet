@@ -458,6 +458,18 @@ button { color: inherit; }
 #messageInput::placeholder { color: #767676; }
 .teemo-composer-tools { min-height: 32px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .teemo-composer-left,.teemo-composer-right { display: flex; align-items: center; gap: 9px; color: #737373; font-size: 10px; }
+.teemo-planning-button { min-width: 44px; height: 28px; padding: 0 9px; border: 1px solid #555; border-radius: 5px; background: transparent; color: #b8b8b8; cursor: pointer; font-size: 12px; }
+.teemo-planning-button[aria-pressed="true"] { border-color: #57a6ff; background: #173b63; color: #d9edff; }
+.teemo-plan-message { max-width: 850px; }
+.teemo-plan-view { border-left: 3px solid #57a6ff; padding: 12px 14px; background: #242a30; }
+.teemo-plan-view h3 { margin: 0 0 8px; font-size: 14px; color: #e7f2ff; }
+.teemo-plan-view h4 { margin: 12px 0 5px; font-size: 12px; color: #9ecbff; }
+.teemo-plan-view p { margin: 0; color: #d2d8dd; white-space: pre-wrap; }
+.teemo-plan-view ul, .teemo-plan-view ol { margin: 5px 0; padding-left: 20px; color: #d2d8dd; }
+.teemo-plan-view li { margin: 4px 0; }
+.teemo-plan-step-status { color: #ffca75; font-size: 11px; }
+.teemo-plan-actions { display: flex; gap: 8px; margin-top: 14px; }
+.teemo-plan-actions button { border: 1px solid #5b6770; border-radius: 4px; background: transparent; color: #d4e6f7; padding: 5px 9px; cursor: pointer; }
 .teemo-context-meter {
   width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; padding: 0;
   border: 0; border-radius: 50%; background: transparent; color: #8a8a8a; cursor: help;
