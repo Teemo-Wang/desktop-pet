@@ -1,5 +1,13 @@
 # Changelog
 
+## P4-1 Runtime / Screen Awareness - 2026-08-10 (CLOSED / PASS)
+- Added an explicit, Main Process-only display snapshot foundation with opaque display references, P1 read Permission, one-shot execution authorization, owner-bound IPC, bounded in-memory preview, discard, and expiry.
+- Screen pixels and display metadata do not enter AIService, Provider adapters, Agent Core, ordinary Chat, Tool definitions/results, filesystem persistence, logs, or telemetry. Automated tests inject synthetic display/image data only.
+- P4-1 does not add any Chat Tool, desktop action, Shell, PowerShell, Git, Controlled Execute, program execution, delete, OCR, Provider Vision, or P4-2/P4-3 capability.
+- External GPT Strict Review of implementation evidence: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P4-2 Taskbook Review only`.
+- Recovery tag: `v1.3.2-p4.1-runtime-screen-awareness`.
+- Implementation evidence is awaiting external GPT Strict Review; no close commit/tag has been created.
+
 ## P3-4 Inspiration Retrieval - 2026-08-10 (CLOSED / PASS)
 - Added local retrieval over P3-3 active metadata with keyword, source, format, orientation, size, sorting, and bounded pagination.
 - Main Process revalidates Source/P1 authorization; revoked, removed, corrupt, unindexed, and disabled sources fail closed.

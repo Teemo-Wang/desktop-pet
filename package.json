@@ -27,6 +27,8 @@
     "test:eagle-library-ui-smoke": "electron tests/TeemoEagleLibraryElectronSmoke.js",
     "test:agent-core": "node tests/TeemoAgentCore.test.js",
     "test:chat-tool-calling-ui-smoke": "electron tests/TeemoChatToolCallingElectronSmoke.js",
+    "test:screen-awareness": "node tests/TeemoScreenService.test.js",
+    "test:screen-awareness-ui-smoke": "electron tests/TeemoScreenElectronSmoke/TeemoScreenElectronSmoke.js",
     "test:cognition": "node tests/TeemoCognition.test.js",
     "test:cognition-management": "node tests/TeemoCognitionManagement.test.js",
     "test:cognition-ui-smoke": "electron tests/TeemoCognitionCenterElectronSmoke.js",

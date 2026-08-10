@@ -1,6 +1,14 @@
 # Teemo助理 V1.3.2 使用 SOP
 
-## P3-4 Inspiration Retrieval (IMPLEMENTED / WAITING REVIEW)
+## P4-1 Runtime / Screen Awareness (CLOSED / PASS)
+
+Chat Window now includes a local-only `Runtime / Screen Awareness` page. Choose an opaque display reference, explicitly request one snapshot, respond to the P1 read permission prompt, and review the bounded local preview. Use `Discard` when finished; previews also expire automatically.
+
+The snapshot stays in Main Process memory for its requesting window only. It is not written to files, chat history, logs, or Git, and it is never sent to AI providers or Agent context. P4-1 does not let Teemo click, type, control windows, access the clipboard, record the screen, or perform any desktop action.
+
+P4-2 Controlled Desktop Actions is not available until its own Taskbook and Strict Review are complete.
+
+## P3-4 Inspiration Retrieval (CLOSED / PASS)
 
 “我的灵感”现在可对已建立的本地 Metadata Index 做关键词检索。支持文件名/相对路径 substring、来源、PNG/JPEG/WEBP/GIF、横向/纵向/正方形、最小宽高、最新/最早/名称排序和最多 100 项分页。结果点击复用现有预览。
 

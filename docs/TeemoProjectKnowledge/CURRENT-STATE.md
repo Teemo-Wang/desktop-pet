@@ -40,6 +40,9 @@ P3-5:
 P3-6:
 `CLOSED / PASS`
 
+P4:
+`P4-1 CLOSED / PASS / BLOCKERS: 0`
+
 Maintenance M1:
 `TeemoChatAgentToolCalling`
 
@@ -67,22 +70,22 @@ Known Non-Blocking Limitation:
 `Natural-language authorized-root alias / root grounding UX`
 
 Current Maintenance:
-`TeemoProjectKnowledge SSOT`
+`None`
 
 Current Stage:
-`P3 Personal Inspiration; CLOSED / PASS`
+`P4-2 Controlled Desktop Actions; Taskbook Gate / NOT STARTED`
 
 Current Task:
-`No active implementation task; P3 is CLOSED / PASS`
+`P4-2 Taskbook proposal and external GPT Strict Review only; no implementation`
 
 Current Blockers:
-`No active P3 blocker. P4/P5 require independent approved Taskbooks.`
+`P4-2 implementation requires an independently approved Taskbook and external GPT Strict Review.`
 
 Next Allowed Stage:
-`P4 requires an independent approved Taskbook.`
+`P4-2 Taskbook Strict Review only; P4-2 implementation remains blocked.`
 
 Latest Closed Stage:
-`P3 Personal Inspiration Final Acceptance`
+`P4-1 Runtime / Screen Awareness`
 
 ## Agent Capability State
 
@@ -94,7 +97,7 @@ P3-5 Eagle-compatible connector is closed with zero blockers. It is a local-only
 
 P3-6 Agent Uses Inspiration is closed with GPT Strict Review approval. It provides an explicit-request-only, bounded retrieval-to-context path that reuses P3-4 Retrieval, exposes only bounded public metadata as untrusted reference data, keeps Provider and filesystem boundaries provider-neutral, and fails closed for disabled, revoked, removed, corrupt, or unavailable sources. P4 and P5 have not started.
 
-P3 Personal Inspiration is closed with final GPT Strict Review approval. P3-1 through P3-6 remain independently closed, and the final acceptance adds no product capability. P4 and P5 remain not started and require independent approved Taskbooks.
+P3 Personal Inspiration is closed with final GPT Strict Review approval. P3-1 through P3-6 remain independently closed, and the final acceptance adds no product capability. P4-1 Runtime / Screen Awareness is closed with external GPT implementation-evidence approval and recovery tag `v1.3.2-p4.1-runtime-screen-awareness`. P4-2 is limited to its Taskbook gate; P4-3 through P4 Final Acceptance and P5 remain not started.
 
 <!-- TEEMO_PROJECT_KNOWLEDGE_AUTO:START -->
 - Version: `1.3.2`
@@ -105,6 +108,6 @@ P3 Personal Inspiration is closed with final GPT Strict Review approval. P3-1 th
 This is a historical snapshot written when Project Knowledge was last synchronized. Git branch, HEAD, and worktree are real-time engineering facts and must be queried directly during Agent Pre-Flight.
 
 - Branch: `Teemo/p3-personal-inspiration`
-- HEAD: `285e597cfa7f84b7107aaa13bb800808088c33a9`
-- Worktree: `CLEAN`
+- HEAD: `eac0572e3ff065f266cdabf362d3a7c735a05252`
+- Worktree: `DIRTY`
 <!-- TEEMO_PROJECT_KNOWLEDGE_AUTO:END -->

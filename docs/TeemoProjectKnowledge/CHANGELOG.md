@@ -3,7 +3,10 @@
 ## 1.3.2
 
 Current:
-P3 Personal Inspiration is closed with zero blockers after final GPT Strict Review. P3-1 through P3-6 remain closed; final acceptance introduced no new product capability. P4/P5 remain not started.
+P3 Personal Inspiration is closed with zero blockers after final GPT Strict Review. P3-1 through P3-6 remain closed; final acceptance introduced no new product capability. P4-1 Runtime / Screen Awareness is closed after external GPT implementation-evidence Strict Review returned `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES`. P4-2 is at its independent Taskbook gate; P4-2/P4-3/P4 Final Acceptance/P5 implementation remains not started.
+
+Added:
+P4-1 explicit local-only screen awareness: opaque display references, P1 read permission, one-shot Main execution authorization, Main Process screen-only capture, owner-bound bounded in-memory preview, discard, and expiry. Screen data has no Provider/Agent/persistence path and automated tests use synthetic data only.
 
 Added:
 P3-5 source registration, bounded Eagle metadata indexing, existing retrieval/preview reuse, and fail-closed P1 authorization checks. Provider calls remain zero and source bytes remain unchanged.

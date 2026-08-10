@@ -1,10 +1,12 @@
-const { app, BrowserWindow, screen, ipcMain, session, net, dialog, shell, nativeImage, Tray, Menu } = require('electron');
+const { app, BrowserWindow, screen, desktopCapturer, ipcMain, session, net, dialog, shell, nativeImage, Tray, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const TeemoFileService = require('./src/services/TeemoFileService');
 const TeemoPermissionService = require('./src/permissions/TeemoPermissionService');
 const registerTeemoPermissionIpc = require('./src/permissions/TeemoPermissionIpc');
+const TeemoScreenService = require('./src/runtime/TeemoScreenService');
+const registerTeemoScreenIpc = require('./src/runtime/TeemoScreenIpc');
 const registerTeemoFileToolIpc = require('./src/tools/file/TeemoFileToolIpc');
 const TeemoGitService = require('./src/services/TeemoGitService');
 const registerTeemoGitToolIpc = require('./src/tools/git/TeemoGitToolIpc');
@@ -37,6 +39,33 @@ const teemoGitService = new TeemoGitService({ fileService });
 const teemoExecuteService = new TeemoExecuteService({ fileService });
 const teemoPermissionService = new TeemoPermissionService();
 registerTeemoPermissionIpc(ipcMain, teemoPermissionService);
+const teemoScreenService = new TeemoScreenService({
+  displayProvider: {
+    list: () => screen.getAllDisplays().map(display => ({
+      nativeId: String(display.id),
+      width: display.bounds.width,
+      height: display.bounds.height,
+    })),
+  },
+  captureProvider: {
+    capture: async (nativeId, limits) => {
+      const sources = await desktopCapturer.getSources({
+        types: ['screen'],
+        thumbnailSize: { width: limits.maxWidth, height: limits.maxHeight },
+      });
+      const source = sources.find(candidate => String(candidate.display_id || '') === String(nativeId));
+      if (!source || !source.thumbnail || source.thumbnail.isEmpty()) {
+        throw TeemoScreenService.screenError('SCREEN_DISPLAY_UNAVAILABLE', 'The selected display is unavailable.');
+      }
+      const size = source.thumbnail.getSize();
+      return { png: source.thumbnail.toPNG(), width: size.width, height: size.height };
+    },
+  },
+});
+registerTeemoScreenIpc(ipcMain, {
+  screenService: teemoScreenService,
+  permissionService: teemoPermissionService,
+});
 
 function localAccessFilePath() {
   return path.join(app.getPath('userData'), LOCAL_ACCESS_FILE);

@@ -115,8 +115,10 @@ function verify() {
     'CLOSED / PASS',
     'P3-6:',
     'CLOSED / PASS',
+    'P4:',
+    'P4-1 CLOSED / PASS / BLOCKERS: 0',
     'Next Allowed Stage:',
-    'P4 requires an independent approved Taskbook.',
+    'P4-2 Taskbook Strict Review only; P4-2 implementation remains blocked.',
   ];
   for (const claim of requiredStateClaims) {
     if (!state.includes(claim)) {
@@ -134,6 +136,10 @@ function verify() {
   const currentTask = fs.readFileSync(path.join(projectRoot, 'CURRENT-TASK.md'), 'utf8');
   const projectStatus = fs.readFileSync(path.join(projectRoot, 'PROJECT-STATUS.md'), 'utf8');
   const currentTaskClaims = [
+    'P4-1 Runtime / Screen Awareness',
+    'CLOSED / PASS',
+    'CAN_CLOSE_AND_TAG: YES',
+    'Teemo-P4-1-RUNTIME-SCREEN-AWARENESS.md',
     'P3 Personal Inspiration Final Acceptance',
     'CLOSED / PASS',
     'CAN_CLOSE_P3: YES',

@@ -41,6 +41,11 @@
           <div><strong>我的灵感</strong><span>个人灵感系统</span></div>
           <span class="teemo-settings-chevron">›</span>
         </button>
+        <button class="teemo-sidebar-memory teemo-sidebar-runtime" id="TeemoRuntimeButton" title="查看运行环境">
+          <span class="teemo-sidebar-memory-icon">▣</span>
+          <div><strong>运行环境</strong><span>本地屏幕感知</span></div>
+          <span class="teemo-settings-chevron">›</span>
+        </button>
         <button class="teemo-sidebar-foot" id="settingsButton" title="打开设置">
           <img src="../icon/Teemo-app.png" alt="">
           <div><strong>Teemo</strong><span id="modelLabel">私人助理</span></div>
@@ -269,6 +274,29 @@
               <div class="teemo-inspiration-entry-list" id="TeemoInspirationEntryList"></div>
               <div class="teemo-inspiration-preview" id="TeemoInspirationPreview"><span>选择支持的图片进行预览</span></div>
             </div>
+          </section>
+        </div>
+      </main>
+
+      <main class="teemo-settings-page teemo-runtime-page" id="TeemoRuntimeView" hidden>
+        <div class="teemo-settings-head teemo-memory-head">
+          <button id="TeemoRuntimeBackButton" class="teemo-back-button">← 返回聊天</button>
+          <div class="teemo-memory-head-copy"><h1>运行环境</h1><p>只在你确认后获取一次本地屏幕预览</p></div>
+        </div>
+        <div class="teemo-runtime-content">
+          <section class="teemo-runtime-privacy">
+            <div><span>Local only</span><strong>屏幕内容不会发送给对话模型</strong><p>预览只保留在当前窗口的短时内存中，离开此页、手动丢弃或到期后会清除。</p></div>
+            <em>显式授权</em>
+          </section>
+          <div class="teemo-runtime-status" id="TeemoRuntimeStatus" aria-live="polite"></div>
+          <section class="teemo-runtime-capture" aria-labelledby="TeemoRuntimeCaptureTitle">
+            <header><div><span>Screen awareness</span><h2 id="TeemoRuntimeCaptureTitle">本地屏幕预览</h2><p>选择一个显示器后，Teemo 会在执行前再次请求本次读取权限。</p></div></header>
+            <div class="teemo-runtime-actions">
+              <label><span>显示器</span><select id="TeemoRuntimeDisplay" aria-label="选择显示器"></select></label>
+              <button class="teemo-primary-button" id="TeemoRuntimeCaptureButton" type="button">获取预览</button>
+              <button class="teemo-secondary-button" id="TeemoRuntimeDiscardButton" type="button" disabled>丢弃预览</button>
+            </div>
+            <div class="teemo-runtime-preview" id="TeemoRuntimePreview"><span>尚未获取本地预览</span></div>
           </section>
         </div>
       </main>
@@ -550,6 +578,7 @@
   <script src="../src/creative/TeemoChallengeContextBuilder.js"></script>
   <script src="../src/permissions/TeemoPermissionPrompt.js"></script>
   <script src="../src/permissions/TeemoPermissionClient.js"></script>
+  <script src="../src/runtime/TeemoScreenClient.js"></script>
   <script src="../src/tools/TeemoToolRegistry.js"></script>
   <script src="../src/tools/TeemoBuiltinTools.js"></script>
   <script src="../src/tools/file/TeemoFileClient.js"></script>

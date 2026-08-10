@@ -1,5 +1,19 @@
 # Teemo助理 — 项目进度与规划
 
+## P4-1 Runtime / Screen Awareness (CLOSED / PASS)
+
+- P3 Personal Inspiration is `CLOSED / PASS / BLOCKERS: 0`, with recovery tag `v1.3.2-p3-final-acceptance`.
+- P4 began with roadmap stage P4-1. Its Taskbook is `docs/Teemo-P4-1-RUNTIME-SCREEN-AWARENESS.md`.
+- P4-1 is explicit, local-only runtime display awareness plus a single P1-permissioned Main Process snapshot for local bounded in-memory preview. It has no Provider or Agent screen-data path.
+- P4-1 Taskbook received external GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES`.
+- P4-1 implementation adds only an explicit local display snapshot path: opaque display ref -> P1 read Permission -> Main one-shot execution authorization -> Main Process `desktopCapturer` screen source -> bounded in-memory owner preview -> discard/expiry.
+- No screenshot or display data reaches AIService, Provider adapters, Agent Core, ordinary Chat, Tool definitions/results, persistence, logs, or telemetry. Tests use injected synthetic data only; no real display was captured.
+- `test:screen-awareness` (20 assertions), real Chat Window `test:screen-awareness-ui-smoke` (25 assertions), P1/M1, P2/P3 Node, and P2/P3/M1 Electron regressions passed.
+- Implementation evidence received external GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P4-2 Taskbook Review only`.
+- P4-1 is closed under recovery tag `v1.3.2-p4.1-runtime-screen-awareness`. P4-2 Controlled Desktop Actions may proceed only as a separate Taskbook and external GPT Strict Review; its implementation remains `NOT STARTED`.
+- P4-3 Design Tool Adapters / Workflows, P4 Final Acceptance, and P5 remain `NOT STARTED`.
+- Chat Safe File Tools, P1 authorized-root enforcement, M1 restrictions, closed P3 stages, and the version remain unchanged.
+
 ## P3 Personal Inspiration Final Acceptance (CLOSED / PASS)
 
 - Local retrieval is implemented over active P3-3 metadata snapshots with keyword, source, format, orientation, minimum-size, sorting, and bounded pagination filters.
@@ -15,7 +29,7 @@
 - Final GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_P3: YES / NEXT_STAGE_ALLOWED: P3 Final close commit/tag only; P4/P5 NOT ALLOWED`.
 - P3 is closed. Recovery tag: `v1.3.2-p3-final-acceptance`. P4/P5 remain not started and require independent approved Taskbooks.
 
-> 文档版本：v1.32 ｜ 更新日期：2026-08-10 ｜ 当前开发版本：**v1.3.2（P3-6 CLOSED / PASS；P3 Final Acceptance Taskbook pending）**
+> 文档版本：v1.3.2 ｜ 更新日期：2026-08-10 ｜ 当前开发版本：**v1.3.2（P3 CLOSED / PASS；P4-1 CLOSED / PASS；P4-2 Taskbook Gate）**
 
 ## 当前状态
 
@@ -35,7 +49,7 @@
 - P3-6：`CLOSED / PASS / BLOCKERS: 0`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
 - P3 Baseline：`cd29e6f` / `v1.2.1-p3-baseline`
-- Current Development：`TeemoProjectKnowledge SSOT`
+- Current Development：`P4-2 Controlled Desktop Actions Taskbook Gate`
 - Current Branch：`Teemo/p3-personal-inspiration`
 
 P3-3 GPT Strict Review：`PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-4`。

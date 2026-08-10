@@ -1,5 +1,17 @@
 # Current Task
 
+## P4-2 Controlled Desktop Actions (TASKBOOK GATE / NOT STARTED)
+
+- P3 Personal Inspiration is `CLOSED / PASS / BLOCKERS: 0`; recovery tag: `v1.3.2-p3-final-acceptance`.
+- P4-1 Runtime / Screen Awareness is `CLOSED / PASS / BLOCKERS: 0`. Its implementation evidence received external GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P4-2 Taskbook Review only`.
+- P4-1 closed capability: explicit local display selection, P1 read permission, one-shot Main execution authorization, owner-bound Main capture, bounded in-memory local preview, discard, and expiry. Provider/Agent calls for screen data remain zero.
+- P4-1 used only injected synthetic data in Node and isolated Chat Window Electron smoke. It adds no Provider/Agent screen context, ordinary Chat Tools, desktop actions, mouse/keyboard/clipboard access, filesystem persistence, Shell, PowerShell, Git, Controlled Execute, program execution, delete, or destructive behavior.
+- P4-2 may begin only as its own Taskbook and external GPT Strict Review. P4-2 implementation, P4-3 Design Tool Adapters / Workflows, P4 Final Acceptance, and P5 are not started.
+- Taskbook: `docs/Teemo-P4-1-RUNTIME-SCREEN-AWARENESS.md`.
+- P4-1 Taskbook received external GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES`.
+- Synthetic Node and real Chat Window Electron smoke cover allow/deny, missing execution authorization, owner isolation, expiry/discard, no direct renderer capture, and unchanged ordinary Chat Tool allowlist. P1/P2/P3/M1 regressions passed.
+- The authorized P4-1 recovery tag is `v1.3.2-p4.1-runtime-screen-awareness`; no P4-2 code is included in the P4-1 close commit.
+
 ## P3 Personal Inspiration Final Acceptance (CLOSED / PASS)
 
 - Active P3-3 metadata snapshots now support local keyword retrieval, source/format/orientation/size filters, newest/oldest/name sorting, and pagination capped at 100 items.
@@ -20,8 +32,8 @@
 
 - Product：Teemo助理
 - Branch：`Teemo/p3-personal-inspiration`
-- Phase：P3 Final Acceptance
-- State：`P3 CLOSED / PASS / BLOCKERS: 0`
+- Phase：P4-2 Controlled Desktop Actions Taskbook Gate
+- State：`NOT STARTED`
 - Installed App Version：`v1.3.2`
 - Development App Version：`v1.3.2`
 - P3 Baseline：`cd29e6f` / `v1.2.1-p3-baseline`

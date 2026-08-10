@@ -44,6 +44,7 @@
   window.teemoCreativeDirectorState = creativeDirectorState;
   window.teemoChallengeContextBuilder = challengeContextBuilder;
   const permissionClient = window.TeemoPermissionClient ? new window.TeemoPermissionClient({ ipcRenderer }) : null;
+  const screenClient = window.TeemoScreenClient ? new window.TeemoScreenClient({ ipcRenderer }) : null;
   const inspirationRegistry = window.TeemoInspirationConnectorRegistry
     ? new window.TeemoInspirationConnectorRegistry()
     : null;
@@ -100,6 +101,7 @@
   }
   // Ordinary chat exposes only P1 file tools. Git and controlled execution stay unavailable.
   window.teemoPermissionClient = permissionClient;
+  window.teemoScreenClient = screenClient;
   window.teemoFileClient = fileClient;
   window.teemoGitClient = gitClient;
   window.teemoExecuteClient = executeClient;
@@ -180,11 +182,19 @@
     memoryBack: document.getElementById('memoryBackButton'),
     creativeButton: document.getElementById('TeemoCreativeButton'),
     inspirationButton: document.getElementById('TeemoInspirationButton'),
+    runtimeButton: document.getElementById('TeemoRuntimeButton'),
     chatView: document.getElementById('chatView'),
     settingsView: document.getElementById('settingsView'),
     memoryView: document.getElementById('memoryView'),
     creativeView: document.getElementById('TeemoCreativeView'),
     inspirationView: document.getElementById('TeemoInspirationView'),
+    runtimeView: document.getElementById('TeemoRuntimeView'),
+    runtimeBack: document.getElementById('TeemoRuntimeBackButton'),
+    runtimeStatus: document.getElementById('TeemoRuntimeStatus'),
+    runtimeDisplay: document.getElementById('TeemoRuntimeDisplay'),
+    runtimeCapture: document.getElementById('TeemoRuntimeCaptureButton'),
+    runtimeDiscard: document.getElementById('TeemoRuntimeDiscardButton'),
+    runtimePreview: document.getElementById('TeemoRuntimePreview'),
     challengeQuick: document.getElementById('TeemoChallengeQuickButton'),
     challengeQuickLabel: document.getElementById('TeemoChallengeQuickLabel'),
     directorBalanced: document.getElementById('TeemoDirectorBalanced'),
@@ -1666,6 +1676,7 @@
     if (els.memoryView) els.memoryView.hidden = true;
     if (els.creativeView) els.creativeView.hidden = true;
     if (els.inspirationView) els.inspirationView.hidden = true;
+    if (els.runtimeView) els.runtimeView.hidden = true;
     els.settingsView.hidden = false;
   }
 
@@ -1675,6 +1686,7 @@
     if (els.memoryView) els.memoryView.hidden = true;
     if (els.creativeView) els.creativeView.hidden = true;
     if (els.inspirationView) els.inspirationView.hidden = true;
+    if (els.runtimeView) els.runtimeView.hidden = true;
     els.chatView.hidden = false;
     renderAll();
     els.input.focus();
@@ -1699,6 +1711,7 @@
     els.settingsView.hidden = true;
     if (els.creativeView) els.creativeView.hidden = true;
     if (els.inspirationView) els.inspirationView.hidden = true;
+    if (els.runtimeView) els.runtimeView.hidden = true;
     if (els.memoryView) els.memoryView.hidden = false;
     const center = ensureCognitionCenter();
     if (center) center.show();
@@ -1707,6 +1720,7 @@
   function hideMemory() {
     if (els.memoryView) els.memoryView.hidden = true;
     if (els.inspirationView) els.inspirationView.hidden = true;
+    if (els.runtimeView) els.runtimeView.hidden = true;
     els.settingsView.hidden = true;
     els.chatView.hidden = false;
     renderAll();
@@ -1731,6 +1745,7 @@
     els.settingsView.hidden = true;
     if (els.memoryView) els.memoryView.hidden = true;
     if (els.inspirationView) els.inspirationView.hidden = true;
+    if (els.runtimeView) els.runtimeView.hidden = true;
     if (els.creativeView) els.creativeView.hidden = false;
     const center = ensureCreativeProfileCenter();
     if (center) center.show();
@@ -1740,6 +1755,7 @@
     if (els.creativeView) els.creativeView.hidden = true;
     if (els.memoryView) els.memoryView.hidden = true;
     if (els.inspirationView) els.inspirationView.hidden = true;
+    if (els.runtimeView) els.runtimeView.hidden = true;
     els.settingsView.hidden = true;
     els.chatView.hidden = false;
     renderAll();
@@ -1767,6 +1783,7 @@
     els.settingsView.hidden = true;
     if (els.memoryView) els.memoryView.hidden = true;
     if (els.creativeView) els.creativeView.hidden = true;
+    if (els.runtimeView) els.runtimeView.hidden = true;
     if (els.inspirationView) els.inspirationView.hidden = false;
     const center = ensureInspirationCenter();
     if (center) center.show();
@@ -1776,8 +1793,158 @@
     if (els.inspirationView) els.inspirationView.hidden = true;
     if (els.memoryView) els.memoryView.hidden = true;
     if (els.creativeView) els.creativeView.hidden = true;
+    if (els.runtimeView) els.runtimeView.hidden = true;
     els.settingsView.hidden = true;
     els.chatView.hidden = false;
+    renderAll();
+    els.input.focus();
+  }
+
+  let activeScreenSnapshotId = null;
+  let screenCapturePending = false;
+
+  function screenToolCallId() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return `screen_capture_${crypto.randomUUID()}`;
+    }
+    return `screen_capture_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+  }
+
+  function setRuntimeStatus(message, isError = false) {
+    if (!els.runtimeStatus) return;
+    els.runtimeStatus.textContent = message || '';
+    els.runtimeStatus.classList.toggle('error', !!isError);
+  }
+
+  function setRuntimePending(pending) {
+    screenCapturePending = !!pending;
+    if (els.runtimeCapture) els.runtimeCapture.disabled = screenCapturePending || !els.runtimeDisplay || !els.runtimeDisplay.value;
+    if (els.runtimeDisplay) els.runtimeDisplay.disabled = screenCapturePending;
+    if (els.runtimeDiscard) els.runtimeDiscard.disabled = screenCapturePending || !activeScreenSnapshotId;
+  }
+
+  function clearRuntimePreviewUi() {
+    if (els.runtimePreview) {
+      els.runtimePreview.replaceChildren();
+      const empty = document.createElement('span');
+      empty.textContent = '尚未获取本地预览';
+      els.runtimePreview.appendChild(empty);
+    }
+    activeScreenSnapshotId = null;
+    setRuntimePending(screenCapturePending);
+  }
+
+  async function loadRuntimeDisplays() {
+    if (!screenClient || !els.runtimeDisplay) {
+      setRuntimeStatus('当前运行环境不可用。', true);
+      return;
+    }
+    setRuntimePending(true);
+    setRuntimeStatus('正在读取可用显示器…');
+    try {
+      const displays = await screenClient.listDisplays();
+      els.runtimeDisplay.replaceChildren();
+      for (const display of displays) {
+        const option = document.createElement('option');
+        option.value = display.displayRef;
+        option.textContent = display.label;
+        els.runtimeDisplay.appendChild(option);
+      }
+      if (!displays.length) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = '没有可用显示器';
+        els.runtimeDisplay.appendChild(option);
+        setRuntimeStatus('未发现可用于本地预览的显示器。', true);
+      } else {
+        setRuntimeStatus('选择显示器后可请求一次本地预览。');
+      }
+    } catch (error) {
+      els.runtimeDisplay.replaceChildren();
+      const option = document.createElement('option');
+      option.value = '';
+      option.textContent = '显示器不可用';
+      els.runtimeDisplay.appendChild(option);
+      setRuntimeStatus(error.message || '读取显示器失败。', true);
+    } finally {
+      setRuntimePending(false);
+    }
+  }
+
+  async function captureRuntimePreview() {
+    if (!screenClient || !permissionClient || !els.runtimeDisplay || !els.runtimeDisplay.value || screenCapturePending) return;
+    let prepared = null;
+    setRuntimePending(true);
+    setRuntimeStatus('正在准备本次本地预览…');
+    try {
+      const toolCallId = screenToolCallId();
+      prepared = await screenClient.prepare(els.runtimeDisplay.value, { toolCallId, sessionId: null });
+      const permission = await permissionClient.authorize({
+        toolCallId,
+        runId: null,
+        sessionId: null,
+        toolName: 'screen_snapshot',
+        permission: 'read',
+        resource: prepared.resource,
+        requiresExecutionAuthorization: true,
+        reason: prepared.reason,
+      });
+      if (!permission || permission.decision !== 'allow') {
+        setRuntimeStatus('未取得本次屏幕预览权限。', true);
+        return;
+      }
+      const snapshot = await screenClient.execute(prepared.preparation);
+      prepared = null;
+      const preview = await screenClient.getPreview(snapshot.snapshotId);
+      activeScreenSnapshotId = preview.snapshotId;
+      if (els.runtimePreview) {
+        els.runtimePreview.replaceChildren();
+        const image = document.createElement('img');
+        image.src = preview.dataUrl;
+        image.alt = '本地屏幕预览';
+        const caption = document.createElement('p');
+        caption.textContent = `${preview.width} × ${preview.height} · 仅保留在当前窗口短时内存中`;
+        els.runtimePreview.append(image, caption);
+      }
+      setRuntimeStatus('本地预览已获取，未发送给模型。');
+    } catch (error) {
+      setRuntimeStatus(error.message || '本地预览获取失败。', true);
+    } finally {
+      if (prepared) await screenClient.release(prepared.preparation).catch(() => {});
+      setRuntimePending(false);
+    }
+  }
+
+  async function discardRuntimePreview(options = {}) {
+    const snapshotId = activeScreenSnapshotId;
+    clearRuntimePreviewUi();
+    if (!snapshotId || !screenClient) return;
+    try {
+      await screenClient.discard(snapshotId);
+      if (options.showStatus) setRuntimeStatus('本地预览已丢弃。');
+    } catch (error) {
+      if (options.showStatus) setRuntimeStatus(error.message || '本地预览清除失败。', true);
+    }
+  }
+
+  function showRuntime() {
+    els.chatView.hidden = true;
+    els.settingsView.hidden = true;
+    if (els.memoryView) els.memoryView.hidden = true;
+    if (els.creativeView) els.creativeView.hidden = true;
+    if (els.inspirationView) els.inspirationView.hidden = true;
+    if (els.runtimeView) els.runtimeView.hidden = false;
+    void loadRuntimeDisplays();
+  }
+
+  function hideRuntime() {
+    if (els.runtimeView) els.runtimeView.hidden = true;
+    if (els.memoryView) els.memoryView.hidden = true;
+    if (els.creativeView) els.creativeView.hidden = true;
+    if (els.inspirationView) els.inspirationView.hidden = true;
+    els.settingsView.hidden = true;
+    els.chatView.hidden = false;
+    void discardRuntimePreview();
     renderAll();
     els.input.focus();
   }
@@ -3158,6 +3325,11 @@
   if (els.memoryButton) els.memoryButton.addEventListener('click', showMemory);
   if (els.creativeButton) els.creativeButton.addEventListener('click', showCreativeProfile);
   if (els.inspirationButton) els.inspirationButton.addEventListener('click', showInspiration);
+  if (els.runtimeButton) els.runtimeButton.addEventListener('click', showRuntime);
+  if (els.runtimeBack) els.runtimeBack.addEventListener('click', hideRuntime);
+  if (els.runtimeCapture) els.runtimeCapture.addEventListener('click', () => { void captureRuntimePreview(); });
+  if (els.runtimeDiscard) els.runtimeDiscard.addEventListener('click', () => { void discardRuntimePreview({ showStatus: true }); });
+  if (els.runtimeDisplay) els.runtimeDisplay.addEventListener('change', () => setRuntimePending(screenCapturePending));
   if (els.challengeQuick) {
     els.challengeQuick.addEventListener('click', () => {
       const state = creativeDirectorState && creativeDirectorState.getState(activeDirectorSessionId());
