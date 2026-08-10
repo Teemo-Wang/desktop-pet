@@ -5,7 +5,9 @@
   if (typeof window !== 'undefined') window.TeemoFileTools = api;
   if (typeof module === 'object' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
-  const pathProperty = { type: 'string', minLength: 1, maxLength: 32767 };
+    const pathProperty = { type: 'string', minLength: 1, maxLength: 32767 };
+    const rootIdProperty = { type: 'string', minLength: 6, maxLength: 64 };
+    const relativePathProperty = { type: 'string', minLength: 1, maxLength: 32767 };
   const hashProperty = { type: 'string', pattern: '^[A-Fa-f0-9]{64}$' };
 
   function createDefinitions(options = {}) {
@@ -26,14 +28,16 @@
     return [
       make('list_directory', 'List a bounded number of entries in an authorized local directory.', 'read',
         { path: pathProperty }, ['path']),
-      make('read_file', 'Read bounded text or extract text from a supported document in an authorized folder.', 'read',
-        { path: pathProperty }, ['path']),
+      make('read_file', 'Read bounded text from an authorized root. Prefer rootId plus relativePath.', 'read',
+        { path: pathProperty, rootId: rootIdProperty, relativePath: relativePathProperty }, []),
       make('search_files', 'Search file names below an authorized local directory with bounded depth and results.', 'read',
         { path: pathProperty, query: { type: 'string', minLength: 1, maxLength: 500 } }, ['path', 'query']),
       make('search_text', 'Search UTF-8 text below an authorized local directory with bounded work and results.', 'read',
         { path: pathProperty, query: { type: 'string', minLength: 1, maxLength: 500 } }, ['path', 'query']),
       make('create_file', 'Create one new approved UTF-8 text file without overwriting an existing file.', 'write',
         { path: pathProperty, content: { type: 'string', maxLength: 1048576 } }, ['path', 'content']),
+      make('create_directory', 'Create one new directory in an authorized root without overwriting. Prefer rootId plus relativePath.', 'write',
+        { path: pathProperty, rootId: rootIdProperty, relativePath: relativePathProperty }, []),
       make('patch_file', 'Apply deterministic exact-text edits to one approved UTF-8 file after hash verification.', 'write', {
         path: pathProperty,
         expectedSha256: hashProperty,

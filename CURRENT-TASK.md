@@ -1,13 +1,21 @@
 # Current Task
 
+## P3-5 More Inspiration Sources (TASKBOOK REQUIRED)
+
+- Active P3-3 metadata snapshots now support local keyword retrieval, source/format/orientation/size filters, newest/oldest/name sorting, and pagination capped at 100 items.
+- Results are returned through Main Process retrieval IPC and reuse the existing P3-2 preview path. Revoked, removed, corrupt, unindexed, or disabled sources fail closed.
+- No provider calls, source mutation, Agent Context injection, watcher, second index, Shell, or new filesystem authorization was added.
+- P3-4 Strict Review: PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES. P3-4 close commit/tag is authorized before P3-5 implementation.
+- P3-5 is planning-only until its independent Taskbook is approved. P3-6 remains not started.
+
 ## 当前阶段
 
 - Product：Teemo助理
 - Branch：`Teemo/p3-personal-inspiration`
-- Phase：P3-3 Visual Metadata Index
-- State：`CLOSED / PASS / BLOCKERS: 0`
-- Installed App Version：`v1.2.1`
-- Development App Version：`v1.3.0`
+- Phase：TeemoProjectKnowledge SSOT
+- State：`TASKBOOK REQUIRED`
+- Installed App Version：`v1.3.2`
+- Development App Version：`v1.3.2`
 - P3 Baseline：`cd29e6f` / `v1.2.1-p3-baseline`
 - P1 Recovery Tag：`v1.2.0-p1-agent-foundation`
 - P2-1 Recovery Tag：`v1.2.0-p2.1-cognition-ui`
@@ -18,6 +26,24 @@
 - P3-1 Recovery Tag：`v1.3.0-p3.1-inspiration-foundation`
 - P3-2 Recovery Tag：`v1.3.0-p3.2-local-folder-connector`
 - P3-3 Recovery Tag：`v1.3.0-p3.3-visual-metadata-index`
+
+## TeemoProjectKnowledge SSOT（IMPLEMENTED / WAITING REVIEW）
+
+- 新建唯一正式目录 `docs/TeemoProjectKnowledge/`，以 `INDEX.md` 作为所有 Teemo 自身开发 Agent 的强制入口。
+- `CURRENT-STATE.md` 负责权威当前摘要；`ROADMAP.md`、`ARCHITECTURE.md`、`DECISIONS.md`、精简 `CHANGELOG.md` 与 `HISTORY/` 按固定职责维护。
+- 新增 `project:knowledge:sync` 和 `project:knowledge:verify`；同步版本、latest recovery tag 与 Last Verified Git Snapshot，验证 Project Knowledge 文件结构、版本一致性和状态文档一致性。Git branch/HEAD/worktree 由 Pre-Flight 直接查询，不要求与 tracked 文档永久相等。
+- 根目录 `AGENTS.md` 已加入统一 Pre-Flight 与 Post-Flight：先读 Project Knowledge，修改后必须 sync/verify PASS 才能提交 Implementation Evidence。
+- 本任务不修改 P3-3，不启动 P3-4，不创建 close commit/tag，等待 Strict Review。
+
+## TeemoChatAgentToolCalling M1（PASS / BLOCKERS: 0）
+
+- 普通 Chat 已接入 Provider-neutral Native Tool Calling：兼容 Provider 的结构化 `tool_calls` 统一进入 `TeemoAgentCore`、Tool Registry、P1 Permission、File IPC 和 Main Process `TeemoFileService`；Safe File Tool 路径不从 Renderer 直接执行 filesystem I/O。
+- 普通 Chat 仅开放 Safe File Tool allowlist：`list_directory`、`read_file`、`search_files`、`search_text`、`create_file`、`patch_file`、`rename_file`、`create_directory`。
+- M1 正式使用契约是：用户提供位于 P1 authorized root 内的明确真实路径。每次操作仍经 P1 Permission 和 Main Process 最终授权边界；未授权路径、越界路径与拒绝授权均 fail closed。
+- 普通 Chat 不开放 Git Tools、Controlled Execute、任意 Shell/PowerShell、任意程序执行、delete 或其他 destructive operation。
+- 已完成真实 Provider 的 `read_file` 与 `create_directory` 正常链路，以及 Permission DENY 无文件系统变化验证；`tool_call_id` 以原值作为 `role: tool` 结果回传后继续第二轮 Provider 回复。
+- Natural-language authorized-root alias / root grounding 仍可作为后续 UX Enhancement；它不属于 M1 关闭前的阻塞项，模型不得借此获得未授权路径。
+- P3-3 保持既有关闭状态，P3-4 仍未开始。M1 当前已通过 Gate；详细当前事实见 `docs/TeemoProjectKnowledge/CURRENT-STATE.md`。
 
 ## P3-3 已实现
 

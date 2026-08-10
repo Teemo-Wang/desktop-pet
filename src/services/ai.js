@@ -123,7 +123,11 @@
             return part;
           });
         }
-        return { role: message.role, content };
+        const normalized = { role: message.role, content };
+        if (message.role === 'assistant' && Array.isArray(message.tool_calls)) normalized.tool_calls = message.tool_calls;
+        if (message.role === 'tool' && typeof message.tool_call_id === 'string') normalized.tool_call_id = message.tool_call_id;
+        if (message.role === 'tool' && typeof message.name === 'string') normalized.name = message.name;
+        return normalized;
       });
   }
 
@@ -201,6 +205,56 @@
       }
       // 推理模型正文在 content，思考过程在 reasoning_content；正文为空时回退推理内容
       return msg.content || msg.reasoning_content || '⚠️ 模型无响应';
+    }
+
+    async sendWithTools(messages, options = {}) {
+      messages = _sanitizeChatMessages(messages);
+      if (this.useMock || this._isAIBrain() || !this.config || !this.config.apiKey) {
+        const error = new Error('Current provider does not support native tool calling.');
+        error.code = 'NATIVE_TOOL_CALLING_UNSUPPORTED';
+        throw error;
+      }
+      const tools = Array.isArray(options.tools) ? options.tools : [];
+      if (!tools.length) throw new Error('Native tool calling requires an explicit tool allowlist.');
+      const response = await fetch(this.config.baseUrl + '/chat/completions', {
+        method: 'POST',
+        headers: this._buildHeaders(),
+        body: JSON.stringify({
+          model: this.config.modelName,
+          messages,
+          tools,
+          tool_choice: 'auto',
+          ...this._tokenLimitParam(8192),
+          ...this._temperatureParam(),
+        }),
+        signal: options.signal || AbortSignal.timeout(options.timeout || 90000),
+      });
+      if (!response.ok) {
+        const error = new Error(await this._formatHttpError(response));
+        error.code = 'NATIVE_TOOL_CALLING_REQUEST_FAILED';
+        throw error;
+      }
+      const message = ((await response.json()).choices || [])[0]?.message || {};
+      const calls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
+      if (!calls.length) return { type: 'final_response', content: message.content || message.reasoning_content || '' };
+      if (calls.length !== 1 || calls[0]?.type !== 'function' || !calls[0]?.id || !calls[0]?.function?.name) {
+        const error = new Error('Provider returned an invalid native tool call.');
+        error.code = 'NATIVE_TOOL_CALL_INVALID';
+        throw error;
+      }
+      let argumentsValue;
+      try { argumentsValue = JSON.parse(calls[0].function.arguments || '{}'); } catch (_) {
+        const error = new Error('Provider returned unparseable tool arguments.');
+        error.code = 'NATIVE_TOOL_ARGUMENTS_INVALID';
+        throw error;
+      }
+      return {
+        type: 'tool_request',
+        tool: calls[0].function.name,
+        arguments: argumentsValue,
+        providerMessage: { role: 'assistant', content: message.content || null, tool_calls: calls },
+        providerToolCallId: calls[0].id,
+      };
     }
 
     /**

@@ -69,22 +69,26 @@ D:\Teemo助手\Teemo机器人项目\Teemo-source
 
 1. 本 `AGENTS.md`
 2. 用户当前任务中的明确要求
-3. 当前 Git 分支和源码中的实际实现
-4. `PROJECT-STATUS.md`、`PROJECT_STATUS.md`、`CONTINUE-HERE-继续优化指南.md` 等历史状态/交接文档
-5. README、旧注释和更早的开发记录
+3. 当前 Git 分支、HEAD、worktree、源码、`package.json` 与已执行测试的实际结果
+4. `docs/TeemoProjectKnowledge/CURRENT-STATE.md` 的稳定当前项目状态
+5. `PROJECT-STATUS.md`、`PROJECT_STATUS.md`、`CONTINUE-HERE-继续优化指南.md` 等历史状态/交接文档
+6. README、旧注释和更早的开发记录
 
-历史文档用于了解业务背景、已完成工作和技术债，不自动代表当前开发规则。发现冲突时保留历史文档，并在交付报告中说明冲突。
+`docs/TeemoProjectKnowledge/INDEX.md` 是所有 Teemo 自身开发任务的唯一 Project Knowledge 入口。Git branch、HEAD 与 worktree 是实时工程事实，必须在 Pre-Flight 直接查询；`CURRENT-STATE.md` 内的 Last Verified Git Snapshot 仅作历史记录。历史文档用于了解业务背景、已完成工作和技术债，不自动代表当前状态。发现稳定 Project Knowledge 与 Git、源码、版本或测试结果冲突时，先检查真实状态并修正文档；不得为匹配旧文档而修改业务代码。
 
 ## 4. 修改前必须执行的流程
 
 任何 AI 修改代码前必须完成：
 
-1. 读取本 `AGENTS.md`。
-2. 确认当前 Git 分支。
-3. 确认工作区状态：包括已有修改、未跟踪文件和最近提交。
-4. 阅读与任务直接相关的代码和调用方。
-5. 理解现有调用关系、数据格式、权限边界和启动方式。
-6. 明确影响范围、验证方式和回滚方式。
+1. 先读取 `docs/TeemoProjectKnowledge/INDEX.md`、`CURRENT-STATE.md`、`ROADMAP.md`、`ARCHITECTURE.md` 与 `DECISIONS.md`。
+2. 读取本 `AGENTS.md`。
+3. 执行并检查 `git status --short`、`git branch --show-current`、`git rev-parse HEAD` 与 `package.json` version。
+4. 确认工作区状态：包括已有修改、未跟踪文件和最近提交；同时检查 `CURRENT-TASK.md` 与 `CURRENT-STATE.md` 是否显示其他未完成任务。
+5. 阅读与任务直接相关的代码和调用方。
+6. 理解现有调用关系、数据格式、权限边界和启动方式。
+7. 明确影响范围、验证方式和回滚方式。
+
+在读取 `docs/TeemoProjectKnowledge/INDEX.md` 前，不得修改 Teemo 源码、创建 Taskbook、判断当前阶段、升级版本、创建 commit/tag 或开始下一阶段。
 
 禁止：
 
@@ -308,6 +312,17 @@ Teemo: add permission check
 - 修改 Electron 主进程：使用隔离 profile 启动验证。
 
 不要因为局部任务执行全部重型测试，但必须覆盖受影响模块。
+
+## 11.1 Project Knowledge 收尾规则
+
+完成任何 Teemo 源码、维护、架构或项目状态修改后，在输出 `IMPLEMENTED / WAITING REVIEW` 前必须：
+
+1. 同步 `CURRENT-TASK.md`、`PROJECT-STATUS.md`、相关根目录 `CHANGELOG.md` 与 `docs/TeemoProjectKnowledge/CURRENT-STATE.md`。
+2. 如存在重要长期决策，更新 `docs/TeemoProjectKnowledge/DECISIONS.md`；如确认路线变更，更新 `ROADMAP.md`。
+3. 执行 `npm.cmd run project:knowledge:sync`。
+4. 执行 `npm.cmd run project:knowledge:verify` 并要求 PASS。
+
+同步脚本更新版本、latest recovery tag 与可选的 Last Verified Git Snapshot；Git branch、HEAD、worktree 的实时事实仍由 Pre-Flight 直接查询。它不得自行推断 PASS、CLOSED、BLOCKERS 或下一阶段。`project:knowledge:verify` 直接读取 Git，但不要求历史快照持续等于实时 HEAD/worktree；失败时不得宣称已实施完成。只有 Strict Review 明确允许后，才能更新正式关闭状态、创建 close commit 与 annotated recovery tag。
 
 ## 12. 交付汇报格式
 

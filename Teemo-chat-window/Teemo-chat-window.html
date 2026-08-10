@@ -225,6 +225,28 @@
             </header>
             <div id="TeemoInspirationSourceList"></div>
           </section>
+          <section class="teemo-inspiration-retrieval" id="TeemoInspirationRetrieval" aria-labelledby="TeemoInspirationRetrievalTitle">
+            <header>
+              <div><span>Retrieval</span><h2 id="TeemoInspirationRetrievalTitle">本地灵感检索</h2><p>仅检索当前已授权且已建立索引的素材</p></div>
+              <span class="teemo-inspiration-result-count" id="TeemoInspirationResultCount" aria-live="polite"></span>
+            </header>
+            <div class="teemo-inspiration-retrieval-controls">
+              <label><span>关键词</span><input id="TeemoInspirationSearchInput" type="search" maxlength="160" placeholder="文件名或相对路径"></label>
+              <label><span>来源</span><select id="TeemoInspirationSearchSource"><option value="">全部来源</option></select></label>
+              <label><span>格式</span><select id="TeemoInspirationSearchFormat"><option value="">全部格式</option><option value="png">PNG</option><option value="jpeg">JPEG</option><option value="webp">WEBP</option><option value="gif">GIF</option></select></label>
+              <label><span>方向</span><select id="TeemoInspirationSearchOrientation"><option value="">全部方向</option><option value="landscape">横向</option><option value="portrait">纵向</option><option value="square">正方形</option></select></label>
+              <label><span>最小宽度</span><input id="TeemoInspirationSearchMinWidth" type="number" min="0" step="1" inputmode="numeric"></label>
+              <label><span>最小高度</span><input id="TeemoInspirationSearchMinHeight" type="number" min="0" step="1" inputmode="numeric"></label>
+              <label><span>排序</span><select id="TeemoInspirationSearchSort"><option value="newest">最新</option><option value="oldest">最早</option><option value="name">名称</option></select></label>
+              <button class="teemo-secondary-button" id="TeemoInspirationSearchButton" type="button">检索</button>
+            </div>
+            <div class="teemo-inspiration-search-results" id="TeemoInspirationSearchResults"></div>
+            <footer class="teemo-inspiration-search-footer">
+              <button class="teemo-secondary-button" id="TeemoInspirationSearchPrevious" type="button">上一页</button>
+              <span id="TeemoInspirationSearchPage">1 / 1</span>
+              <button class="teemo-secondary-button" id="TeemoInspirationSearchNext" type="button">下一页</button>
+            </footer>
+          </section>
           <section class="teemo-inspiration-index-panel" id="TeemoInspirationIndexPanel" hidden>
             <header>
               <div><span>Metadata Index</span><h2 id="TeemoInspirationIndexTitle">素材索引</h2><p id="TeemoInspirationIndexSummary"></p></div>
@@ -495,6 +517,7 @@
   <script src="../src/inspiration/TeemoInspirationService.js"></script>
   <script src="../src/inspiration/TeemoLocalFolderClient.js"></script>
   <script src="../src/inspiration/TeemoInspirationIndexClient.js"></script>
+  <script src="../src/inspiration/TeemoInspirationRetrievalClient.js"></script>
   <script src="../src/inspiration/TeemoLocalFolderConnector.js"></script>
   <script src="../src/skills/TeemoSkillSpecification.js"></script>
   <script src="../src/skills/TeemoSkillValidator.js"></script>

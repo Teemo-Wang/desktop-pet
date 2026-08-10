@@ -1,0 +1,21 @@
+const { app, BrowserWindow, ipcMain } = require('electron');
+const fs = require('fs'); const os = require('os'); const path = require('path');
+const TeemoFileService = require('../src/services/TeemoFileService');
+const TeemoPermissionService = require('../src/permissions/TeemoPermissionService');
+const registerPermission = require('../src/permissions/TeemoPermissionIpc');
+const registerFile = require('../src/tools/file/TeemoFileToolIpc');
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'Teemo-M1-E2E-'));
+const home = fs.mkdtempSync(path.join(os.tmpdir(), 'Teemo-M1-home-'));
+const profile = path.join(root, 'profile'); fs.mkdirSync(profile, { recursive: true });
+const text = 'Teemo M1 synthetic content: read_file success.'; fs.writeFileSync(path.join(root, 'test.txt'), text, 'utf8');
+const raw = fs.readFileSync(path.join(process.env.USERPROFILE, '.hellobike-pet', 'settings.json'), 'utf8');
+const section = /"user_msklfr0f"\s*:\s*\{([\s\S]*?)\}\s*,\s*"customProviders"/.exec(raw); if (!section) throw new Error('All-Star provider config unavailable');
+const field = name => { const m = new RegExp('"' + name + '"\\s*:\\s*"([^"]*)"').exec(section[1]); if (!m) throw new Error('Missing provider ' + name); return m[1]; };
+const model = { provider: 'user_msklfr0f', label: '全明星gpt', apiKey: field('apiKey'), modelName: field('modelName'), baseUrl: field('baseUrl'), systemPrompt: `The authorized test directory is ${root}. Use only declared tools when needed.` };
+process.env.USERPROFILE = home; fs.mkdirSync(path.join(home, '.hellobike-pet'), { recursive: true }); fs.writeFileSync(path.join(home, '.hellobike-pet', 'settings.json'), JSON.stringify({ model, providerConfigs: { user_msklfr0f: model }, customProviders: { user_msklfr0f: model } }));
+app.setPath('userData', profile); app.commandLine.appendSwitch('disable-gpu');
+const service = new TeemoFileService(); let mode = 'allow'; const permission = new TeemoPermissionService({ decisionProvider: () => ({ decision: mode, scope: 'once' }) });
+registerPermission(ipcMain, permission); registerFile(ipcMain, service, { rootsProvider: () => [root], permissionService: permission });
+ipcMain.handle('teemo:local-access-list', () => ({ ok: true, roots: [root] })); ipcMain.handle('get-app-version', () => app.getVersion());
+async function send(win, prompt, decision) { mode = decision; return win.webContents.executeJavaScript(`(async()=>{window.TeemoPermissionPrompt={request:async()=>({decision:'${decision}',scope:'once'})};const i=document.getElementById('messageInput'),b=document.getElementById('sendButton');i.value=${JSON.stringify(prompt)};i.dispatchEvent(new Event('input',{bubbles:true}));b.click();let started=false;for(let n=0;n<1200;n++){started=started||b.classList.contains('stop');if(started&&!b.classList.contains('stop'))break;await new Promise(r=>setTimeout(r,100));}if(!started)throw new Error('chat did not start');return [...document.querySelectorAll('#messageList .teemo-message')].map(x=>x.innerText).slice(-1)[0]||'';})()`); }
+app.whenReady().then(async()=>{let win;try{win=new BrowserWindow({show:false,webPreferences:{nodeIntegration:true,contextIsolation:false,sandbox:false}});await win.loadFile(path.join(__dirname,'..','Teemo-chat-window','Teemo-chat-window.html'));const read=await send(win,`读取 ${path.join(root,'test.txt')}，并告诉我内容。`,'allow');const made=await send(win,`在 ${root} 下创建 Teemo-M1-Test 文件夹。`,'allow');console.log(JSON.stringify({read, made, text, created:fs.existsSync(path.join(root,'Teemo-M1-Test')), audit:permission.listAudit()}));app.exit(0)}catch(e){console.error(e);app.exit(1)}finally{if(win&&!win.isDestroyed())win.destroy()}});app.on('window-all-closed',()=>{});

@@ -62,6 +62,9 @@
   const inspirationIndexClient = window.TeemoInspirationIndexClient && inspirationAccessGuard
     ? new window.TeemoInspirationIndexClient({ ipcRenderer, accessGuard: inspirationAccessGuard })
     : null;
+  const inspirationRetrievalClient = window.TeemoInspirationRetrievalClient
+    ? new window.TeemoInspirationRetrievalClient({ ipcRenderer })
+    : null;
   const inspirationService = window.TeemoInspirationService
     ? new window.TeemoInspirationService({ registry: inspirationRegistry, accessGuard: inspirationAccessGuard })
     : null;
@@ -69,6 +72,7 @@
   window.teemoInspirationService = inspirationService;
   window.teemoLocalFolderClient = localFolderClient;
   window.teemoInspirationIndexClient = inspirationIndexClient;
+  window.teemoInspirationRetrievalClient = inspirationRetrievalClient;
   const fileClient = window.TeemoFileClient ? new window.TeemoFileClient({ ipcRenderer }) : null;
   const gitClient = window.TeemoGitClient ? new window.TeemoGitClient({ ipcRenderer }) : null;
   const executeClient = window.TeemoExecuteClient ? new window.TeemoExecuteClient({ ipcRenderer }) : null;
@@ -78,12 +82,7 @@
   if (toolRegistry && window.TeemoFileTools && fileClient) {
     window.TeemoFileTools.register(toolRegistry, { fileClient });
   }
-  if (toolRegistry && window.TeemoGitTools && gitClient) {
-    window.TeemoGitTools.register(toolRegistry, { gitClient });
-  }
-  if (toolRegistry && window.TeemoExecuteTools && executeClient) {
-    window.TeemoExecuteTools.register(toolRegistry, { executeClient });
-  }
+  // Ordinary chat exposes only P1 file tools. Git and controlled execution stay unavailable.
   window.teemoPermissionClient = permissionClient;
   window.teemoFileClient = fileClient;
   window.teemoGitClient = gitClient;
@@ -1738,6 +1737,7 @@
         service: inspirationService,
         sourceClient: localFolderClient,
         indexClient: inspirationIndexClient,
+        retrievalClient: inspirationRetrievalClient,
         onBack: hideInspiration,
       });
     }
@@ -3002,14 +3002,17 @@
           }
         };
         if (agentCore) {
-          const agentResult = await agentCore.runStream({
-            messages: apiMessages,
+          const rootRefs = await ipcRenderer.invoke('teemo-file-tool:list-roots').catch(() => ({ roots: [] }));
+          const rootContext = Array.isArray(rootRefs && rootRefs.roots) && rootRefs.roots.length
+            ? [{ role: 'system', content: `Authorized local roots (use rootId + relativePath; never guess an absolute path): ${JSON.stringify(rootRefs.roots)}` }]
+            : [];
+          const agentResult = await agentCore.runNativeTools({
+            messages: [...rootContext, ...apiMessages],
             sessionId: active.id || null,
             userMessage: text || displayText,
             modalities: attachments.length ? [...new Set(attachments.map(attachmentModality))] : ['text'],
             signal: abortController.signal,
-            disableActionContract: true,
-            onChunk,
+            toolRegistry,
           });
           if (!agentResult.ok) {
             if (agentResult.error.cancelled) throw new DOMException('已停止生成', 'AbortError');

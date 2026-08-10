@@ -52,6 +52,26 @@ async function main() {
   }
 
   {
+    let call = 0;
+    const ai = {
+      async sendWithTools(messages, options) {
+        assert.equal(options.tools.some(tool => tool.function.name === 'echo'), true);
+        if (call++ === 0) return {
+          type: 'tool_request', tool: 'echo', arguments: { text: 'native' },
+          providerMessage: { role: 'assistant', content: null, tool_calls: [{ id: 'call_native', type: 'function', function: { name: 'echo', arguments: '{"text":"native"}' } }] },
+          providerToolCallId: 'call_native',
+        };
+        assert.equal(messages.at(-1).tool_call_id, 'call_native');
+        return { type: 'final_response', content: 'native done' };
+      },
+    };
+    const result = await new TeemoAgentCore({ aiService: ai, toolRegistry: createRegistry() }).runNativeTools({ messages: [{ role: 'user', content: 'native test' }] });
+    assert.equal(result.ok, true);
+    assert.equal(result.content, 'native done');
+    assert.equal(result.run.toolCalls.length, 1);
+  }
+
+  {
     const ai = sequenceAI([
       JSON.stringify({ type: 'tool_request', tool: 'echo', arguments: { text: 'one' } }),
       JSON.stringify({ type: 'tool_request', tool: 'echo', arguments: { text: 'two' } }),

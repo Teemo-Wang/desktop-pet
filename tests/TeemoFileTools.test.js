@@ -121,6 +121,27 @@ async function main() {
     () => service.prepareOperation('create_file', { path: createdPath, content: 'overwrite' }, roots),
     error => error.code === 'FILE_ALREADY_EXISTS',
   );
+  const createdDirectoryPath = path.join(root, 'Teemo-created-directory');
+  const directoryPrepared = service.prepareOperation('create_directory', { path: createdDirectoryPath }, roots);
+  const createdDirectory = await service.executePrepared(directoryPrepared, roots);
+  assert.equal(createdDirectory.created, true);
+  assert.equal(fs.statSync(createdDirectoryPath).isDirectory(), true);
+  assert.throws(
+    () => service.prepareOperation('create_directory', { path: createdDirectoryPath }, roots),
+    error => error.code === 'FILE_ALREADY_EXISTS',
+  );
+  const staleDirectory = service.prepareOperation('create_directory', { path: path.join(root, 'Teemo-raced-directory') }, roots);
+  fs.mkdirSync(path.join(root, 'Teemo-raced-directory'));
+  await expectCode(service.executePrepared(staleDirectory, roots), 'FILE_RESOURCE_CHANGED');
+  for (const unsafeDirectory of [
+    `${root}${path.sep}..${path.sep}authorized-copy${path.sep}Teemo-escape`,
+    '\\\\server\\share\\Teemo-escape',
+    '\\\\?\\C:\\Teemo-escape',
+  ]) {
+    assert.throws(() => service.prepareOperation('create_directory', { path: unsafeDirectory }, roots), error => (
+      ['FILE_PATH_TRAVERSAL', 'FILE_PATH_UNSAFE'].includes(error.code)
+    ));
+  }
   assert.throws(
     () => service.prepareOperation('create_file', { path: path.join(root, 'blocked.exe'), content: 'x' }, roots),
     error => error.code === 'FILE_TYPE_NOT_WRITABLE',
@@ -224,6 +245,28 @@ async function main() {
   });
   assert.equal(bypass.error.code, 'PERMISSION_CHECK_FAILED', 'direct file IPC must not bypass central permission');
 
+  const makeRegistryFileClient = (permissionService) => {
+    const protectedIpc = makeIpcHarness(service, () => roots, permissionService);
+    const client = new TeemoFileClient({ ipcRenderer: { invoke: (channel, payload) => protectedIpc.invoke(protectedIpc.sender, channel, payload) } });
+    const protectedRegistry = new TeemoToolRegistry({ permissionService: { authorize: request => permissionService.requestPermission(request) } });
+    TeemoFileTools.register(protectedRegistry, { fileClient: client });
+    return protectedRegistry;
+  };
+  const deniedDirectoryPath = path.join(root, 'Teemo-denied-directory');
+  const deniedDirectoryRegistry = makeRegistryFileClient(new TeemoPermissionService({
+    decisionProvider: async () => ({ decision: 'deny' }),
+  }));
+  const deniedDirectory = await deniedDirectoryRegistry.execute('create_directory', { path: deniedDirectoryPath }, { runId: 'deny-run', sessionId: 'deny-session' });
+  assert.equal(deniedDirectory.error.code, 'PERMISSION_DENIED');
+  assert.equal(fs.existsSync(deniedDirectoryPath), false, 'denied directory creation must not execute');
+  const allowedDirectoryPath = path.join(root, 'Teemo-allowed-directory');
+  const allowedDirectoryRegistry = makeRegistryFileClient(new TeemoPermissionService({
+    decisionProvider: async () => ({ decision: 'allow', scope: 'once' }),
+  }));
+  const allowedDirectory = await allowedDirectoryRegistry.execute('create_directory', { path: allowedDirectoryPath }, { runId: 'allow-run', sessionId: 'allow-session' });
+  assert.equal(allowedDirectory.ok, true);
+  assert.equal(fs.statSync(allowedDirectoryPath).isDirectory(), true);
+
   let allowedRequest = null;
   let released = 0;
   let executed = 0;
@@ -240,7 +283,7 @@ async function main() {
   });
   TeemoFileTools.register(registry, { fileClient: fakeClient });
   assert.deepEqual(registry.list().sort(), [
-    'create_file', 'list_directory', 'patch_file', 'read_file', 'rename_file', 'search_files', 'search_text',
+    'create_directory', 'create_file', 'list_directory', 'patch_file', 'read_file', 'rename_file', 'search_files', 'search_text',
   ]);
   const toolResult = await registry.execute('read_file', { path: helloPath }, { runId: 'run-file', sessionId: 'session-file' });
   assert.equal(toolResult.ok, true);

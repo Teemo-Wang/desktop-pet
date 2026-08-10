@@ -1,12 +1,19 @@
 # Teemo助理 — 项目进度与规划
 
-> 文档版本：v1.30 ｜ 更新日期：2026-08-10 ｜ 当前开发版本：**v1.3.0（P3-3 CLOSED / PASS）**
+## P3-5 More Inspiration Sources (TASKBOOK REQUIRED)
+
+- Local retrieval is implemented over active P3-3 metadata snapshots with keyword, source, format, orientation, minimum-size, sorting, and bounded pagination filters.
+- Main Process revalidates Source/P1 authorization; P3-2 preview is reused for result selection. Provider calls, Agent Context changes, and source-byte changes are zero.
+- P3-4 Strict Review: PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES. P3-4 close commit/tag is authorized before P3-5 implementation.
+- P3-5 is planning-only until its independent Taskbook is approved. P3-6 remains not started.
+
+> 文档版本：v1.32 ｜ 更新日期：2026-08-10 ｜ 当前开发版本：**v1.3.2（TeemoProjectKnowledge SSOT IMPLEMENTED / WAITING REVIEW）**
 
 ## 当前状态
 
 - Product：`Teemo助理`
-- Installed Version：`v1.2.1`
-- Development Version：`v1.3.0`
+- Installed Version：`v1.3.2`
+- Development Version：`v1.3.2`
 - Source：`D:\Teemo助手\Teemo机器人项目\Teemo-source`
 - P0：`CLOSED`
 - P1：`CLOSED / PASS / BLOCKERS: 0`
@@ -17,12 +24,29 @@
 - P3-3：`CLOSED / PASS / BLOCKERS: 0`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
 - P3 Baseline：`cd29e6f` / `v1.2.1-p3-baseline`
-- Current Development：`P3-3 VISUAL METADATA INDEX`
+- Current Development：`TeemoProjectKnowledge SSOT`
 - Current Branch：`Teemo/p3-personal-inspiration`
 
 P3-3 GPT Strict Review：`PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-4`。
 审阅记录：`docs/Teemo-P3-3-GPT-STRICT-REVIEW.md`。
 P3-3 close commit/tag 已创建；P3-4 仍未开始，remote push 未执行。
+
+## TeemoProjectKnowledge SSOT（2026-08-10，IMPLEMENTED / WAITING REVIEW）
+
+- 新增唯一 Git 可追踪 Project Knowledge 目录：`docs/TeemoProjectKnowledge/`；`INDEX.md` 是所有 Teemo 自身开发 Agent 的唯一入口，`CURRENT-STATE.md` 是当前状态权威摘要。
+- 固定维护 `ROADMAP.md`、`ARCHITECTURE.md`、`DECISIONS.md`、精简 Project Knowledge `CHANGELOG.md` 与 `HISTORY/`；历史聊天、复制交接与过期 SOP 不再作为当前状态权威源。
+- 新增 `npm.cmd run project:knowledge:sync` 和 `npm.cmd run project:knowledge:verify`，同步 package version、latest recovery tag 与 Last Verified Git Snapshot；verify 直接读取 Git branch/HEAD/worktree，但不要求 tracked 快照永久相等，并验证必需文档结构；不自动推断 Gate 结论。
+- `AGENTS.md` 强制所有 Agent 在修改前读取 Project Knowledge 并检查 Git/version，修改后运行 sync/verify PASS 后才能输出 Implementation Evidence。
+- 本任务不修改 P3-3，不启动 P3-4，不创建 close commit/tag，等待 Strict Review。
+
+## TeemoChatAgentToolCalling Maintenance M1（2026-08-10，PASS / BLOCKERS: 0）
+
+- 普通 Chat 使用 Provider-neutral Native Tool Calling；兼容 Provider 返回的结构化 `tool_calls` 统一进入 `TeemoAgentCore`、Tool Registry、P1 Permission、File IPC 与 Main Process `TeemoFileService`；Safe File Tool 路径不从 Renderer 直接执行 filesystem I/O。
+- 当前普通 Chat 仅开放 Safe File Tool allowlist：`list_directory`、`read_file`、`search_files`、`search_text`、`create_file`、`patch_file`、`rename_file`、`create_directory`。
+- M1 正式能力是位于 P1 authorized root 内的明确真实路径。正常与拒绝路径均经 P1 Permission；Main Process 仍是最终 filesystem authorization boundary。未授权和越界路径 hard deny。
+- 已完成当前 OpenAI-compatible Provider 的 Native Tool Calling Capability Gate，以及普通 Chat `read_file`、`create_directory`、Permission DENY、原始 `tool_call_id` tool-result continuation 的实际验证。
+- 普通 Chat 不暴露 Git Tools、Controlled Execute、任意 Shell/PowerShell、任意程序执行、delete 或 destructive operation。
+- Natural-language authorized-root alias / root grounding 是后续 UX Enhancement，不阻塞 M1；它不得扩大 Provider 可访问的路径范围。P3-3 未修改，P3-4 未开始。当前权威状态见 `docs/TeemoProjectKnowledge/CURRENT-STATE.md`。
 
 ## P3-3 阶段（2026-08-09，CLOSED / PASS）
 

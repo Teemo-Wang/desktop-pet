@@ -1,10 +1,18 @@
-# Teemo助理 V1.3.0 使用 SOP
+# Teemo助理 V1.3.2 使用 SOP
 
-> 适用版本：`v1.3.0`
+## P3-4 Inspiration Retrieval (IMPLEMENTED / WAITING REVIEW)
+
+“我的灵感”现在可对已建立的本地 Metadata Index 做关键词检索。支持文件名/相对路径 substring、来源、PNG/JPEG/WEBP/GIF、横向/纵向/正方形、最小宽高、最新/最早/名称排序和最多 100 项分页。结果点击复用现有预览。
+
+检索只读取 Teemo 私有 active metadata，不上传素材，不调用 Provider，不写入 Source，不注入 Agent Context。撤销授权、移除来源、索引不可用或关闭灵感能力时 fail closed。P3-5/P3-6 未开始，Git/Controlled Execute/Shell/delete 仍不向普通 Chat 开放。
+
+> 适用版本：`v1.3.2`
 > 产品：Windows Electron 桌面 AI 助手
 > 当前源码：`D:\Teemo助手\Teemo机器人项目\Teemo-source`
 > 更新日期：2026-08-10
 > 阶段状态：`P3-3 Visual Metadata Index CLOSED / PASS / BLOCKERS: 0`
+
+> 当前工程状态权威来源：`docs/TeemoProjectKnowledge/CURRENT-STATE.md`。本 SOP 只描述产品使用和运维，不用于判断当前开发阶段、Gate 或下一步授权。
 
 ## 1. 产品定位
 
@@ -22,9 +30,9 @@ Teemo助理是面向个人设计生产力的桌面 AI 助手，提供多模型�
 C:\Users\Teemo\AppData\Local\Programs\teemo-assistant\Teemo助理.exe
 ```
 
-开始菜单入口：`Teemo助理`。启动后可在设置或关于信息中确认版本为 `v1.3.0`。
+开始菜单入口：`Teemo助理`。启动后可在设置或关于信息中确认版本为 `v1.3.2`。
 
-当前本机安装文件版本为 `1.3.0`，对应恢复标签 `v1.3.0-p3.3-visual-metadata-index`。
+当前本机安装文件版本为 `1.3.2`，开发源码 `package.json` 与 `package-lock.json` 也为 `1.3.2`；`npm.cmd run verify:release-version` 已通过。
 
 版本规则：发布标签使用 `vX.Y.Z-*`，界面、package/lockfile 和安装包必须显示同一 `X.Y.Z`。界面通过 Electron `app.getVersion()` 动态读取，不单独硬编码；正式构建会自动执行版本一致性检查。
 
@@ -64,6 +72,8 @@ API Key、Token、密码等凭据只保存在本机配置中，不要写入源�
 - 支持流式输出；请求过程中可取消。
 - 连接异常时先使用“测试连接”，再检查地址、模型名、Key 和代理设置。
 - 不同模型共享同一套本地文件授权和 Service 规则，不要为单个模型另建权限逻辑。
+- 对支持 Native Tool Calling 的 Provider，普通 Chat 可调用当前 Safe File Tools。模型的结构化工具请求会经过 `TeemoAgentCore`、Tool Registry、P1 Permission、File IPC 和 Main Process `TeemoFileService`；Safe File Tool 路径不从聊天界面直接执行 filesystem I/O。
+- 普通 Chat 当前只开放：`list_directory`、`read_file`、`search_files`、`search_text`、`create_file`、`patch_file`、`rename_file`、`create_directory`。不开放 Git Tools、Controlled Execute、任意 Shell/PowerShell、任意程序执行、delete 或 destructive operation。
 
 ## 5. 图片、视频与文档
 
@@ -81,7 +91,9 @@ Teemo 默认不能浏览任意本地路径。使用“本地文件”前：
 3. 在聊天窗口点击“本地文件”，从已授权目录中选择文档。
 4. 不再需要时点击“取消授权”。
 
-P1 文件能力支持授权目录内的安全读取、搜索、文本创建、精确 patch 与不覆盖 rename；不提供 delete。Git 只开放本地 read、显式 stage 与 staged-only commit；执行只开放明确授权的 npm script 与 Node-only process，不提供任意 Shell。
+在普通 Chat 使用文件工具时，请提供位于 P1 authorized root 内的明确真实路径。工具调用仍会逐次经过 P1 Permission，Main Process 是最终 filesystem authorization boundary。普通 Chat 支持安全读取、搜索、文本创建、精确 patch、不覆盖 rename 与创建空目录；不提供 delete。
+
+自然语言目录别名（例如“素材库”）的自动定位仍属于后续体验优化，不是当前普通 Chat File Tool 的正式使用契约；不要假定模型可以猜测本机绝对路径。
 
 请只授权必要目录。未授权目录、授权目录外的路径和路径穿越请求必须被拒绝。
 

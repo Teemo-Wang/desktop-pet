@@ -9,6 +9,7 @@
       this.service = options.service || null;
       this.sourceClient = options.sourceClient || null;
       this.indexClient = options.indexClient || null;
+      this.retrievalClient = options.retrievalClient || null;
       this.onBack = typeof options.onBack === 'function' ? options.onBack : () => {};
       const get = id => document.getElementById(id);
       this.els = {
@@ -35,6 +36,20 @@
         browserBack: get('TeemoInspirationBrowserBack'),
         entryList: get('TeemoInspirationEntryList'),
         preview: get('TeemoInspirationPreview'),
+        retrieval: get('TeemoInspirationRetrieval'),
+        searchInput: get('TeemoInspirationSearchInput'),
+        searchSource: get('TeemoInspirationSearchSource'),
+        searchFormat: get('TeemoInspirationSearchFormat'),
+        searchOrientation: get('TeemoInspirationSearchOrientation'),
+        searchMinWidth: get('TeemoInspirationSearchMinWidth'),
+        searchMinHeight: get('TeemoInspirationSearchMinHeight'),
+        searchSort: get('TeemoInspirationSearchSort'),
+        searchButton: get('TeemoInspirationSearchButton'),
+        searchResults: get('TeemoInspirationSearchResults'),
+        resultCount: get('TeemoInspirationResultCount'),
+        searchPrevious: get('TeemoInspirationSearchPrevious'),
+        searchNext: get('TeemoInspirationSearchNext'),
+        searchPage: get('TeemoInspirationSearchPage'),
       };
       this.snapshot = null;
       this.busy = false;
@@ -45,6 +60,8 @@
       this.activeIndexSnapshot = null;
       this.activeIndexOperation = null;
       this.indexProgress = null;
+      this.searchOffset = 0;
+      this.searchResult = null;
       this._bind();
     }
 
@@ -58,6 +75,14 @@
       if (this.els.indexPrevious) this.els.indexPrevious.addEventListener('click', () => this._changeIndexPage(-1));
       if (this.els.indexNext) this.els.indexNext.addEventListener('click', () => this._changeIndexPage(1));
       if (this.els.browserBack) this.els.browserBack.addEventListener('click', () => this._browseParent());
+      if (this.els.searchButton) this.els.searchButton.addEventListener('click', () => this._search(0));
+      if (this.els.searchInput) this.els.searchInput.addEventListener('keydown', event => {
+        if (event.key === 'Enter') this._search(0);
+      });
+      if (this.els.searchPrevious) this.els.searchPrevious.addEventListener('click', () => this._search(Math.max(0, this.searchOffset - 100)));
+      if (this.els.searchNext) this.els.searchNext.addEventListener('click', () => {
+        if (this.searchResult && this.searchResult.hasMore) this._search(this.searchOffset + 100);
+      });
     }
 
     show() {
@@ -86,6 +111,7 @@
           localFolderAvailable,
         };
         this.render();
+        this._renderSearchSources();
         const stateError = this.snapshot.state && this.snapshot.state.stateError;
         if (stateError) this._setStatus(stateError.message || '灵感系统状态无法读取，已安全停用', true);
         else if (this.snapshot.sourceStateError) this._setStatus(this.snapshot.sourceStateError.message || '灵感来源配置无法读取，已安全停用', true);
@@ -138,6 +164,68 @@
         const activeSource = sources.find(source => source.sourceId === this.activeIndexSourceId);
         if (!enabled || !activeSource || activeSource.status !== 'CONFIGURED') this._closeIndex();
       }
+      if (this.els.retrieval) this.els.retrieval.hidden = !enabled || !this.retrievalClient;
+      this._renderSearchSources();
+      this._renderSearchResult();
+    }
+
+    _renderSearchSources() {
+      if (!this.els.searchSource || !this.snapshot) return;
+      const current = this.els.searchSource.value;
+      const sources = (this.snapshot.sources || []).filter(source => source.status === 'CONFIGURED');
+      this.els.searchSource.innerHTML = '<option value="">全部来源</option>' + sources.map(source => `<option value="${this._escape(source.sourceId)}">${this._escape(source.displayName)}</option>`).join('');
+      this.els.searchSource.value = sources.some(source => source.sourceId === current) ? current : '';
+    }
+
+    async _search(offset = 0) {
+      if (this.busy || !this.retrievalClient) return;
+      this.busy = true; this.searchOffset = Math.max(0, Number(offset) || 0); this.render();
+      try {
+        this.searchResult = await this.retrievalClient.search({
+          query: this.els.searchInput && this.els.searchInput.value,
+          sourceId: this.els.searchSource && this.els.searchSource.value,
+          format: this.els.searchFormat && this.els.searchFormat.value,
+          orientation: this.els.searchOrientation && this.els.searchOrientation.value,
+          minWidth: this.els.searchMinWidth && this.els.searchMinWidth.value,
+          minHeight: this.els.searchMinHeight && this.els.searchMinHeight.value,
+          sort: this.els.searchSort && this.els.searchSort.value,
+          offset: this.searchOffset,
+          limit: 100,
+        });
+        if (this.searchResult.status !== 'READY') {
+          const labels = { DISABLED: '灵感基础能力当前已停用', NOT_INDEXED: '请先建立素材索引', CORRUPT: '索引不可用，请先重建', AUTHORIZATION_REQUIRED: '来源需要重新授权', SOURCE_NOT_FOUND: '找不到指定来源' };
+          this._setStatus(labels[this.searchResult.status] || '当前没有可检索的已授权索引', true);
+        } else this._setStatus('');
+      } catch (error) {
+        this.searchResult = { status: 'FAILED', items: [], total: 0, offset: this.searchOffset, limit: 100, hasMore: false };
+        this._setStatus(error && error.message ? error.message : '灵感检索失败', true);
+      } finally { this.busy = false; this.render(); }
+    }
+
+    _renderSearchResult() {
+      const result = this.searchResult;
+      if (!this.els.searchResults || !result) return;
+      const items = Array.isArray(result.items) ? result.items : [];
+      if (this.els.resultCount) this.els.resultCount.textContent = `${Number(result.total) || 0} 项结果`;
+      this.els.searchResults.innerHTML = items.length ? items.map(item => `<button type="button" class="teemo-inspiration-search-result" data-search-source="${this._escape(item.sourceId)}" data-search-path="${this._escape(item.relativePath)}">
+        <span class="teemo-inspiration-search-result-copy"><strong>${this._escape(item.name)}</strong><em>${this._escape(item.sourceDisplayName)} · ${this._escape(item.relativePath)}</em></span>
+        <span class="teemo-inspiration-search-result-meta">${item.width} × ${item.height} · ${this._escape(item.mime)}</span>
+      </button>`).join('') : '<div class="teemo-inspiration-empty"><strong>没有匹配的已授权素材</strong></div>';
+      this.els.searchResults.querySelectorAll('[data-search-source]').forEach(button => button.addEventListener('click', () => this._previewSearchResult(button.dataset.searchSource, button.dataset.searchPath)));
+      const limit = Math.max(1, Number(result.limit) || 100);
+      const pages = Math.max(1, Math.ceil((Number(result.total) || 0) / limit));
+      if (this.els.searchPage) this.els.searchPage.textContent = `${Math.floor((Number(result.offset) || 0) / limit) + 1} / ${pages}`;
+      if (this.els.searchPrevious) this.els.searchPrevious.disabled = !result.offset || this.busy;
+      if (this.els.searchNext) this.els.searchNext.disabled = !result.hasMore || this.busy;
+    }
+
+    async _previewSearchResult(sourceId, relativePath) {
+      if (!this.snapshot || this.busy || !this.service) return;
+      const source = (this.snapshot.sources || []).find(item => item.sourceId === sourceId);
+      if (!source || source.status !== 'CONFIGURED') { this._setStatus('来源需要重新授权后才能预览', true); return; }
+      this.activeSourceId = sourceId; this.activeDirectory = '';
+      if (this.els.browser) this.els.browser.hidden = false;
+      await this._preview(relativePath);
     }
 
     _sourceMarkup(source, enabled) {

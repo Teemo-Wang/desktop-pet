@@ -1,12 +1,14 @@
 {
   "name": "teemo-assistant",
-  "version": "1.3.0",
+  "version": "1.3.2",
   "description": "哈啰桌面AI机器人 - 设计助手",
   "main": "main.js",
   "author": "Teemo Wang",
   "scripts": {
     "start": "electron .",
     "verify:release-version": "node scripts/TeemoVerifyReleaseVersion.js",
+    "project:knowledge:sync": "node scripts/TeemoProjectKnowledge.js sync",
+    "project:knowledge:verify": "node scripts/TeemoProjectKnowledge.js verify",
     "test:auto-update": "node tests/TeemoAutoUpdatePolicy.test.js",
     "test:inspiration-foundation": "node tests/TeemoInspirationFoundation.test.js",
     "test:inspiration-isolation": "node tests/TeemoInspirationIsolation.test.js",
@@ -17,7 +19,10 @@
     "test:inspiration-index": "node tests/TeemoInspirationMetadataIndex.test.js",
     "test:inspiration-index-isolation": "node tests/TeemoInspirationMetadataIndexIsolation.test.js",
     "test:inspiration-index-ui-smoke": "electron tests/TeemoInspirationMetadataIndexElectronSmoke.js",
+    "test:inspiration-retrieval": "node tests/TeemoInspirationRetrieval.test.js",
+    "test:inspiration-retrieval-ui-smoke": "electron tests/TeemoInspirationRetrievalElectronSmoke.js",
     "test:agent-core": "node tests/TeemoAgentCore.test.js",
+    "test:chat-tool-calling-ui-smoke": "electron tests/TeemoChatToolCallingElectronSmoke.js",
     "test:cognition": "node tests/TeemoCognition.test.js",
     "test:cognition-management": "node tests/TeemoCognitionManagement.test.js",
     "test:cognition-ui-smoke": "electron tests/TeemoCognitionCenterElectronSmoke.js",
@@ -87,8 +92,18 @@
       "category": "public.app-category.productivity",
       "icon": "icon/app.icns",
       "target": [
-        { "target": "dmg", "arch": ["universal"] },
-        { "target": "zip", "arch": ["universal"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
       ]
     },
     "dmg": {
@@ -97,7 +112,12 @@
     "win": {
       "icon": "icon/Teemo-app.png",
       "target": [
-        { "target": "nsis", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
     "nsis": {

@@ -26,7 +26,7 @@
   const IGNORED_DIRECTORIES = new Set(['node_modules', '.git', 'dist', 'cache', '.cache']);
   const TOOLS = new Set([
     'list_directory', 'read_file', 'search_files', 'search_text',
-    'create_file', 'patch_file', 'rename_file',
+    'create_file', 'create_directory', 'patch_file', 'rename_file',
   ]);
 
   class TeemoFileError extends Error {
@@ -168,6 +168,24 @@
       return { target, root, parent };
     }
 
+    _resolveNewDirectory(directoryPath, roots) {
+      const requested = this._validatePathInput(directoryPath);
+      const basename = path.basename(requested);
+      if (!basename || basename === '.' || basename === '..') fail('FILE_PATH_INVALID', 'A directory name is required.');
+      if (process.platform === 'win32' && (/[. ]$/.test(basename)
+        || /[<>:"/\\|?*]/.test(basename)
+        || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(basename))) {
+        fail('FILE_PATH_UNSAFE', 'The destination directory name is unsafe on Windows.');
+      }
+      let parent;
+      try { parent = fs.realpathSync.native(path.dirname(requested)); } catch (_) { fail('FILE_PARENT_NOT_FOUND', 'The destination parent folder does not exist.'); }
+      const root = this._findRoot(parent, roots);
+      if (!root) fail('FILE_OUTSIDE_AUTHORIZED_ROOT', 'The destination is outside authorized folders.');
+      const target = path.join(parent, basename);
+      if (!this.isPathWithinRoot(root, target)) fail('FILE_OUTSIDE_AUTHORIZED_ROOT', 'The destination is outside authorized folders.');
+      return { target, root, parent };
+    }
+
     _resource(filePath) {
       return pathToFileURL(filePath).href;
     }
@@ -220,6 +238,15 @@
         this._assertTextWrite(resolved.target);
         const exists = fs.existsSync(resolved.target);
         if (exists) fail('FILE_ALREADY_EXISTS', 'The destination file already exists.');
+        snapshot = this._snapshot(resolved, {
+          parent: resolved.parent,
+          parentIdentity: this._identity(resolved.parent),
+          exists,
+        });
+      } else if (tool === 'create_directory') {
+        const resolved = this._resolveNewDirectory(args.path, roots);
+        const exists = fs.existsSync(resolved.target);
+        if (exists) fail('FILE_ALREADY_EXISTS', 'The destination directory already exists.');
         snapshot = this._snapshot(resolved, {
           parent: resolved.parent,
           parentIdentity: this._identity(resolved.parent),
@@ -295,6 +322,7 @@
         search_files: () => this._search(current, false, options),
         search_text: () => this._search(current, true, options),
         create_file: () => this._createFile(current, options),
+        create_directory: () => this._createDirectory(current, options),
         patch_file: () => this._patchFile(current, options),
         rename_file: () => this._renameFile(current, options),
       };
@@ -511,6 +539,21 @@
       }
       const stat = fs.statSync(destination);
       return { path: destination, previousPath: source, renamed: true, sha256: currentHash, size: stat.size, modifiedAt: iso(stat.mtimeMs) };
+    }
+
+    _createDirectory(prepared, options) {
+      const target = prepared.snapshot.target;
+      this._assertNotCancelled(options.checkCancelled);
+      if (fs.existsSync(target)) fail('FILE_ALREADY_EXISTS', 'The destination directory already exists.');
+      try {
+        fs.mkdirSync(target);
+      } catch (error) {
+        if (error && error.code === 'EEXIST') fail('FILE_ALREADY_EXISTS', 'The destination directory already exists.');
+        throw error;
+      }
+      const stat = fs.statSync(target);
+      if (!stat.isDirectory()) fail('FILE_OPERATION_FAILED', 'The destination is not a directory.');
+      return { path: target, type: 'directory', created: true, createdAt: iso(stat.birthtimeMs) };
     }
 
     async readDocument(filePath) {

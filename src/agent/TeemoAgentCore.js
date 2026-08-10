@@ -63,6 +63,8 @@
         type: 'tool_request',
         tool: action.tool.trim(),
         arguments: action.arguments || {},
+        providerMessage: action.providerMessage || null,
+        providerToolCallId: typeof action.providerToolCallId === 'string' ? action.providerToolCallId : null,
       };
     }
     return { type: 'agent_error', code: 'INVALID_ACTION', message: `未知 Agent Action 类型：${action.type || '(空)'}` };
@@ -425,6 +427,46 @@
           run,
           error: { ...run.error, cancelled: run.status === 'cancelled' },
         };
+      } finally {
+        if (TERMINAL.has(run.status)) this.activeRuns.delete(run.runId);
+      }
+    }
+
+    async runNativeTools(options = {}) {
+      const ai = options.aiService || this.aiService;
+      const registry = options.toolRegistry || this.toolRegistry;
+      if (!ai || typeof ai.sendWithTools !== 'function') throw new Error('Agent Core requires a native tool-calling provider adapter.');
+      if (!registry || typeof registry.listDefinitions !== 'function') throw new Error('Agent Core requires a tool registry.');
+      const prepared = await this._prepareMessages(options, false);
+      const run = this.createRun({ ...options, messages: prepared.messages });
+      const signal = options.signal;
+      const maxSteps = Number.isInteger(options.maxSteps) && options.maxSteps > 0 ? options.maxSteps : this.maxSteps;
+      const tools = registry.listDefinitions().map(definition => ({ type: 'function', function: {
+        name: definition.name, description: definition.description, parameters: definition.inputSchema,
+      } }));
+      run.status = 'thinking';
+      try {
+        for (let step = 1; step <= maxSteps; step += 1) {
+          run.step = step;
+          const action = normalizeAction(await ai.sendWithTools(run.messages, { tools, signal, timeout: options.timeout }));
+          if (action.type === 'direct_response' || action.type === 'final_response') {
+            run.status = 'completed'; run.finishedAt = new Date().toISOString();
+            return { ok: true, run, action, content: action.content };
+          }
+          if (action.type === 'agent_error') throw Object.assign(new Error(action.message), { code: action.code });
+          const result = await this._executeTool(registry, action, run, signal, options.onStatus);
+          run.messages.push(action.providerMessage || { role: 'assistant', content: JSON.stringify(action) });
+          run.messages.push(action.providerToolCallId
+            ? { role: 'tool', tool_call_id: action.providerToolCallId, content: JSON.stringify(result) }
+            : { role: 'tool', name: action.tool, content: JSON.stringify(result) });
+          run.status = 'continuing';
+        }
+        throw Object.assign(new Error(`Agent exceeded max steps (${maxSteps}).`), { code: 'MAX_STEPS' });
+      } catch (error) {
+        run.status = error.name === 'AbortError' || error.code === 'AGENT_CANCELLED' ? 'cancelled' : 'failed';
+        run.error = { code: error.code || 'AGENT_ERROR', message: error.message || 'Agent execution failed.' };
+        run.finishedAt = new Date().toISOString();
+        return { ok: false, run, error: { ...run.error, cancelled: run.status === 'cancelled' } };
       } finally {
         if (TERMINAL.has(run.status)) this.activeRuns.delete(run.runId);
       }

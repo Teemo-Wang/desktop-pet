@@ -18,6 +18,8 @@ const TeemoInspirationIndexStorage = require('./src/inspiration/TeemoInspiration
 const TeemoLocalFolderIndexScanner = require('./src/inspiration/TeemoLocalFolderIndexScanner');
 const TeemoInspirationIndexService = require('./src/inspiration/TeemoInspirationIndexService');
 const registerTeemoInspirationIndexIpc = require('./src/inspiration/TeemoInspirationIndexIpc');
+const TeemoInspirationRetrievalService = require('./src/inspiration/TeemoInspirationRetrievalService');
+const registerTeemoInspirationRetrievalIpc = require('./src/inspiration/TeemoInspirationRetrievalIpc');
 const dingtalkBridge = require('./dingtalk-bridge');
 const materialBridge = require('./material-bridge');
 
@@ -76,6 +78,14 @@ const teemoLocalFolderIndexScanner = new TeemoLocalFolderIndexScanner({
 const teemoInspirationIndexService = new TeemoInspirationIndexService({
   storage: teemoInspirationIndexStorage,
   scanner: teemoLocalFolderIndexScanner,
+});
+const teemoInspirationRetrievalService = new TeemoInspirationRetrievalService({
+  indexService: teemoInspirationIndexService,
+  sourceService: teemoInspirationSourceService,
+  inspirationStateService: teemoInspirationStateService,
+});
+registerTeemoInspirationRetrievalIpc(ipcMain, {
+  retrievalService: teemoInspirationRetrievalService,
 });
 registerTeemoInspirationIndexIpc(ipcMain, {
   indexService: teemoInspirationIndexService,
