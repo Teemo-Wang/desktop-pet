@@ -91,13 +91,13 @@ P3-5 Eagle-compatible connector is closed with zero blockers. It is a local-only
 
 <!-- TEEMO_PROJECT_KNOWLEDGE_AUTO:START -->
 - Version: `1.3.2`
-- Latest Recovery Tag: `v1.3.2-p3.4-inspiration-retrieval`
+- Latest Recovery Tag: `v1.3.2-p3.5-eagle-library`
 
 ## Last Verified Git Snapshot
 
 This is a historical snapshot written when Project Knowledge was last synchronized. Git branch, HEAD, and worktree are real-time engineering facts and must be queried directly during Agent Pre-Flight.
 
 - Branch: `Teemo/p3-personal-inspiration`
-- HEAD: `f93a9341afb4c8e83f8e364933178a7dfda4233b`
-- Worktree: `DIRTY`
+- HEAD: `8d9da07ea5f98c0442a7f795c5b964896c53e588`
+- Worktree: `CLEAN`
 <!-- TEEMO_PROJECT_KNOWLEDGE_AUTO:END -->
