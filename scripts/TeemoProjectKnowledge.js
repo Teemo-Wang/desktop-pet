@@ -121,10 +121,11 @@ function verify() {
     'P5-1 CLOSED / PASS / BLOCKERS: 0',
     'P5-2 CLOSED / PASS / BLOCKERS: 0',
     'P5-3 CLOSED / PASS / BLOCKERS: 0',
+    'P5 FINAL CLOSED / PASS / BLOCKERS: 0',
     'Next Allowed Stage:',
-    'P5 Final Acceptance Taskbook Review only; P5 Final implementation remains blocked.',
+    'Maintenance only; no next P5 stage remains.',
     'Latest Closed Stage:',
-    'P5-2 Autonomous Execution & Verification',
+    'P5-3 Controlled Self-Upgrade',
   ];
   for (const claim of requiredStateClaims) {
     if (!state.includes(claim)) {
@@ -161,6 +162,9 @@ function verify() {
     'CLOSED / PASS / BLOCKERS: 0',
     'P5-3 Controlled Self-Upgrade',
     'Teemo-P5-3-CONTROLLED-SELF-UPGRADE.md',
+    'CLOSED / PASS / BLOCKERS: 0',
+    'P5 Final Acceptance',
+    'Teemo-P5-FINAL-ACCEPTANCE.md',
     'CLOSED / PASS / BLOCKERS: 0',
     'P3 Personal Inspiration Final Acceptance',
     'CLOSED / PASS',

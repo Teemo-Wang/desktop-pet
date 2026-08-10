@@ -5,6 +5,9 @@
 - The proposal defines one clean-baseline, owner/plan/repo-bound, immutable patch manifest using P5-2/P1/Main file execution, read-only Git verification, baseline-bound npm scripts, finite failure handling, and external Strict Review.
 - External GPT Strict Review approved implementation within the Taskbook with zero blockers and no required fixes. Closed under `v1.3.2-p5.3-controlled-self-upgrade`; P5 Final Acceptance remains blocked. Create/delete/rename, package/dependency mutation, Git writes/remotes, arbitrary execution/Shell, installation/restart, background/persistent/recursive upgrade, and auto-close/tag remain excluded.
 
+## P5 Final Acceptance - 2026-08-10 (CLOSED / PASS / BLOCKERS: 0)
+- Verification-only P5 Final Acceptance matrix passed across P5-1/P5-2/P5-3 and shared P1-P4 boundaries using synthetic data. Closed under `v1.3.2-p5-final-acceptance`; no release build, installation, or restart was performed.
+
 ## P5-2 Autonomous Execution & Verification - 2026-08-10 (CLOSED / PASS)
 - Added an owner/plan-bound, memory-only bounded execution state machine with explicit full-run approval, exact write-step confirmation, `maxSteps`, finite read/verification retry, timeout, cancellation, and fail-closed ownership/plan checks.
 - Existing Agent Core and the unchanged eight Chat Safe File Tools now provide approved plan-step actions; Tool Registry, P1 Permission, File IPC, and Main Process FileService remain the only execution and postcondition-verification path.

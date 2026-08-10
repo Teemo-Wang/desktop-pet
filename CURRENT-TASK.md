@@ -87,6 +87,14 @@
 - State：`IMPLEMENTED / WAITING REVIEW; P5 Final Acceptance NOT STARTED`
 - External GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P5 Final Acceptance Taskbook Review only / P5_FINAL_STARTED: NO`.
 - P5-3 is closed under recovery tag `v1.3.2-p5.3-controlled-self-upgrade`; P5 Final Acceptance remains `NOT STARTED`.
+
+## P5 Final Acceptance (CLOSED / PASS / BLOCKERS: 0)
+
+- Taskbook: `docs/Teemo-P5-FINAL-ACCEPTANCE.md`.
+- External GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES / P5_3_STARTED: NO / P5_FINAL_STARTED: NO`.
+- Verification-only implementation completed within the approved Taskbook and passed external implementation-evidence Strict Review with zero blockers.
+- P5 Final is closed under recovery tag `v1.3.2-p5-final-acceptance`.
+- P5-1, P5-2, and P5-3 remain closed; current version remains `1.3.2`.
 - Installed App Version：`v1.3.2`
 - Development App Version：`v1.3.2`
 - P3 Baseline：`cd29e6f` / `v1.2.1-p3-baseline`

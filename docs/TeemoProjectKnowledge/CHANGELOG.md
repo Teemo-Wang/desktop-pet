@@ -8,6 +8,10 @@ P3 and P4 are closed. P5-1 is closed under `v1.3.2-p5.1-autonomous-planning`; P5
 Planned:
 P5-3 Controlled Self-Upgrade Taskbook approves one clean-baseline, owner-controlled, immutable existing-file patch manifest with P5-2/P1/Main execution, read-only Git verification, baseline-bound npm verification, explicit rollback, and external Strict Review. Implementation is allowed only within those bounds.
 
+P5 Final Acceptance has a verification-only Taskbook proposal; external Strict Review is required before any final verification begins.
+
+P5 Final Acceptance passed final external implementation-evidence Strict Review and is closed under `v1.3.2-p5-final-acceptance`; no new product capability was added.
+
 Added:
 P5-2 Autonomous Execution & Verification implements one explicit, bounded, owner/plan-bound in-memory run using only the existing Safe File Tools through Agent Core, Tool Registry, P1 Permission, File IPC, and Main Process FileService. Exact write confirmation, trusted postcondition verification, finite retry, timeout, cancellation, and fail-closed ownership checks are enforced. Status is `CLOSED / PASS / BLOCKERS: 0`.
 
