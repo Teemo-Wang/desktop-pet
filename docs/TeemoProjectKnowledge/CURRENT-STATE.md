@@ -101,13 +101,13 @@ P3 Personal Inspiration is closed with final GPT Strict Review approval. P3-1 th
 
 <!-- TEEMO_PROJECT_KNOWLEDGE_AUTO:START -->
 - Version: `1.3.2`
-- Latest Recovery Tag: `v1.3.2-p3-final-acceptance`
+- Latest Recovery Tag: `v1.3.2-p4.1-runtime-screen-awareness`
 
 ## Last Verified Git Snapshot
 
 This is a historical snapshot written when Project Knowledge was last synchronized. Git branch, HEAD, and worktree are real-time engineering facts and must be queried directly during Agent Pre-Flight.
 
 - Branch: `Teemo/p3-personal-inspiration`
-- HEAD: `eac0572e3ff065f266cdabf362d3a7c735a05252`
-- Worktree: `DIRTY`
+- HEAD: `82cf888378b9cc0abe57187b3418531c94ed52d6`
+- Worktree: `CLEAN`
 <!-- TEEMO_PROJECT_KNOWLEDGE_AUTO:END -->
