@@ -83,13 +83,13 @@ P3-4 Retrieval is local-only. It filters active P3-3 metadata snapshots and reus
 
 <!-- TEEMO_PROJECT_KNOWLEDGE_AUTO:START -->
 - Version: `1.3.2`
-- Latest Recovery Tag: `v1.3.0-p3.3-visual-metadata-index`
+- Latest Recovery Tag: `v1.3.2-p3.4-inspiration-retrieval`
 
 ## Last Verified Git Snapshot
 
 This is a historical snapshot written when Project Knowledge was last synchronized. Git branch, HEAD, and worktree are real-time engineering facts and must be queried directly during Agent Pre-Flight.
 
 - Branch: `Teemo/p3-personal-inspiration`
-- HEAD: `fd2bb03bca04a02067a05744a9e2b29d0887cd89`
-- Worktree: `DIRTY`
+- HEAD: `7104b81795f48534de4d2e2edabb4ca8fb78748f`
+- Worktree: `CLEAN`
 <!-- TEEMO_PROJECT_KNOWLEDGE_AUTO:END -->
