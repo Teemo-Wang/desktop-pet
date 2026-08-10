@@ -12,6 +12,11 @@
 - Reused P1 authorized-root and Permission boundaries; traversal, link/junction, containment, and TOCTOU checks fail closed.
 - Provider calls: `0`; Eagle source bytes and formal user data unchanged. GPT Strict Review: `PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES`.
 
+## P3 Personal Inspiration Final Acceptance - 2026-08-10 (CLOSED / PASS)
+- P3-1 Inspiration Foundation, P3-2 Local Folder and Preview, P3-3 Visual Metadata Index, P3-4 Retrieval, P3-5 Eagle-compatible read-only source, and P3-6 Agent Inspiration Context completed their final acceptance.
+- Final regression passed all listed P3 Node/Electron suites, Tool Registry, P1 Permission/Safe File Tools, Agent Core, Chat Tool Calling, Skill UI, auto-update policy, release-version, Project Knowledge, 164 JavaScript syntax checks, and `git diff --check`.
+- GPT Strict Review: `PASS / BLOCKERS: 0 / CAN_CLOSE_P3: YES`; recovery tag `v1.3.2-p3-final-acceptance`. P4/P5 remain not started.
+
 ## P3-6 Agent Uses Inspiration - 2026-08-10 (CLOSED / PASS)
 - Added explicit-request-only, bounded reuse of existing P3-4 local retrieval results as provider-neutral, untrusted Inspiration Context.
 - Generic chat bypasses retrieval; disabled/revoked/unavailable sources fail closed. No absolute paths, source bytes, previews, credentials, or new filesystem permissions enter Provider payloads.

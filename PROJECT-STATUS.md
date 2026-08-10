@@ -1,6 +1,6 @@
 # Teemo助理 — 项目进度与规划
 
-## P3-6 Agent Uses Inspiration (CLOSED / PASS)
+## P3 Personal Inspiration Final Acceptance (CLOSED / PASS)
 
 - Local retrieval is implemented over active P3-3 metadata snapshots with keyword, source, format, orientation, minimum-size, sorting, and bounded pagination filters.
 - Main Process revalidates Source/P1 authorization; P3-2 preview is reused for result selection. P3-4 itself makes no provider calls or source-byte changes; P3-6 adds only the approved bounded Agent Context path.
@@ -9,7 +9,11 @@
 - P3-5 More Inspiration Sources: `CLOSED / PASS / BLOCKERS: 0`; close commit `8d9da07` and recovery tag `v1.3.2-p3.5-eagle-library` are present.
 - P3-6 Taskbook received GPT Strict Review approval: `PASS / BLOCKERS: 0 / IMPLEMENTATION_ALLOWED: YES`.
 - P3-6 Implementation Evidence received GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3 Final Acceptance`.
-- P3-6 is closed. The next allowed work is a separate P3 Final Acceptance Taskbook and Strict Review; P4/P5 remain not started.
+- P3-6 is closed with commit `79bb4bb` and recovery tag `v1.3.2-p3.6-agent-uses-inspiration`.
+- P3 Final Acceptance Taskbook received GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES / NEXT_STAGE_ALLOWED: P3 Final Acceptance Evidence only; P4/P5 NOT ALLOWED`.
+- Final acceptance verification passed P3/P1/P2 regression, Electron smoke, version, syntax, Project Knowledge, and diff checks.
+- Final GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_P3: YES / NEXT_STAGE_ALLOWED: P3 Final close commit/tag only; P4/P5 NOT ALLOWED`.
+- P3 is closed. Recovery tag: `v1.3.2-p3-final-acceptance`. P4/P5 remain not started and require independent approved Taskbooks.
 
 > 文档版本：v1.32 ｜ 更新日期：2026-08-10 ｜ 当前开发版本：**v1.3.2（P3-6 CLOSED / PASS；P3 Final Acceptance Taskbook pending）**
 
@@ -22,7 +26,7 @@
 - P0：`CLOSED`
 - P1：`CLOSED / PASS / BLOCKERS: 0`
 - P2：`CLOSED / PASS / BLOCKERS: 0`
-- P3：`IN PROGRESS`
+- P3：`CLOSED / PASS / BLOCKERS: 0`
 - P3-1：`CLOSED / PASS / BLOCKERS: 0`
 - P3-2：`CLOSED / PASS / BLOCKERS: 0`
 - P3-3：`CLOSED / PASS / BLOCKERS: 0`

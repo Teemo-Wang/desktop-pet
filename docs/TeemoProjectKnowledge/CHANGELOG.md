@@ -3,7 +3,7 @@
 ## 1.3.2
 
 Current:
-P3-6 Agent Uses Inspiration is closed with zero blockers after GPT Strict Review. P3 Final Acceptance is the only next P3 work and requires its own approved Taskbook.
+P3 Personal Inspiration is closed with zero blockers after final GPT Strict Review. P3-1 through P3-6 remain closed; final acceptance introduced no new product capability. P4/P5 remain not started.
 
 Added:
 P3-5 source registration, bounded Eagle metadata indexing, existing retrieval/preview reuse, and fail-closed P1 authorization checks. Provider calls remain zero and source bytes remain unchanged.

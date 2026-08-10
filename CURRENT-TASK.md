@@ -1,6 +1,6 @@
 # Current Task
 
-## P3-6 Agent Uses Inspiration (CLOSED / PASS)
+## P3 Personal Inspiration Final Acceptance (CLOSED / PASS)
 
 - Active P3-3 metadata snapshots now support local keyword retrieval, source/format/orientation/size filters, newest/oldest/name sorting, and pagination capped at 100 items.
 - Results are returned through Main Process retrieval IPC and reuse the existing P3-2 preview path. Revoked, removed, corrupt, unindexed, or disabled sources fail closed.
@@ -10,14 +10,18 @@
 - P3-5 More Inspiration Sources: `CLOSED / PASS / BLOCKERS: 0`; close commit `8d9da07` and recovery tag `v1.3.2-p3.5-eagle-library` are present.
 - P3-6 Taskbook received GPT Strict Review approval: `PASS / BLOCKERS: 0 / IMPLEMENTATION_ALLOWED: YES`.
 - P3-6 Implementation Evidence received GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3 Final Acceptance`.
-- P3-6 is closed. The next allowed work is a separate P3 Final Acceptance Taskbook and Strict Review; P4/P5 remain not started.
+- P3-6 is closed with commit `79bb4bb` and recovery tag `v1.3.2-p3.6-agent-uses-inspiration`.
+- P3 Final Acceptance Taskbook received GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES / NEXT_STAGE_ALLOWED: P3 Final Acceptance Evidence only; P4/P5 NOT ALLOWED`.
+- Final acceptance verification passed P3/P1/P2 regression, Electron smoke, version, syntax, Project Knowledge, and diff checks.
+- Final GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_P3: YES / NEXT_STAGE_ALLOWED: P3 Final close commit/tag only; P4/P5 NOT ALLOWED`.
+- P3 is closed. Recovery tag: `v1.3.2-p3-final-acceptance`. P4/P5 remain not started and require independent approved Taskbooks.
 
 ## 当前阶段
 
 - Product：Teemo助理
 - Branch：`Teemo/p3-personal-inspiration`
-- Phase：P3 Final Acceptance Taskbook preparation
-- State：`P3-6 CLOSED / PASS; P3 Final Acceptance Taskbook pending Strict Review`
+- Phase：P3 Final Acceptance
+- State：`P3 CLOSED / PASS / BLOCKERS: 0`
 - Installed App Version：`v1.3.2`
 - Development App Version：`v1.3.2`
 - P3 Baseline：`cd29e6f` / `v1.2.1-p3-baseline`
