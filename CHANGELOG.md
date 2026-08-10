@@ -1,5 +1,11 @@
 # Changelog
 
+## P5-2 Autonomous Execution & Verification - 2026-08-10 (CLOSED / PASS)
+- Added an owner/plan-bound, memory-only bounded execution state machine with explicit full-run approval, exact write-step confirmation, `maxSteps`, finite read/verification retry, timeout, cancellation, and fail-closed ownership/plan checks.
+- Existing Agent Core and the unchanged eight Chat Safe File Tools now provide approved plan-step actions; Tool Registry, P1 Permission, File IPC, and Main Process FileService remain the only execution and postcondition-verification path.
+- Added isolated Node and Electron acceptance. P1/M1, P2, P3, P4, and P5-1 regressions pass. P5-3, P5 Final Acceptance, self-upgrade, persistence/background execution, allowlist expansion, Git, Controlled Execute, Shell, programs, delete, desktop, and ComfyUI remain excluded.
+- External GPT Strict Review returned `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P5-3 Taskbook Review only`. Recovery tag: `v1.3.2-p5.2-autonomous-execution-verification`.
+
 ## P5-1 Autonomous Planning - 2026-08-10 (CLOSED / PASS)
 - Added an explicit planning-only Chat path with a provider-neutral request that omits Tool definitions and rejects unexpected provider tool calls before the Agent tool loop.
 - Plans are bounded, untrusted, session-local data with proposed/blocked steps only; revision and discard never execute Tools, request Permission, access filesystem/desktop, or persist plan state.

@@ -28,6 +28,8 @@
     "test:agent-core": "node tests/TeemoAgentCore.test.js",
     "test:autonomous-planning": "node tests/TeemoAutonomousPlanning.test.js",
     "test:autonomous-planning-ui-smoke": "electron tests/TeemoAutonomousPlanningElectronSmoke.js",
+    "test:autonomous-execution": "node tests/TeemoAutonomousExecution.test.js",
+    "test:autonomous-execution-ui-smoke": "electron tests/TeemoAutonomousExecutionElectronSmoke.js",
     "test:chat-tool-calling-ui-smoke": "electron tests/TeemoChatToolCallingElectronSmoke.js",
     "test:screen-awareness": "node tests/TeemoScreenService.test.js",
     "test:screen-awareness-ui-smoke": "electron tests/TeemoScreenElectronSmoke/TeemoScreenElectronSmoke.js",

@@ -14,6 +14,10 @@
   if (typeof module === 'object' && module.exports) module.exports = AgentCore;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (PlanningContract) {
   const TERMINAL = new Set(['completed', 'cancelled', 'failed']);
+  const AUTONOMOUS_SAFE_FILE_TOOLS = new Set([
+    'list_directory', 'read_file', 'search_files', 'search_text',
+    'create_file', 'patch_file', 'rename_file', 'create_directory',
+  ]);
 
   function makeId(prefix) {
     const random = Math.random().toString(36).slice(2, 10);
@@ -499,6 +503,42 @@
       } finally {
         if (TERMINAL.has(run.status)) this.activeRuns.delete(run.runId);
       }
+    }
+
+    async requestAutonomousToolAction(options = {}) {
+      const ai = options.aiService || this.aiService;
+      const registry = options.toolRegistry || this.toolRegistry;
+      if (!ai || typeof ai.sendWithTools !== 'function') throw Object.assign(new Error('Autonomous execution requires native tool calling.'), { code: 'NATIVE_TOOL_CALLING_UNSUPPORTED' });
+      if (!registry || typeof registry.get !== 'function') throw Object.assign(new Error('Autonomous execution requires the Tool Registry.'), { code: 'EXECUTION_TOOL_REGISTRY_UNAVAILABLE' });
+      const definitions = [];
+      for (const name of AUTONOMOUS_SAFE_FILE_TOOLS) {
+        const definition = registry.get(name);
+        if (definition) definitions.push({ type: 'function', function: { name, description: definition.description, parameters: definition.inputSchema } });
+      }
+      if (!definitions.length) throw Object.assign(new Error('No Safe File Tools are available.'), { code: 'EXECUTION_SAFE_TOOLS_UNAVAILABLE' });
+      const planStep = options.planStep || {};
+      const messages = [
+        { role: 'system', content: 'Execute exactly the supplied approved plan step. Return exactly one native Safe File Tool call. Do not add goals or steps, do not claim success, and do not use shell, Git, programs, delete, desktop, network, or ComfyUI.' },
+        { role: 'user', content: JSON.stringify({ goal: options.plan && options.plan.goal || '', step: options.step, title: planStep.title || '', description: planStep.description || '', successCriteria: options.plan && options.plan.successCriteria || [] }) },
+      ];
+      return normalizeAction(await ai.sendWithTools(messages, { tools: definitions, signal: options.signal, timeout: options.timeout }));
+    }
+
+    async executeAutonomousToolAction(options = {}) {
+      const action = normalizeAction(options.action);
+      if (action.type !== 'tool_request' || !AUTONOMOUS_SAFE_FILE_TOOLS.has(action.tool)) {
+        throw Object.assign(new Error('Autonomous execution rejected a non-Safe-File action.'), { code: 'EXECUTION_TOOL_NOT_ALLOWED' });
+      }
+      const toolCalls = Array.isArray(options.toolCalls) ? options.toolCalls : [];
+      const executionRun = {
+        runId: options.runId || makeId('execution_run'),
+        sessionId: options.sessionId || null,
+        step: Number.isInteger(options.step) ? options.step : 0,
+        status: 'tool_waiting',
+        toolCalls,
+      };
+      const envelope = await this._executeTool(options.toolRegistry || this.toolRegistry, action, executionRun, options.signal, options.onStatus);
+      return envelope;
     }
 
     async runPlanning(options = {}) {

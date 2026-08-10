@@ -1,5 +1,19 @@
 # Teemo助理 — 项目进度与规划
 
+## P5-2 Autonomous Execution & Verification (CLOSED / PASS / BLOCKERS: 0)
+
+- Taskbook: `docs/Teemo-P5-2-AUTONOMOUS-EXECUTION-VERIFICATION.md`.
+- External GPT Strict Review: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES / P5_3_STARTED: NO / P5_FINAL_STARTED: NO`.
+- P5-2 implementation is authorized only within the approved Taskbook.
+- Implemented path: a P5-1 plan requires explicit owner approval for one bounded run, then bounded sequential execution, owner-bound in-memory state tracking, trusted result verification, and finite retry or stop / fail / ask user.
+- The implementation enforces `maxSteps`, `maxRetries`, timeout, cancellation, P1 Permission, Main Process execution, and a fresh explicit owner confirmation before each side-effecting Safe File step.
+- No Chat Tool allowlist expansion was made. Git, Controlled Execute, Shell, PowerShell, arbitrary program execution, delete, destructive operations, desktop/ComfyUI actions, background daemon, persistence, self-upgrade, P5-3, and P5 Final Acceptance are excluded.
+- Implemented `TeemoAutonomousExecution` as an owner/plan-bound memory-only state machine. It requires complete-run approval, finite validated limits, active-owner and plan-fingerprint checks, fresh exact confirmation before every write, and cancel/timeout propagation.
+- Agent Core exposes only the existing eight Safe File definitions for each approved plan step. Execution and trusted postcondition verification reuse Tool Registry, P1 Permission, File IPC, and Main Process FileService; mutations are never automatically retried.
+- P5-2 Node/Electron acceptance plus P1/M1, P2, P3, P4, and P5-1 shared-boundary regressions pass with isolated synthetic data. Implementation awaits external GPT Strict Review; no close commit/tag, installer, install, or restart was created.
+- External GPT Strict Review of implementation evidence: `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P5-3 Taskbook Review only / P5_3_STARTED: NO / P5_FINAL_STARTED: NO`.
+- P5-2 is closed under recovery tag `v1.3.2-p5.2-autonomous-execution-verification`; no installer, install, or restart was created. P5-3 implementation and P5 Final Acceptance remain `NOT STARTED`.
+
 ## P5-1 Autonomous Planning (CLOSED / PASS / BLOCKERS: 0)
 
 - Taskbook: `docs/Teemo-P5-1-AUTONOMOUS-PLANNING.md`.
@@ -91,7 +105,7 @@
 - P3-6：`CLOSED / PASS / BLOCKERS: 0`
 - P0 Baseline：`219b92a` / `v1.1.6-p0-closed`
 - P3 Baseline：`cd29e6f` / `v1.2.1-p3-baseline`
-- Current Development：`P5-1 Autonomous Planning CLOSED / PASS; P5-2 NOT STARTED`
+- Current Development：`P5-2 Autonomous Execution & Verification CLOSED / PASS; P5-3 NOT STARTED`
 - Current Branch：`Teemo/p3-personal-inspiration`
 
 P3-3 GPT Strict Review：`PASS / BLOCKERS: 0 / CAN_CLOSE_AND_TAG: YES / NEXT_STAGE_ALLOWED: P3-4`。

@@ -137,6 +137,10 @@
     skillRouter,
     skillComposer,
   }) : null;
+  const autonomousExecution = window.TeemoAutonomousExecution && agentCore
+    ? new window.TeemoAutonomousExecution({ agentCore, aiService: ai, toolRegistry })
+    : null;
+  window.teemoAutonomousExecution = autonomousExecution;
   const ruleCapture = window.RuleCaptureService ? new window.RuleCaptureService(skills, ai) : null;
   const comfyui = new window.TeemoComfyUIService(store);
   window.comfyUIService = comfyui;
@@ -1031,6 +1035,32 @@
     container.appendChild(list);
   }
 
+  const executionTerminalStates = new Set(['succeeded', 'failed', 'blocked', 'cancelled', 'timed_out']);
+  const executionStateLabels = {
+    pending: '准备执行',
+    awaiting_user_approval: '等待整次运行确认',
+    awaiting_step_confirmation: '等待写操作确认',
+    authorizing: '等待权限授权',
+    running: '正在执行',
+    verifying: '正在核验结果',
+    succeeded: '已执行并核验',
+    failed: '执行失败',
+    blocked: '已停止并等待用户处理',
+    cancelled: '已取消',
+    timed_out: '已超时',
+  };
+
+  function executionTarget(action) {
+    const args = action && action.arguments || {};
+    if (action && action.tool === 'rename_file') return `${args.path || '(无源路径)'} -> ${args.newPath || '(无目标路径)'}`;
+    return args.path || [args.rootId, args.relativePath].filter(Boolean).join(' / ') || '(无目标路径)';
+  }
+
+  function activeExecution(sessionId) {
+    const run = autonomousExecution && autonomousExecution.getLatestRun(sessionId);
+    return run && !executionTerminalStates.has(run.state) ? run : null;
+  }
+
   function createPlanningArticle(sessionId, planState) {
     if (!planState || !planState.plan) return null;
     const plan = planState.plan;
@@ -1065,14 +1095,75 @@
     body.appendChild(steps);
     appendPlanList(body, '风险', plan.risks);
     appendPlanList(body, '成功标准', plan.successCriteria);
+    const executionStatus = document.createElement('p');
+    executionStatus.className = 'teemo-plan-execution-status';
+    const latestRun = autonomousExecution && autonomousExecution.getLatestRun(sessionId);
+    executionStatus.textContent = latestRun
+      ? `执行状态：${executionStateLabels[latestRun.state] || latestRun.state}${latestRun.currentStep ? `（步骤 ${latestRun.currentStep}/${latestRun.steps.length}）` : ''}`
+      : '执行状态：尚未开始';
+    body.appendChild(executionStatus);
     const actions = document.createElement('div');
     actions.className = 'teemo-plan-actions';
+    const execute = document.createElement('button');
+    execute.type = 'button';
+    execute.textContent = '执行规划';
+    execute.disabled = !autonomousExecution || Boolean(activeExecution(sessionId));
+    const cancelExecution = document.createElement('button');
+    cancelExecution.type = 'button';
+    cancelExecution.textContent = '取消执行';
+    cancelExecution.hidden = !activeExecution(sessionId);
+    cancelExecution.addEventListener('click', () => {
+      const active = history.getActive();
+      const run = active && autonomousExecution && activeExecution(active.id);
+      if (!active || active.id !== sessionId || !run) return;
+      autonomousExecution.cancel(run.runId, sessionId);
+      cancelExecution.disabled = true;
+      setStatus('正在取消规划执行…');
+    });
+    execute.addEventListener('click', async () => {
+      const active = history.getActive();
+      if (!active || active.id !== sessionId || !autonomousExecution || activeExecution(sessionId)) return;
+      execute.disabled = true;
+      cancelExecution.hidden = false;
+      const result = await autonomousExecution.run({
+        sessionId,
+        planState,
+        maxSteps: plan.steps.length,
+        maxRetries: 0,
+        runTimeoutMs: 5 * 60 * 1000,
+        stepTimeoutMs: 60 * 1000,
+        getCurrentSessionId: () => {
+          const current = history.getActive();
+          return current && current.id || null;
+        },
+        getCurrentPlanState: () => planningSessionState && planningSessionState.get(sessionId),
+        requestRunApproval: run => askConfirm(
+          '确认执行这份规划',
+          `将按当前 ${run.steps.length} 个步骤执行一次有界运行。只允许现有安全文件工具；写操作仍会逐项确认。`,
+        ),
+        requestStepConfirmation: action => askConfirm(
+          `确认步骤 ${action.step}：${action.tool}`,
+          `目标：${executionTarget(action)}`,
+        ),
+        onState: run => {
+          executionStatus.textContent = `执行状态：${executionStateLabels[run.state] || run.state}${run.currentStep ? `（步骤 ${run.currentStep}/${run.steps.length}）` : ''}`;
+          const terminal = executionTerminalStates.has(run.state);
+          cancelExecution.hidden = terminal;
+          execute.disabled = !terminal;
+        },
+        onToolStatus: message => setStatus(message),
+      });
+      cancelExecution.hidden = true;
+      execute.disabled = false;
+      setStatus(result.ok ? '规划已执行并通过本地核验' : (result.error && result.error.message || '规划执行已停止'), !result.ok);
+      renderMessages();
+    });
     const revise = document.createElement('button');
     revise.type = 'button';
     revise.textContent = '修订规划';
     revise.addEventListener('click', () => {
       const active = history.getActive();
-      if (!active || active.id !== sessionId) return;
+      if (!active || active.id !== sessionId || activeExecution(sessionId)) return;
       els.input.value = plan.goal;
       resizeInput();
       setPlanningMode(true);
@@ -1083,11 +1174,14 @@
     discard.type = 'button';
     discard.textContent = '丢弃规划';
     discard.addEventListener('click', () => {
+      if (activeExecution(sessionId)) return;
       planningSessionState.discard(sessionId);
+      const run = autonomousExecution && autonomousExecution.getLatestRun(sessionId);
+      if (run) autonomousExecution.discard(run.runId, sessionId);
       renderMessages();
       setStatus('规划已丢弃');
     });
-    actions.append(revise, discard);
+    actions.append(execute, cancelExecution, revise, discard);
     body.appendChild(actions);
     article.appendChild(body);
     return article;
