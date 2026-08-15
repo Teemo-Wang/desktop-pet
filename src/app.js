@@ -6,45 +6,6 @@
 
   // Services
   window.aiService = new window.AIService();
-  window.cognitionService = new window.TeemoCognitionService();
-  window.cognitionCollector = new window.TeemoCognitionCollector({ cognitionService: window.cognitionService });
-  window.contextBuilder = new window.TeemoContextBuilder({ cognitionService: window.cognitionService });
-  window.creativeProfileService = new window.TeemoCreativeProfileService();
-  window.creativeContextBuilder = new window.TeemoCreativeContextBuilder({ profileService: window.creativeProfileService });
-  window.creativeDirectorState = new window.TeemoCreativeDirectorSessionState();
-  window.challengeContextBuilder = new window.TeemoChallengeContextBuilder({
-    profileService: window.creativeProfileService,
-    sessionState: window.creativeDirectorState,
-  });
-  window.teemoPermissionClient = new window.TeemoPermissionClient({ ipcRenderer });
-  window.teemoFileClient = new window.TeemoFileClient({ ipcRenderer });
-  window.teemoGitClient = new window.TeemoGitClient({ ipcRenderer });
-  window.teemoExecuteClient = new window.TeemoExecuteClient({ ipcRenderer });
-  window.teemoToolRegistry = window.TeemoBuiltinTools.createRegistry({
-    permissionService: window.teemoPermissionClient,
-  });
-  window.TeemoFileTools.register(window.teemoToolRegistry, { fileClient: window.teemoFileClient });
-  window.TeemoGitTools.register(window.teemoToolRegistry, { gitClient: window.teemoGitClient });
-  window.TeemoExecuteTools.register(window.teemoToolRegistry, { executeClient: window.teemoExecuteClient });
-  const skillService = new window.SkillService();
-  window.skillManifestService = new window.TeemoSkillManifestService({ skillService });
-  window.skillSessionState = new window.TeemoSkillSessionState();
-  window.skillRouter = new window.TeemoSkillRouter({
-    manifestService: window.skillManifestService,
-    sessionState: window.skillSessionState,
-    toolRegistry: window.teemoToolRegistry,
-  });
-  window.skillComposer = new window.TeemoSkillComposer({ manifestService: window.skillManifestService });
-  window.agentCore = new window.TeemoAgentCore({
-    aiService: window.aiService,
-    contextBuilder: window.contextBuilder,
-    creativeContextBuilder: window.creativeContextBuilder,
-    challengeContextBuilder: window.challengeContextBuilder,
-    cognitionCollector: window.cognitionCollector,
-    toolRegistry: window.teemoToolRegistry,
-    skillRouter: window.skillRouter,
-    skillComposer: window.skillComposer,
-  });
   const dtService = new window.DingTalkService();
   const yqService = new window.YuqueService();
   const store = new window.SettingsStore();
@@ -55,6 +16,7 @@
   const dtAI = new window.DingTalkAIService();
   const materialService = new window.MaterialService(store);
   window.materialService = materialService; // 供 material-card 拉取鉴权缩略图
+  const skillService = new window.SkillService();
   const ruleCaptureService = new window.RuleCaptureService(skillService, window.aiService);
   const projectService = new window.ProjectService();
   const visualGenService = new window.VisualGenService();
@@ -78,10 +40,6 @@
   const todos = new window.TodosComponent(document.getElementById('todosPanel'), todoService);
   const skills = new window.SkillsComponent(document.getElementById('skillsPanel'), skillService);
   const workspace = new window.WorkspaceComponent(document.getElementById('workspacePanel'), { projects: projectService, todos: todoService });
-  chat.getProjectContext = () => {
-    const projectId = workspace.getActiveProjectId();
-    return projectId ? { projectId, project: projectService.getById(projectId) } : null;
-  };
   const apiPanel = new window.APIConnectComponent(document.getElementById('apiPanel'), { ai: window.aiService, dingtalk: dtService, yuque: yqService, material: materialService }, store);
   const prefPanel = new window.PreferencesComponent(document.getElementById('prefPanel'), store);
   const notif = new window.NotificationComponent();
