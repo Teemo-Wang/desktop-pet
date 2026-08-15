@@ -1,5 +1,9 @@
 # Teemo Capability Changelog
 
+## 2026-08-15
+
+Teemo v1.4.0 正式版发布。合并 Cursor 目录（T1 插件化 + MiniMax-H3 技能）与 Teemo-source 为一致代码库，以 Teemo-source 为准。保留聊天上下文缓存命中率优化。修复三个回归：桌宠交互（app.js 移除未加载的 P1-P5 模块引用）、能力中心错位（补回 `.teemo-settings-overlay-page` 定位）、桌宠图片（恢复 37x111）。依赖调整：补 `adm-zip`、`koffi` 升级 3.1.5。Node 测试 45/45、`project:knowledge:verify` PASS。提交 `a663c2c`，标签 `v1.4.0`。
+
 ## 2026-08-12
 
 Three-Level Approval Mode is `IMPLEMENTED / DEPLOYED`. Chat permission UX mirrors ChatGPT’s three levels (`请求批准` / `帮我批准` / `完全访问`) via `settings.permission.approvalMode`. Authorized folders remain the hard path boundary; auto-allow only reduces popups inside those folders. Execute / desktop click / ComfyUI always prompt. Decision `D-2026-08-12-05`. Installer `0296A8EA...B66AD`; packaged/installed `app.asar` `037CF862...7F60A`; silent install exit `0`; formal `1.3.2.0` restarted.

@@ -1,5 +1,15 @@
 # Changelog
 
+## Teemo v1.4.0 正式版 - 2026-08-15 (RELEASED)
+
+- 将 Cursor 目录（`Teemo-desktop-pet`，含 T1 插件化）与官方 `Teemo-source` 合并为一致代码库，以 Teemo-source 为准，版本升级为 1.4.0。
+- 合入 T1 插件化：新增能力注册表（`image.generate` / `workflow.execute`）、插件运行时与 ComfyUI 插件，聊天出图走 Skill → Capability → Plugin。
+- 合入 MiniMax-H3 视频技能（9 个技能）。
+- 保留聊天上下文缓存命中率优化：易变上下文（认知/创意/挑战/灵感）后置到对话末尾，提升前缀缓存命中。
+- 依赖调整：补 `adm-zip`（Skill 压缩包导入）、`koffi` 升级 3.1.5。
+- 修复三个回归：桌宠无法点击/拖拽/交互（app.js 移除未加载的 P1-P5 模块引用，恢复 PetComponent 初始化）；能力中心页面错位（补回 `.teemo-settings-overlay-page` 定位）；桌宠图片被误替换（恢复 37x111 正确素材）。
+- 验证：Node 测试 45/45 通过，`project:knowledge:verify` PASS。提交 `a663c2c`，标签 `v1.4.0`。
+
 ## Teemo Single-Pass Chat Orchestration - 2026-08-12 (IMPLEMENTED / DEPLOYED)
 - Removed the default pre-send Structured AI Intent classifier from ordinary Chat send path.
 - Ordinary `normal_chat` now keeps eight Safe File tools available when authorized roots exist, enabling single-pass native Tool Calling.

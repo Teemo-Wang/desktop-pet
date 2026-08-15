@@ -148,13 +148,13 @@ P3 Personal Inspiration is closed with final GPT Strict Review approval. P4 is c
 
 <!-- TEEMO_PROJECT_KNOWLEDGE_AUTO:START -->
 - Version: `1.4.0`
-- Latest Recovery Tag: `v1.3.2-p5-final-acceptance`
+- Latest Recovery Tag: `v1.4.0`
 
 ## Last Verified Git Snapshot
 
 This is a historical snapshot written when Project Knowledge was last synchronized. Git branch, HEAD, and worktree are real-time engineering facts and must be queried directly during Agent Pre-Flight.
 
 - Branch: `Teemo/p3-personal-inspiration`
-- HEAD: `2f79edbe176c5b3883bd1176f59ebfc93bf4a76b`
+- HEAD: `a663c2c9ef23241b4bccaa095c45ffda1c38cf12`
 - Worktree: `DIRTY`
 <!-- TEEMO_PROJECT_KNOWLEDGE_AUTO:END -->
