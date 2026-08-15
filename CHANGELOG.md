@@ -1,5 +1,103 @@
 # Changelog
 
+## Teemo Single-Pass Chat Orchestration - 2026-08-12 (IMPLEMENTED / DEPLOYED)
+- Removed the default pre-send Structured AI Intent classifier from ordinary Chat send path.
+- Ordinary `normal_chat` now keeps eight Safe File tools available when authorized roots exist, enabling single-pass native Tool Calling.
+- Expanded local high-confidence routing for Safe File NL, inspiration, execute-current-plan, and self-upgrade; missing prerequisites soft-fallback to normal Chat.
+- Updated focused Node and isolated Electron V1.4 / V1.4.1 suites. No P1/Main/Git/Shell/Execute exposure or version change.
+
+## Teemo Auto-Deploy After Change - 2026-08-12 (ACTIVE)
+- Removed every deployment-time review gate: external GPT Strict Review, WAITING REVIEW, and the previous local verification suite no longer block build/install/restart.
+- Packaged-application changes must auto build/install/restart in the same Agent task so the formal app becomes the latest change.
+- Kept hard safety boundaries only: formal user data protection, no Shell/Git expansion in ordinary Chat, no unknown dirty build input, and Project Knowledge sync/verify after changes.
+- Added active decision D-2026-08-12-04: move ordinary Chat toward single-pass orchestration; do not keep a default extra Intent Classifier round-trip before every reply.
+
+## Teemo Deployment Gate Simplification - 2026-08-12 (SUPERSEDED)
+- Historical: external review was first removed while local verification remained the deployment gate. Superseded by Auto-Deploy After Change.
+
+## V1.4.1 Safe Normal Chat Fallback Hotfix - 2026-08-12 (IMPLEMENTED / DEPLOYED / OPTIONAL REVIEW)
+- Changed unreliable Structured AI Intent outcomes from a user-visible routing error/forced capability-choice response to the safe `normal_chat` tool-free fallback.
+- Classifier timeout, unavailability, malformed JSON, invalid schema, unsupported/inconsistent intent, ambiguity, and low confidence cannot open Safe File, P5-2, P5-3, Permission, or any other effectful path.
+- Added isolated ordinary Chat E2E for three exact `你好` failures, effectful execution/self-modification failure containment, and unchanged valid Safe File/P5-2/P5-3 routing.
+- No keyword table, intent schema, Tool, P1, P5-2, P5-3, Tool Registry, Main boundary, persistence, dependency, or version changed. External review remains optional/recommended and does not block local deployment after the local gate passes.
+- Fixed the visible pre-send pause by rendering a local-only user bubble and understanding state before the Structured Intent request completes. The preview has no Tool, Permission, persistence, or side effect, and pending classifier latency no longer blocks local message feedback. Drafts and attachments created during the wait are preserved.
+- Delayed-classifier Electron coverage passes `IMMEDIATE_LOCAL_SEND_PREVIEW`, classifier-independent local rendering, and waiting-draft preservation while all original route and failure-escalation assertions remain unchanged.
+- Immediate Send Feedback deployment passed: installer SHA-256 `48D98042DF54671B3E62125B2A6422A2B834DFC3C53CACEFD28BB7AB75CF0956`; packaged and installed `app.asar` SHA-256 `D53181BA42ADF5ADCB065392475792154E19899FF0CAFD9CB42553519447C801`; install exit `0`; formal `1.3.2.0` restarted with four processes. The complete 55-file formal-profile manifest and authorized-root configuration remained byte-identical across installation.
+- Local-gate deployment passed: installer SHA-256 `464B70DBCCA09CC49D2EB9333952030E8D81DE35E25CA308DA2A171CEC9666F7`; packaged and installed `app.asar` SHA-256 `5A73374530E930AAB18FC05A2849625FF07FF663A64BE1D6DB441F25A866E8A7`; silent install exit `0`; formal version `1.3.2.0`; four running Electron processes. The 54-file formal-profile manifest and `local-file-access.json` hashes were unchanged.
+
+## Teemo V1.4.1 AI Intent Orchestration - 2026-08-11 (IMPLEMENTED / STRICT REVIEW PASS / DEPLOYED)
+- Added `docs/Teemo-V1.4.1-AI-INTENT-ORCHESTRATION.md`, grounded in the current keyword Router, Agent Core, AIService, Inspiration, P5-1/P5-2/P5-3, Tool Registry, P1, and ordinary Chat code.
+- Proposed a bounded hybrid intent path: explicit high-confidence local controls, otherwise zero-Tool Structured AI Intent, strict local schema/confidence validation, live capability/state validation, and fixed local route exposure.
+- Proposed only a minimal Chat entry to the existing P5-3 controller; ordinary Chat gains no Git, Execute, Shell, new Tool, IPC, Main privilege, permission relaxation, persistence change, dependency, or version change.
+- Taskbook review is the active gate. Implementation, build, install, restart, commit, and tag remain prohibited until `PASS / BLOCKERS: 0 / IMPLEMENTATION_ALLOWED: YES`.
+- Taskbook Strict Review passed after three routing-contract fixes. The approved implementation adds a zero-Tool Structured AI Intent call, closed schema/confidence fail-safe, runtime capability/state validation, and a sixth `controlled_self_upgrade` route without adding a capability.
+- Execute-current-plan is no longer a local shortcut; the bounded current-plan summary lets AI distinguish P5-2 from P5-3, after which local validation selects the existing controller.
+- The existing P5-3 plan-button flow and ordinary Chat share one UI helper. Dedicated Git/Execute/discovery registries remain internal to P5-3 and are never added to ordinary Chat.
+- Focused Node and real isolated ordinary Chat Electron E2E pass all acceptance markers, including real synthetic P5-3 repository validation, immutable manifest, patch/hash/diff/npm verification, and evidence. Affected V1.4, M1/M2, P1/P3/P5 regressions pass; formal data and version are unchanged.
+- External implementation-evidence Strict Review returned `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ACCEPTED: YES / DEPLOYMENT_ALLOWED: YES`. Installer `E2DBAF46...3390C` installed with exit `0`; built and installed `app.asar` match at `EC9B78DF...EA6A`; formal `1.3.2.0` restarted with four processes; authorized-root configuration stayed byte-identical at `3A2A3949...CF43F8`. No mixed-worktree close commit/tag was created.
+
+## Blocked Planning Execution UX Maintenance - 2026-08-11 (IMPLEMENTED / DEPLOYED)
+- Clarified P5-1 planning instructions so actionable future steps remain `proposed` even for planning-only requests; `blocked` now means a concrete missing prerequisite named in the description.
+- Added pre-approval blocked-plan rejection in Chat and P5-2. It makes zero Provider/Tool/Permission/Main calls and does not weaken the existing execution boundary.
+- Replaced the misleading “待确认” state and internal English execution error with a Chinese blocked-step explanation, disabled execution, and a plan-revision path.
+- Focused Node and isolated Electron planning/execution/V1.4 regressions pass; M2, P1, allowlist, version, and formal data are unchanged.
+- Built installer SHA-256 `D315610E7E00A23E6AA620C5CE72BF7D3A3C09F812C8C75264CE8529D390C67B`; packaged and installed `app.asar` both hash to `2EC2E820D7307D2F0EA8D9839B1AF4CC96D0415BDE066B552714CC22CC2FE01F`. Silent install returned `0`, formal `1.3.2.0` restarted, and authorized-root configuration remained unchanged.
+
+## V1.4 Follow-up — Route-Specific Tool Exposure - 2026-08-11 (IMPLEMENTED / WAITING REVIEW / USER-AUTHORIZED DEPLOYMENT COMPLETE)
+- Added a context-preserving `runToolFreeStream` Agent Core entry for ordinary Chat routes that must not receive Provider tools. It never enters Tool Registry execution or interprets tool-shaped prose as a Tool request.
+- Local deterministic routing now gates capability exposure: only `safe_file_operation` receives the unchanged eight Safe File definitions; `normal_chat` and `inspiration_retrieval` receive zero, planning remains zero, and P5-2 is unchanged.
+- Isolated ordinary Chat Electron E2E proves the two required normal prompts make zero Tool/Permission calls and reply normally, Safe File INDEX read and `test.md` patch each expose eight definitions and preserve M2/P1/Main behavior, and planning exposes zero definitions.
+- Safe File allowlist, M2 normalization, validator, P1, IPC/Main, version, and formal data are unchanged.
+- The user explicitly authorized pre-review deployment. Installer SHA-256 is `631FB05E87F0BCD77E959E9623593303ABE546CAD356BDD93E5813599F4185E0`; packaged and installed `app.asar` both hash to `3D765D46621A0385D2A6FCA1EC9F927AE4BB3816A95F694834ACF01F596B9363`; silent installation returned `0`; formal version `1.3.2.0` restarted. The authorized-root configuration hash remained `3A2A3949300DC6C961D2786873E064854C6CA0FF34C21CEED8E06FBB16CF43F8`.
+- External Strict Review is still required before closure; no close commit or tag was created.
+
+## Teemo V1.4 Productization & Stability - 2026-08-11 (IMPLEMENTED / STRICT REVIEW PASS / DEPLOYED)
+- Added the pure `TeemoChatProductization` adapter and focused ordinary Chat wiring for runtime-derived capability awareness, deterministic five-route intent selection, code-first error normalization, and eight unified public states with stale/terminal update rejection.
+- Provider Native Tool Calling receives exactly the existing eight Safe File definitions through a filtered Registry view only when the local route is `safe_file_operation`. The underlying Registry, M2 normalization, strict validator, P1, IPC, and Main contracts are unchanged.
+- Natural planning and current-plan execution reuse the existing P5-1/P5-2 flows and confirmations. A missing current plan fails locally with no Provider/Tool/Permission/Main activity.
+- Added focused Node and isolated ordinary Chat Electron E2E. All five routes, Safe File read/write, P1 allow/deny/timeout, M2 canonical arguments, Main execution, second Provider response, Inspiration, planning/execution, capability redaction, state and error leakage checks pass; affected M1/M2/P1/P3/P5 regressions pass.
+- Added pre-implementation recovery marker `v1.3.2-v1.4-pre-implementation-20260811` at snapshot `371d6379...`. External implementation review returned `PASS / BLOCKERS: 0 / IMPLEMENTATION_ACCEPTED: YES / DEPLOYMENT_ALLOWED: YES`; isolated build input was separately accepted.
+- Detached baseline `371d6379...` plus exactly three reviewed runtime files built `Teemo-1.3.2-x64.exe` (`4431749D...1107B`) and `app.asar` (`88A30C46...B1D74`). Packaged/installed source hashes match, silent install returned `0`, formal `D:\\` configuration was byte-identical, version remains `1.3.2`, and restart passed. No mixed-worktree close commit/tag was created.
+
+## Teemo V1.4 Productization & Stability Taskbook - 2026-08-11 (APPROVED / IMPLEMENTATION ALLOWED)
+- Added `docs/Teemo-V1.4-PRODUCTIZATION-STABILITY.md` from the current codebase. The proposal stabilizes existing P0-P5 + M2 capability awareness, five-way ordinary Chat routing, cross-layer Tool contracts, public errors/states, and Chat-first reuse without adding a core capability.
+- Proposed minimal implementation is one pure `TeemoChatProductization` contract plus focused Chat wiring and isolated Node/Electron acceptance. Existing Agent Core, Inspiration, P5 planning/execution, Registry, P1, IPC, Main, and Runtime remain authoritative.
+- External Taskbook Strict Review returned `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / IMPLEMENTATION_ALLOWED: YES`. Focused implementation is allowed; implementation evidence still requires external review before closure/deployment.
+
+## M2 Follow-up — Safe File Tool Argument Normalization - 2026-08-11 (IMPLEMENTED / WAITING REVIEW)
+- Added trusted Main-backed Safe File Tool argument normalization before Tool Registry schema validation. Mixed `rootId + rootReference + path` input canonicalizes to `rootId + relativePath`; resolved `rootReference`, legacy `path`, and rename `newPath` are removed.
+- Registry validation remains strict and provider definitions expose no normalization hook. File IPC independently re-grounds current roots and adds trusted absolute paths only inside Main before the unchanged FileService path.
+- Agent Context now explicitly requires exactly one root selector and forbids mixing structured selectors with `path`.
+- Added `TeemoM2SafeFileArgumentNormalizationElectronSmoke.js` with the exact INDEX prompt. It captures raw mixed native arguments, proves final pre-execution `{ rootId, relativePath }`, and completes Registry -> P1 -> File IPC -> Main FileService -> content -> Tool Result -> second Provider response.
+- Requested acceptance markers and M2/M1/Agent Core/Registry/P1/File Tool/P5-2 regressions pass. Version, persistence, P1, allowlist, Tool count, formal data, and V1.4 scope are unchanged. The user explicitly authorized deployment before review: rebuilt `Teemo-1.3.2-x64.exe` installed with exit code `0`; installed `app.asar` matches the build at SHA-256 `28FEEAE18FD2FC669E60F886AE0C6231D53EA85EE6F73BE82602B244A6DDE6E4`, contains the follow-up runtime, and runs as formal version `1.3.2.0`; restart succeeded and the existing `D:\\` authorized root was preserved. External review remains pending and no close commit/tag was created.
+
+## Teemo Agent Post-Change Deployment Rule - 2026-08-11 (ACTIVE)
+- Added a root `AGENTS.md` rule requiring completed packaged-application changes to automatically rebuild the current verified Windows installer, validate packaged content, install it, restart the formal application, and verify the installed version after all applicable gates pass.
+- Required deployment gates are local tests, Electron smoke when applicable, syntax, Project Knowledge sync/verify, release-version, diff review, formal-data protection, unexpected-boundary review, and known build-input provenance. External Strict Review is optional/recommended and no longer blocks local deployment.
+- The rule does not authorize automatic version bumps or changes to formal user data. Deployment failure must stop safely and be reported.
+- Documentation-, test-, development-script-, and Project-Knowledge-only changes do not trigger deployment. `scripts/TeemoProjectKnowledge.js` now verifies the rule marker and Windows build command remain present.
+
+## Teemo Maintenance M2 — Authorized Root Discovery & Grounding - 2026-08-11 (GPT STRICT REVIEW PASS / CLOSE AUTHORIZED)
+- Added a Main-side trusted grounding layer that publishes only provider-safe active-root metadata and converts `rootId` or exact unique `rootReference` + `relativePath` into the existing trusted FileService path contract.
+- Unified provider schemas for all eight ordinary Chat Safe File Tools. Exact absolute path input is compatibility-only and must match a current P1 authorized root; stale/revoked/ambiguous roots, outside-root paths, traversal, UNC/device paths, ADS, and link escapes fail closed.
+- Added fixed deterministic aliases for the formal `Teemo-source` root (`Teemo源码`, `当前项目`) without alias learning, fuzzy matching, semantic search, or an alias-management UI.
+- Added isolated Node contract/security coverage and real Chat Window Electron E2E for displayName, alias, authorized absolute path, outside-root denial, native Tool Calling, Tool result continuation, and unchanged renderer/Main/P1 boundaries.
+- M1/P1/Agent Core/P5 shared-boundary regressions pass. Version, P0-P5 closure, ordinary Chat allowlist, Git/Controlled Execute/Shell/delete exposure, persistence, installer, and recovery tags are unchanged.
+- External GPT Strict Review returned `PASS / BLOCKERS: 0 / REQUIRED_FIXES: none / CAN_CLOSE_AND_TAG: YES`. No close commit/tag or remote push was created; a future close commit must exclude the existing desktop-pet maintenance changes.
+- Rebuilt and deployed `Teemo-1.3.2-x64.exe` after review. Silent installation returned `0`; installed `app.asar` matches the new build at SHA-256 `1597E29399C64C25F64EA9F87749CC1A2B61BC81A51AC549A4EEB98C2996D5FD`, contains `TeemoAuthorizedRootGrounding`, and the formal `1.3.2.0` application restarted successfully with the existing `D:\` authorized root preserved.
+
+## Desktop Pet Interaction Maintenance - 2026-08-11 (IMPLEMENTED / REAL WINDOWS VERIFIED)
+- Fixed the production renderer startup failure by loading `TeemoPlanningContract` before the upgrade/Agent modules and preventing the browser path from executing CommonJS-only registry exports. `PetComponent` now initializes in the formal application instead of leaving only the static pet markup visible.
+- Windows input uses Main Process cursor hit-test polling over renderer-published interactive regions. `TeemoWindowsDesktopHitTest` maps Win32 physical client coordinates into Electron content coordinates so mixed-DPI and cross-display layouts remain aligned.
+- Electron did not reliably clear native `WS_EX_TRANSPARENT` when disabling passthrough on the full-screen transparent window. The Windows adapter now synchronizes that style through `GetWindowLongPtrW` / `SetWindowLongPtrW` and refreshes the frame after each passthrough transition.
+- Dragging keeps input captured until mouse release, preventing the pointer from escaping the moving pet hit region; IPC updates are accepted only from the owning renderer.
+- Restored reliable right-bottom startup placement by waiting for valid viewport dimensions and providing a CSS fallback while the renderer initializes.
+- Replaced `pet.png` with the authoritative `D:\Teemo助手\Teemo.png` bytes. Focused Node, isolated Electron smoke, and full-index Electron smoke cover the asset hash, cursor hit testing, drag lifecycle, click-to-open Dock, module initialization, and real 812 x 812 image decode.
+- The current profile's skin selection was switched back to `default` so the authoritative bundled image is selected; the previous custom image bytes remain preserved in settings for recoverability.
+- The build explicitly unpacks the Koffi Windows native binary from ASAR. Built `Teemo-1.3.2-x64.exe`, verified `app.asar` plus `app.asar.unpacked`, installed it successfully with exit code 0, and restarted the formal per-user application from `C:\Users\Teemo\AppData\Local\Programs\teemo-assistant\Teemo助理.exe`.
+- Real Windows verification on the installed application confirmed `WS_EX_TRANSPARENT` is cleared over the pet and restored over empty desktop space. A physical drag moved the pet by approximately `(-365, -265)`, and a physical click opened the AI panel.
+- No version, P5 capability, Tool allowlist, permission, persistence schema, or recovery tag changed.
+
 ## P5-3 Controlled Self-Upgrade - 2026-08-10 (CLOSED / PASS / BLOCKERS: 0)
 - Added the planning-only Taskbook `docs/Teemo-P5-3-CONTROLLED-SELF-UPGRADE.md`; no P5-3 runtime or product capability has been added.
 - The proposal defines one clean-baseline, owner/plan/repo-bound, immutable patch manifest using P5-2/P1/Main file execution, read-only Git verification, baseline-bound npm scripts, finite failure handling, and external Strict Review.

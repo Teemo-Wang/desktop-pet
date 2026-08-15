@@ -26,3 +26,12 @@ The following remain independent facts sources: Cognition, Creative Profile, Cha
 - P1 authorized roots remain the filesystem authorization Source of Truth.
 - Ordinary Chat does not expose arbitrary Shell, Git Tools, Controlled Execute, delete, or destructive operations.
 - Automated tests use isolated profiles and synthetic data, never formal user data.
+
+## Local Deployment Boundary
+
+- `EXTERNAL_REVIEW_DEPLOYMENT_GATE: REMOVED`.
+- `LOCAL_VERIFICATION_GATE: REMOVED`.
+- `AUTO_DEPLOY_AFTER_CHANGE: ACTIVE`.
+- After a packaged-application change, the same Agent task must build/install/restart automatically so the formal app becomes the latest change.
+- Formal-user-data protection and exclusion of unknown/unrelated dirty build input remain hard safety boundaries.
+- External GPT Strict Review and WAITING REVIEW never block local deployment.

@@ -257,6 +257,51 @@
       };
     }
 
+    async sendIntentClassification(messages, options = {}) {
+      messages = _sanitizeChatMessages(messages);
+      if (Array.isArray(options.tools) && options.tools.length) {
+        const error = new Error('Intent classification cannot receive Provider tools.');
+        error.code = 'INTENT_TOOLS_FORBIDDEN';
+        throw error;
+      }
+      if (this.useMock) return { type: 'intent_response', content: this._mock(messages) };
+      if (this._isAIBrain()) {
+        return { type: 'intent_response', content: await this._aibrainExecute(messages, options.signal || null) };
+      }
+      if (!this.config || !this.config.apiKey) {
+        const error = new Error('Please configure an API Key first.');
+        error.code = 'INTENT_PROVIDER_UNAVAILABLE';
+        throw error;
+      }
+      const response = await fetch(this.config.baseUrl + '/chat/completions', {
+        method: 'POST',
+        headers: this._buildHeaders(),
+        body: JSON.stringify({
+          model: this.config.modelName,
+          messages,
+          ...this._tokenLimitParam(1024),
+        }),
+        signal: options.signal || AbortSignal.timeout(options.timeout || 30000),
+      });
+      if (!response.ok) {
+        const error = new Error(await this._formatHttpError(response));
+        error.code = 'INTENT_PROVIDER_REQUEST_FAILED';
+        throw error;
+      }
+      const message = ((await response.json()).choices || [])[0]?.message || {};
+      if (Array.isArray(message.tool_calls) && message.tool_calls.length) {
+        const error = new Error('Intent classifier returned unexpected tool calls.');
+        error.code = 'INTENT_UNEXPECTED_TOOL_CALL';
+        throw error;
+      }
+      if (typeof message.content !== 'string') {
+        const error = new Error('Intent classifier returned no structured response.');
+        error.code = 'INTENT_CLASSIFICATION_INVALID';
+        throw error;
+      }
+      return { type: 'intent_response', content: message.content };
+    }
+
     async sendPlanning(messages, options = {}) {
       messages = _sanitizeChatMessages(messages);
       if (this.useMock) return { type: 'planning_response', content: this._mock(messages) };

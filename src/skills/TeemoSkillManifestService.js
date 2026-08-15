@@ -43,6 +43,7 @@
       return this.skillService.getAll().filter(skill => skill && skill.id !== 'skill1').map(skill => ({
         id: String(skill.id), name: skill.name, desc: skill.desc, description: skill.desc,
         triggers: skill.triggers, domains: skill.domains, allowComposition: skill.allowComposition,
+        requires: skill.requires, workflow: skill.workflow,
         rawBody: String(skill.rawSource != null ? skill.rawSource : skill.systemPrompt || skill.promptTpl || (typeof skill.prompt === 'string' ? skill.prompt : '') || ''),
         sourceRef: `skills.json#${String(skill.id)}`,
       }));

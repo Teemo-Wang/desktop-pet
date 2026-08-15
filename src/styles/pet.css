@@ -1,6 +1,8 @@
 /* ===== 桌宠形象 ===== */
 .pet-area {
   position: absolute;
+  right: 32px;
+  bottom: 32px;
   display: flex;
   flex-direction: column;
   align-items: center;

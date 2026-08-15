@@ -248,11 +248,15 @@
         if (run.cancelRequested || signal.aborted || error.code === 'EXECUTION_CANCELLED' || error.code === 'AGENT_CANCELLED') {
           return this._finish(run, 'cancelled', 'EXECUTION_CANCELLED', 'Execution was cancelled.', options.onState);
         }
-        const blocked = ['EXECUTION_OWNER_STALE', 'EXECUTION_PLAN_STALE', 'EXECUTION_APPROVAL_DENIED', 'EXECUTION_STEP_CONFIRMATION_DENIED', 'EXECUTION_STEP_UNVERIFIABLE'].includes(error.code);
+        const blocked = ['EXECUTION_OWNER_STALE', 'EXECUTION_PLAN_STALE', 'EXECUTION_PLAN_BLOCKED', 'EXECUTION_APPROVAL_DENIED', 'EXECUTION_STEP_CONFIRMATION_DENIED', 'EXECUTION_STEP_UNVERIFIABLE'].includes(error.code);
         return this._finish(run, blocked ? 'blocked' : 'failed', error.code || 'EXECUTION_FAILED', error.message || 'Execution failed.', options.onState);
       };
       try {
         this._assertContext(run, options.getCurrentSessionId, options.getCurrentPlanState);
+        const blockedStep = run.plan.steps.findIndex(step => step.status !== 'proposed');
+        if (blockedStep >= 0) {
+          throw executionError('EXECUTION_PLAN_BLOCKED', `Plan step ${blockedStep + 1} has an unmet prerequisite and must be revised before execution.`);
+        }
         this._setState(run, 'awaiting_user_approval', options.onState);
         const approved = await abortable(options.requestRunApproval(this._snapshot(run), signal), signal);
         this._assertContext(run, options.getCurrentSessionId, options.getCurrentPlanState);

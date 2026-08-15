@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const TeemoFileClient = require('./TeemoFileClient');
+const TeemoAuthorizedRootGrounding = require('./TeemoAuthorizedRootGrounding');
 
 function publicError(error) {
   if (error && error.teemoSafe === true && error.code) {
@@ -16,10 +17,21 @@ function registerTeemoFileToolIpc(ipcMain, fileService, options = {}) {
   const ttlMs = Number(options.ttlMs) || 2 * 60 * 1000;
   const permissionService = options.permissionService || null;
   const readTools = new Set(['list_directory', 'read_file', 'search_files', 'search_text']);
-  const rootChannel = 'teemo-file-tool:list-roots';
-  function rootRefs() { return rootsProvider().map(root => { try { const canonical = fileService.canonicalPath(root); return { rootId: `root_${crypto.createHash('sha256').update(canonical.toLowerCase()).digest('hex').slice(0, 16)}`, displayName: require('path').basename(canonical), capability: 'read-write' }; } catch (_) { return null; } }).filter(Boolean); }
-  function resolveRootArgs(args = {}) { if (!args.rootId) return args; const ref = rootRefs().find(item => item.rootId === args.rootId); if (!ref || typeof args.relativePath !== 'string') { const error = new Error('Authorized root reference is unavailable.'); error.code = 'FILE_ROOT_REFERENCE_INVALID'; error.teemoSafe = true; throw error; } const root = rootsProvider().find(candidate => { try { return `root_${crypto.createHash('sha256').update(fileService.canonicalPath(candidate).toLowerCase()).digest('hex').slice(0, 16)}` === ref.rootId; } catch (_) { return false; } }); return { ...args, path: require('path').join(root, args.relativePath) }; }
-  ipcMain.handle(rootChannel, () => ({ ok: true, roots: rootRefs() }));
+  const fileTools = new Set([...readTools, 'create_file', 'create_directory', 'patch_file', 'rename_file']);
+  const grounding = options.grounding || new TeemoAuthorizedRootGrounding({ fileService });
+  const rootChannel = TeemoFileClient.CHANNELS.listRoots;
+  ipcMain.handle(rootChannel, () => ({ ok: true, roots: grounding.summarize(rootsProvider()) }));
+  ipcMain.handle(TeemoFileClient.CHANNELS.normalize, (_event, payload = {}) => {
+    try {
+      const tool = String(payload.tool || '');
+      if (!fileTools.has(tool)) {
+        return { ok: false, error: { code: 'UNKNOWN_TOOL', message: 'Unknown Safe File Tool.' } };
+      }
+      return { ok: true, args: grounding.normalizeToolArguments(tool, payload.args || {}, rootsProvider()) };
+    } catch (error) {
+      return { ok: false, error: publicError(error) };
+    }
+  });
 
   function ownerOperation(event, operationId) {
     const operation = operations.get(String(operationId || ''));
@@ -43,7 +55,9 @@ function registerTeemoFileToolIpc(ipcMain, fileService, options = {}) {
       if (Array.from(operations.values()).filter(operation => operation.senderId === event.sender.id).length >= 100) {
         return { ok: false, error: { code: 'FILE_PREPARATION_LIMIT', message: 'Too many pending file operations.' } };
       }
-      const prepared = fileService.prepareOperation(payload.tool, resolveRootArgs(payload.args || {}), rootsProvider());
+      const currentRoots = rootsProvider();
+      const groundedArgs = grounding.groundToolArguments(payload.tool, payload.args || {}, currentRoots);
+      const prepared = fileService.prepareOperation(payload.tool, groundedArgs, currentRoots);
       const operationId = `file_op_${crypto.randomUUID()}`;
       operations.set(operationId, {
         operationId,

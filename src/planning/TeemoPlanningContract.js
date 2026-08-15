@@ -25,6 +25,8 @@
     'Never call tools, request permissions, access local resources, or claim work was performed.',
     'Use exactly these fields: goal, assumptions, constraints, steps, risks, successCriteria.',
     'steps must contain 1 to 12 objects with title, description, and status. status is only proposed or blocked.',
+    'Use proposed for an actionable future step. A planning-only request, "do not execute now", or later owner confirmation does not make a step blocked.',
+    'Use blocked only when a concrete prerequisite is currently missing; name that missing prerequisite in the step description.',
   ].join('\n');
 
   function bytes(value) {

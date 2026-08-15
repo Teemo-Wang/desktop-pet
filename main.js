@@ -1,4 +1,7 @@
 const { app, BrowserWindow, screen, desktopCapturer, ipcMain, session, net, dialog, shell, nativeImage, Tray, Menu } = require('electron');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const execFileAsync = promisify(execFile);
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -9,10 +12,12 @@ const TeemoScreenService = require('./src/runtime/TeemoScreenService');
 const registerTeemoScreenIpc = require('./src/runtime/TeemoScreenIpc');
 const TeemoDesktopActionService = require('./src/runtime/TeemoDesktopActionService');
 const TeemoWindowsPrimaryClickAdapter = require('./src/runtime/TeemoWindowsPrimaryClickAdapter');
+const TeemoWindowsDesktopHitTest = require('./src/runtime/TeemoWindowsDesktopHitTest');
 const registerTeemoDesktopActionIpc = require('./src/runtime/TeemoDesktopActionIpc');
 const TeemoComfyWorkflowService = require('./src/runtime/TeemoComfyWorkflowService');
 const registerTeemoComfyWorkflowIpc = require('./src/runtime/TeemoComfyWorkflowIpc');
 const registerTeemoFileToolIpc = require('./src/tools/file/TeemoFileToolIpc');
+const TeemoLocalDriveRoots = require('./src/tools/file/TeemoLocalDriveRoots');
 const TeemoGitService = require('./src/services/TeemoGitService');
 const registerTeemoGitToolIpc = require('./src/tools/git/TeemoGitToolIpc');
 const TeemoExecuteService = require('./src/services/TeemoExecuteService');
@@ -35,6 +40,7 @@ const dingtalkBridge = require('./dingtalk-bridge');
 const materialBridge = require('./material-bridge');
 
 const isWindows = process.platform === 'win32';
+const teemoWindowsDesktopHitTest = new TeemoWindowsDesktopHitTest();
 const appIcon = path.join(__dirname, 'icon', isWindows ? 'Teemo-app.png' : 'app.icns');
 const TEEMO_ARCHIVE_DIR = 'D:\\Teemo助手';
 const TEEMO_COMFY_OUTPUT_DIR = 'I:\\ComfyUI\\ComfyUI\\output';
@@ -98,8 +104,23 @@ function loadLocalAccessRoots() {
   return fileService.loadAuthorizedRoots(localAccessFilePath());
 }
 
+function settingsFilePath() {
+  const configured = process.env.TEEMO_ASSISTANT_DATA_DIR;
+  const dataDir = configured
+    ? path.resolve(configured)
+    : path.join(require('os').homedir(), '.hellobike-pet');
+  return path.join(dataDir, 'settings.json');
+}
+
+function loadEffectiveSafeFileRoots() {
+  return TeemoLocalDriveRoots.resolveEffectiveRoots({
+    authorizedRoots: loadLocalAccessRoots(),
+    approvalMode: TeemoLocalDriveRoots.readApprovalModeFromSettings(settingsFilePath()),
+  });
+}
+
 registerTeemoFileToolIpc(ipcMain, fileService, {
-  rootsProvider: loadLocalAccessRoots,
+  rootsProvider: loadEffectiveSafeFileRoots,
   permissionService: teemoPermissionService,
 });
 registerTeemoGitToolIpc(ipcMain, teemoGitService, {
@@ -206,7 +227,7 @@ function isPathWithinRoot(rootPath, targetPath) {
 }
 
 function resolveAuthorizedLocalPath(filePath) {
-  return fileService.resolveAuthorizedPath(filePath, loadLocalAccessRoots());
+  return fileService.resolveAuthorizedPath(filePath, loadEffectiveSafeFileRoots());
 }
 
 async function localDocumentContent(filePath) {
@@ -245,6 +266,86 @@ ipcMain.handle('teemo:open-folder', async (_event, { folderPath } = {}) => {
     return { ok: false, error: error.message || String(error) };
   }
 });
+
+function isAllowedBrowserUrl(rawUrl) {
+  try {
+    const parsed = new URL(String(rawUrl || '').trim());
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch (_) {
+    return false;
+  }
+}
+
+async function launchPreferredBrowser(preferredInput) {
+  const preferred = String(preferredInput || 'default').toLowerCase();
+  const order = preferred === 'chrome'
+    ? ['chrome', 'msedge', 'firefox']
+    : preferred === 'edge'
+      ? ['msedge', 'chrome', 'firefox']
+      : ['msedge', 'chrome', 'firefox'];
+  if (process.platform === 'win32') {
+    for (const name of order) {
+      try {
+        await execFileAsync('cmd.exe', ['/c', 'start', '', name], { windowsHide: true });
+        return { ok: true, browser: name };
+      } catch (_) { /* try next */ }
+    }
+  }
+  await shell.openExternal('https://www.bing.com/');
+  return { ok: true, browser: 'default' };
+}
+
+ipcMain.handle('teemo:browser-open', async (_event, payload = {}) => {
+  try {
+    const mode = String(payload.mode || 'new_window').toLowerCase();
+    if (mode === 'url') {
+      const url = String(payload.url || '').trim();
+      if (!isAllowedBrowserUrl(url)) {
+        return { ok: false, error: '只允许打开 http 或 https 地址' };
+      }
+      await shell.openExternal(url);
+      return { ok: true, mode: 'url', url };
+    }
+    const launched = await launchPreferredBrowser(payload.browser);
+    return { ok: true, mode: 'new_window', browser: launched.browser };
+  } catch (error) {
+    return { ok: false, error: error && error.message ? error.message : String(error) };
+  }
+});
+
+function fileUrlToPath(urlValue) {
+  try {
+    const parsed = new URL(String(urlValue || ''));
+    if (parsed.protocol !== 'file:') return '';
+    let pathname = decodeURIComponent(parsed.pathname || '');
+    if (process.platform === 'win32') pathname = pathname.replace(/^\/([A-Za-z]:)/, '$1').replace(/\//g, '\\');
+    return pathname;
+  } catch (_) {
+    return '';
+  }
+}
+
+function openTrustedExternalTarget(rawUrl) {
+  let value = String(rawUrl || '').trim();
+  if (!value) return;
+  if ((value.startsWith('<') && value.endsWith('>'))
+    || (value.startsWith('"') && value.endsWith('"'))
+    || (value.startsWith("'") && value.endsWith("'"))) {
+    value = value.slice(1, -1).trim();
+  }
+  if (/^https?:\/\//i.test(value) || /^mailto:/i.test(value)) {
+    shell.openExternal(value).catch(() => {});
+    return;
+  }
+  if (/^file:/i.test(value)) {
+    const localPath = fileUrlToPath(value);
+    if (localPath) shell.openPath(localPath).catch(() => {});
+    return;
+  }
+  if (/^[A-Za-z]:[\\/]/.test(value) || value.startsWith('\\\\')) {
+    shell.openPath(value.replace(/\//g, '\\')).catch(() => {});
+  }
+}
 
 function toFileUrl(filePath) {
   const normalized = String(filePath || '').replace(/\\/g, '/');
@@ -392,6 +493,66 @@ let tray = null;
 let mouseProbeProcess = null;
 let mouseProbeOutput = '';
 const mouseProbeCallbacks = [];
+let desktopInteractionTimer = null;
+let desktopInteractiveRegions = [];
+let desktopDragActive = false;
+let desktopInteractionForced = false;
+let desktopMouseIgnored = null;
+
+const DESKTOP_REGION_PADDING = 8;
+
+function setDesktopMousePassthrough(ignore) {
+  if (!mainWindow || mainWindow.isDestroyed() || desktopMouseIgnored === ignore) return;
+  mainWindow.setIgnoreMouseEvents(ignore, ignore ? { forward: true } : undefined);
+  if (isWindows) teemoWindowsDesktopHitTest.setMousePassthrough(mainWindow, ignore);
+  desktopMouseIgnored = ignore;
+}
+
+function normalizeDesktopInteractiveRegions(regions) {
+  if (!mainWindow || mainWindow.isDestroyed() || !Array.isArray(regions)) return [];
+  const bounds = mainWindow.getContentBounds();
+  return regions.flatMap(region => {
+    if (!region || ![region.x, region.y, region.width, region.height].every(Number.isFinite)) return [];
+    if (region.width <= 0 || region.height <= 0) return [];
+    const left = Math.max(0, Math.floor(region.x - DESKTOP_REGION_PADDING));
+    const top = Math.max(0, Math.floor(region.y - DESKTOP_REGION_PADDING));
+    const right = Math.min(bounds.width, Math.ceil(region.x + region.width + DESKTOP_REGION_PADDING));
+    const bottom = Math.min(bounds.height, Math.ceil(region.y + region.height + DESKTOP_REGION_PADDING));
+    if (right <= left || bottom <= top) return [];
+    return [{ x: left, y: top, width: right - left, height: bottom - top }];
+  });
+}
+
+function cursorIsInInteractiveRegion() {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  if (desktopDragActive || desktopInteractionForced) return true;
+  const nativePoint = isWindows ? teemoWindowsDesktopHitTest.getCursorClientPoint(mainWindow) : null;
+  const point = nativePoint || screen.getCursorScreenPoint();
+  const bounds = nativePoint ? { x: 0, y: 0 } : mainWindow.getBounds();
+  const x = point.x - bounds.x;
+  const y = point.y - bounds.y;
+  return desktopInteractiveRegions.some(region => (
+    x >= region.x && x <= region.x + region.width &&
+    y >= region.y && y <= region.y + region.height
+  ));
+}
+
+function refreshDesktopMousePassthrough() {
+  if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.isVisible()) return;
+  setDesktopMousePassthrough(!cursorIsInInteractiveRegion());
+}
+
+function startDesktopInteractionTracking() {
+  if (desktopInteractionTimer) return;
+  desktopInteractionTimer = setInterval(refreshDesktopMousePassthrough, 40);
+}
+
+function stopDesktopInteractionTracking() {
+  if (!desktopInteractionTimer) return;
+  clearInterval(desktopInteractionTimer);
+  desktopInteractionTimer = null;
+}
+
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
 function startMouseProbe() {
@@ -522,18 +683,41 @@ function createWindow() {
     if (level >= 2) console.log(`[renderer:${tag}] ${message} (${sourceId}:${line})`);
   });
 
-  // 关键：让透明区域鼠标穿透，forward 模式会把事件转发给渲染进程判断
-  mainWindow.setIgnoreMouseEvents(true, { forward: true });
+  // Keep the full-work-area window click-through until the renderer publishes
+  // visible hit regions. Main polls the system cursor because forwarded mouse
+  // movement is not reliable while a transparent Windows window is ignored.
+  desktopMouseIgnored = null;
+  desktopDragActive = false;
+  desktopInteractionForced = false;
+  desktopInteractiveRegions = [];
+  setDesktopMousePassthrough(true);
+  startDesktopInteractionTracking();
 
   // 开发者工具（调试时取消注释）
   // mainWindow.webContents.openDevTools({ mode: 'detach' });
 
   mainWindow.once('ready-to-show', () => {
+    mainWindow.setBounds(screen.getPrimaryDisplay().workArea, false);
     mainWindow.show();
     mainWindow.setAlwaysOnTop(true, isWindows ? 'normal' : 'floating');
     if (!isWindows) mainWindow.setVisibleOnAllWorkspaces(true);
     setupBlurHandler();
+    refreshDesktopMousePassthrough();
   });
+
+  mainWindow.on('closed', () => {
+    desktopMouseIgnored = null;
+    desktopInteractiveRegions = [];
+    desktopDragActive = false;
+    desktopInteractionForced = false;
+    stopDesktopInteractionTracking();
+  });
+}
+
+function syncDesktopWindowToPrimaryDisplay() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.setBounds(screen.getPrimaryDisplay().workArea, false);
+  refreshDesktopMousePassthrough();
 }
 
 // 处理拖拽 — 不再移动窗口，由渲染进程内部移动 DOM
@@ -541,22 +725,43 @@ ipcMain.on('move-window', (event, { deltaX, deltaY }) => {
   // 空操作，拖拽逻辑改为移动 DOM 元素
 });
 
-// 鼠标进入内容区域时取消穿透，离开时恢复穿透
-ipcMain.on('mouse-enter-content', () => {
-  mainWindow.setIgnoreMouseEvents(false);
+ipcMain.on('desktop-interactive-regions', (event, regions) => {
+  if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) return;
+  desktopInteractiveRegions = normalizeDesktopInteractiveRegions(regions);
+  refreshDesktopMousePassthrough();
 });
 
-ipcMain.on('mouse-leave-content', () => {
-  mainWindow.setIgnoreMouseEvents(true, { forward: true });
+ipcMain.on('desktop-drag-state', (event, active) => {
+  if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) return;
+  desktopDragActive = Boolean(active);
+  refreshDesktopMousePassthrough();
+});
+
+// Keep these channels for existing panel code. Region tracking owns ordinary
+// desktop input; panels explicitly request or release a forced capture state.
+ipcMain.on('mouse-enter-content', (event) => {
+  if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) return;
+  desktopInteractionForced = true;
+  refreshDesktopMousePassthrough();
+});
+
+ipcMain.on('mouse-leave-content', (event) => {
+  if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) return;
+  desktopInteractionForced = false;
+  refreshDesktopMousePassthrough();
 });
 
 // 面板/菜单打开时强制取消穿透
-ipcMain.on('disable-passthrough', () => {
-  mainWindow.setIgnoreMouseEvents(false);
+ipcMain.on('disable-passthrough', (event) => {
+  if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) return;
+  desktopInteractionForced = true;
+  refreshDesktopMousePassthrough();
 });
 
-ipcMain.on('enable-passthrough', () => {
-  mainWindow.setIgnoreMouseEvents(true, { forward: true });
+ipcMain.on('enable-passthrough', (event) => {
+  if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) return;
+  desktopInteractionForced = false;
+  refreshDesktopMousePassthrough();
 });
 
 // 置顶切换
@@ -618,6 +823,16 @@ function openStandaloneChatWindow() {
     },
   });
   chatWindow.setMenuBarVisibility(false);
+  chatWindow.webContents.setWindowOpenHandler(({ url }) => {
+    openTrustedExternalTarget(url);
+    return { action: 'deny' };
+  });
+  chatWindow.webContents.on('will-navigate', (event, url) => {
+    const current = chatWindow.webContents.getURL();
+    if (url === current) return;
+    event.preventDefault();
+    openTrustedExternalTarget(url);
+  });
   chatWindow.loadFile(path.join(__dirname, 'Teemo-chat-window', 'Teemo-chat-window.html'));
   chatWindow.once('ready-to-show', () => {
     if (!chatWindow || chatWindow.isDestroyed()) return;
@@ -750,8 +965,10 @@ ipcMain.handle('teemo:local-list-directory', (_event, { rootPath, relativePath =
 
 ipcMain.handle('teemo:local-pick-document', async event => {
   try {
-    const roots = loadLocalAccessRoots().filter(root => fs.existsSync(root));
-    if (!roots.length) return { ok: false, needsAuthorization: true, error: '请先在设置中授权一个文件夹' };
+    const roots = loadEffectiveSafeFileRoots().filter(root => fs.existsSync(root));
+    if (!roots.length) {
+      return { ok: false, needsAuthorization: false, error: '未检测到可用本地磁盘' };
+    }
     const owner = BrowserWindow.fromWebContents(event.sender) || chatWindow || mainWindow;
     const result = await dialog.showOpenDialog(owner, {
       title: '选择要让 Teemo 读取的本地文档',
@@ -1145,6 +1362,9 @@ if (gotSingleInstanceLock) app.whenReady().then(async () => {
   await setupProxy();
   startMouseProbe();
   createWindow();
+  screen.on('display-added', syncDesktopWindowToPrimaryDisplay);
+  screen.on('display-removed', syncDesktopWindowToPrimaryDisplay);
+  screen.on('display-metrics-changed', syncDesktopWindowToPrimaryDisplay);
   createSystemTray();
   setupAutoUpdate();
 });

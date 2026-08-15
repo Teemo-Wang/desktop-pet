@@ -7,6 +7,7 @@ const TeemoFileService = require('../src/services/TeemoFileService');
 const TeemoToolRegistry = require('../src/tools/TeemoToolRegistry');
 const TeemoFileTools = require('../src/tools/file/TeemoFileTools');
 const TeemoFileClient = require('../src/tools/file/TeemoFileClient');
+const TeemoAuthorizedRootGrounding = require('../src/tools/file/TeemoAuthorizedRootGrounding');
 const registerTeemoFileToolIpc = require('../src/tools/file/TeemoFileToolIpc');
 const TeemoPermissionService = require('../src/permissions/TeemoPermissionService');
 
@@ -214,6 +215,15 @@ async function main() {
     decisionProvider: async () => ({ decision: 'allow', scope: 'once' }),
   });
   const ipc = makeIpcHarness(service, () => roots, ipcPermission);
+  const ipcRootId = new TeemoAuthorizedRootGrounding({ fileService: service }).summarize(roots)[0].rootId;
+  const normalizedOverIpc = await ipc.invoke(ipc.sender, TeemoFileClient.CHANNELS.normalize, {
+    tool: 'read_file',
+    args: { rootId: ipcRootId,
+      rootReference: path.basename(root), relativePath: 'hello.txt', path: helloPath },
+  });
+  assert.equal(normalizedOverIpc.ok, true);
+  assert.deepEqual(Object.keys(normalizedOverIpc.args).sort(), ['relativePath', 'rootId']);
+  assert.equal(normalizedOverIpc.args.relativePath, 'hello.txt');
   const preparedOverIpc = await ipc.invoke(ipc.sender, TeemoFileClient.CHANNELS.prepare, {
     tool: 'read_file', args: { path: helloPath }, toolCallId: 'ipc-tool-call',
     runId: 'ipc-run', sessionId: 'ipc-session',

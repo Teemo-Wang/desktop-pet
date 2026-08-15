@@ -7,11 +7,16 @@
   const fs = require('fs');
   const path = require('path');
   const crypto = require('crypto');
+  const AdmZip = require('adm-zip');
   const storage = new window.TeemoStorageService();
   const DIR = storage.getDir();
   const FILE = storage.getPath('skills.json');
-  const NAMES_FILE = storage.getPath('skill-names.json'); // 内置 Skill 名称映射
-  const GROUPS_FILE = storage.getPath('skill-groups.json'); // Skill 分组归属
+  const NAMES_FILE = storage.getPath('skill-names.json'); // 内置 skill 的备注名映射（id -> 自定义显示名）
+  const GROUPS_FILE = storage.getPath('skill-groups.json'); // 分组与 Skill 归属独立保存，不改写 Skill 正文
+  const PACKAGES_DIR = storage.getPath('skill-packages');
+  const PACKAGE_TEXT_EXTENSIONS = new Set(['.md', '.txt', '.json', '.yaml', '.yml', '.csv']);
+  const MAX_PACKAGE_FILES = 1000;
+  const MAX_PACKAGE_BYTES = 100 * 1024 * 1024;
 
   // skill1：当前机器人的默认回复与操作规则（SKILL.md 样式）
   const FALLBACK_RULES_MD = `---
@@ -104,16 +109,18 @@ icon: 📋
     },
   ];
 
-  const RULES_FILE = storage.getPath('skill1-rules.md');
+  const RULES_FILE = path.join(DIR, 'skill1-rules.md');
 
   class SkillService {
     constructor() {
-      storage.ensureDir();
+      if (!fs.existsSync(DIR)) fs.mkdirSync(DIR, { recursive: true });
+      this.listeners = new Set();
       this.customSkills = this._load();
       this.rules = this._loadRules();   // skill1 的可编辑规则（覆盖默认）
       this.customNames = this._loadNames(); // 内置 skill 的备注名映射
       this.groupState = this._loadGroups(); // { groups: [], assignments: { skillId: groupId } }
-      this.listeners = new Set();
+      this._installBundledSkillCollections();
+      this._installBundledProductPoster();
       // 暴露为全局，供 AI 对话层读取当前规则
       window.skillService = this;
     }
@@ -121,8 +128,8 @@ icon: 📋
     /** 读取已保存的规则；没有则用内置默认 */
     _loadRules() {
       try {
-        if (storage.exists('skill1-rules.md')) {
-          const t = storage.readText('skill1-rules.md', '');
+        if (fs.existsSync(RULES_FILE)) {
+          const t = fs.readFileSync(RULES_FILE, 'utf-8');
           if (t && t.trim()) return t;
         }
       } catch (e) { console.warn('[SkillService] load rules failed:', e); }
@@ -135,7 +142,7 @@ icon: 📋
     /** 保存/更新规则，持久化并通知刷新 */
     saveRules(text) {
       this.rules = (text && text.trim()) ? text : RULES_MD;
-      try { storage.writeText('skill1-rules.md', this.rules); }
+      try { fs.writeFileSync(RULES_FILE, this.rules, 'utf-8'); }
       catch (e) { console.warn('[SkillService] save rules failed:', e); }
       this.listeners.forEach(fn => { try { fn(); } catch (e) {} });
       return this.rules;
@@ -317,15 +324,14 @@ icon: 📋
       const idx = this.customSkills.findIndex(s => s.id === id);
       if (idx < 0) return false;
       this.customSkills[idx].systemPrompt = String(text || '');
-      this.customSkills[idx].rawSource = String(text || '');
       this._persist();
       return true;
     }
 
     _load() {
       try {
-        if (!storage.exists('skills.json')) return [];
-        const arr = storage.readJson('skills.json', []);
+        if (!fs.existsSync(FILE)) return [];
+        const arr = JSON.parse(fs.readFileSync(FILE, 'utf-8'));
         return Array.isArray(arr) ? arr : [];
       } catch (e) {
         console.warn('[SkillService] load failed:', e);
@@ -335,7 +341,7 @@ icon: 📋
 
     _persist() {
       try {
-        storage.writeJson('skills.json', this.customSkills);
+        fs.writeFileSync(FILE, JSON.stringify(this.customSkills, null, 2), 'utf-8');
         this.listeners.forEach(fn => { try { fn(); } catch (e) { console.warn(e); } });
       } catch (e) {
         console.warn('[SkillService] save failed:', e);
@@ -355,8 +361,8 @@ icon: 📋
 
     _loadGroups() {
       try {
-        if (!storage.exists('skill-groups.json')) return { groups: [], assignments: {} };
-        const raw = storage.readJson('skill-groups.json', {}) || {};
+        if (!fs.existsSync(GROUPS_FILE)) return { groups: [], assignments: {} };
+        const raw = JSON.parse(fs.readFileSync(GROUPS_FILE, 'utf-8')) || {};
         const groups = Array.isArray(raw.groups)
           ? raw.groups.filter(item => item && item.id && item.name).map(item => ({
             id: String(item.id),
@@ -381,7 +387,7 @@ icon: 📋
 
     _persistGroups() {
       try {
-        storage.writeJson('skill-groups.json', this.groupState || { groups: [], assignments: {} });
+        fs.writeFileSync(GROUPS_FILE, JSON.stringify(this.groupState || { groups: [], assignments: {} }, null, 2), 'utf-8');
         this.listeners.forEach(fn => { try { fn(); } catch (e) { console.warn(e); } });
       } catch (e) {
         console.warn('[SkillService] save groups failed:', e);
@@ -511,6 +517,7 @@ icon: 📋
       const stableSource = String(skill.rawSource != null ? skill.rawSource : skill.systemPrompt || `${skill.name}\n${promptTpl}`);
       const stableId = crypto.createHash('sha256').update(`${String(skill.name).trim()}\n${stableSource}`, 'utf8').digest('hex').slice(0, 20);
       const id = skill.id || `custom_teemo_${stableId}`;
+      const previous = this.customSkills.find(s => s.id === id);
       const item = {
         id,
         name: String(skill.name).slice(0, 30),
@@ -527,13 +534,20 @@ icon: 📋
         promptTpl,
         // 可选：md 文件来的 skill 用 systemPrompt 承载文档正文
         systemPrompt: skill.systemPrompt || '',
-        // 导入的 Raw Skill 原文字节单独保留；Routing/override 永远不得修改它。
-        rawSource: String(skill.rawSource != null ? skill.rawSource : skill.systemPrompt || ''),
-        triggers: String(skill.triggers || ''),
         // 规范类技能的结构化触发器：[{keywords:[...], reply:'...'}]，用于机器人回复时本地快速匹配
         ruleMatchers: Array.isArray(skill.ruleMatchers) ? skill.ruleMatchers : [],
+        packageSource: String(skill.packageSource || ''),
+        packageFiles: Array.isArray(skill.packageFiles) ? skill.packageFiles.map(String) : [],
+        bundleVersion: String(skill.bundleVersion || ''),
+        originalSkillName: String(skill.originalSkillName || ''),
+        triggers: String(skill.triggers || ''),
+        requires: String(skill.requires || ''),
+        workflow: String(skill.workflow || ''),
+        aliases: String(skill.aliases || ''),
+        rawSource: String(skill.rawSource != null ? skill.rawSource : skill.systemPrompt || ''),
         custom: true,
-        createdAt: Date.now(),
+        createdAt: previous && previous.createdAt ? previous.createdAt : Date.now(),
+        updatedAt: Date.now(),
       };
       // 已存在则覆盖
       const idx = this.customSkills.findIndex(s => s.id === id);
@@ -565,7 +579,6 @@ icon: 📋
         icon: Object.prototype.hasOwnProperty.call(values, 'icon') ? (String(values.icon || '').trim() || '⭐') : current.icon,
         desc: Object.prototype.hasOwnProperty.call(values, 'desc') ? String(values.desc || '').trim().slice(0, 80) : current.desc,
         systemPrompt: Object.prototype.hasOwnProperty.call(values, 'systemPrompt') ? String(values.systemPrompt || '') : current.systemPrompt,
-        rawSource: Object.prototype.hasOwnProperty.call(values, 'systemPrompt') ? String(values.systemPrompt || '') : (current.rawSource || current.systemPrompt || ''),
         updatedAt: Date.now(),
       };
       if (!next.name) throw new Error('Skill 名称不能为空');
@@ -586,6 +599,241 @@ icon: 📋
       return this.upload(parsed);
     }
 
+    /** 从 ZIP 导入一个或多个标准 Agent Skill 文件夹。 */
+    uploadFromZip(zipData, filename) {
+      let zip;
+      try {
+        zip = new AdmZip(Buffer.isBuffer(zipData) ? zipData : Buffer.from(zipData));
+      } catch (error) {
+        throw new Error(`ZIP 读取失败：${error.message || error}`);
+      }
+      const zipEntries = zip.getEntries().filter(entry => !entry.isDirectory);
+      if (zipEntries.length > MAX_PACKAGE_FILES) throw new Error(`ZIP 文件数不能超过 ${MAX_PACKAGE_FILES}`);
+      const declaredBytes = zipEntries.reduce((sum, entry) => sum + Number(entry.header && entry.header.size || 0), 0);
+      if (declaredBytes > MAX_PACKAGE_BYTES) throw new Error('ZIP 解压后不能超过 100 MB');
+      const entries = zipEntries.map(entry => ({ relativePath: entry.entryName, data: entry.getData() }));
+      return this.uploadFromPackageEntries(entries, filename || 'Skill.zip');
+    }
+
+    /**
+     * 从文件夹/归档条目导入标准 Skill 包。每个含 SKILL.md 或 SKILL.cn.md 的目录视为一个 Skill。
+     * references 下的文本资料会合并进 systemPrompt，同时完整包会保存到用户目录。
+     */
+    uploadFromPackageEntries(entries, sourceName, options) {
+      const opts = options || {};
+      const normalized = this._normalizePackageEntries(entries);
+      const candidates = new Map();
+      normalized.forEach(entry => {
+        const basename = path.posix.basename(entry.relativePath).toLowerCase();
+        if (basename !== 'skill.md' && basename !== 'skill.cn.md') return;
+        const folder = path.posix.dirname(entry.relativePath) === '.' ? '' : path.posix.dirname(entry.relativePath);
+        const current = candidates.get(folder);
+        if (!current || basename === 'skill.cn.md') candidates.set(folder, entry);
+      });
+      if (!candidates.size) throw new Error('未找到 SKILL.md 或 SKILL.cn.md');
+
+      const overrides = opts.overrides || {};
+      const imported = [];
+      candidates.forEach((mainEntry, folder) => {
+        const override = overrides[folder] || {};
+        if (override.main) {
+          const preferredPath = folder ? `${folder}/${override.main}` : override.main;
+          const preferred = normalized.find(entry => entry.relativePath === preferredPath);
+          if (preferred) mainEntry = preferred;
+        }
+        const existing = override.id ? this.customSkills.find(skill => skill.id === override.id) : null;
+        if (existing && opts.bundleVersion && existing.bundleVersion === opts.bundleVersion) {
+          imported.push(existing);
+          return;
+        }
+        const packaged = this._buildPackagedSkill(normalized, folder, mainEntry, sourceName, {
+          ...override,
+          bundleVersion: opts.bundleVersion || override.bundleVersion || '',
+        });
+        const item = this.upload(packaged);
+        if (opts.persistPackage !== false) this._storeSkillPackage(item.id, normalized, folder);
+        imported.push(item);
+      });
+
+      const officialNames = new Set([
+        'h3-prompt-writing', 'minimalist-product-ad-generator', 'brand-promo-video-generator',
+        '3d-animation-short-generator', 'papercraft-stop-motion-explainer',
+        'paper-collage-explainer-generator', 'handdrawn-live-video-generator',
+        'music-video-subtitle-generator', 'co-op-game-intro-generator',
+      ]);
+      const detectedH3 = imported.filter(item => officialNames.has(item.originalSkillName)).length >= 5;
+      const groupName = opts.groupName || (detectedH3 ? 'MiniMax H3' : '');
+      if (groupName && imported.length) this._assignSkillsToGroup(imported.map(item => item.id), groupName);
+      return imported.map(item => ({ ...item, custom: true }));
+    }
+
+    _normalizePackageEntries(entries) {
+      if (!Array.isArray(entries) || !entries.length) throw new Error('Skill 包为空');
+      if (entries.length > MAX_PACKAGE_FILES) throw new Error(`Skill 包文件数不能超过 ${MAX_PACKAGE_FILES}`);
+      let totalBytes = 0;
+      const normalized = [];
+      entries.forEach(entry => {
+        if (!entry || !entry.relativePath) return;
+        let relativePath = String(entry.relativePath).replace(/\\/g, '/').replace(/^\.\//, '');
+        relativePath = path.posix.normalize(relativePath);
+        if (!relativePath || relativePath === '.' || relativePath.startsWith('../') || relativePath.includes('/../') || relativePath.startsWith('/') || /^[A-Za-z]:/.test(relativePath)) {
+          throw new Error(`Skill 包包含不安全路径：${entry.relativePath}`);
+        }
+        const data = Buffer.isBuffer(entry.data)
+          ? entry.data
+          : (typeof entry.data === 'string' ? Buffer.from(entry.data, 'utf8') : Buffer.from(entry.data || []));
+        totalBytes += data.length;
+        if (totalBytes > MAX_PACKAGE_BYTES) throw new Error('Skill 包解压后不能超过 100 MB');
+        normalized.push({ relativePath, data });
+      });
+      return normalized;
+    }
+
+    _buildPackagedSkill(entries, folder, mainEntry, sourceName, override) {
+      const mainText = mainEntry.data.toString('utf8');
+      const parsed = this._parseMarkdown(mainText, path.posix.basename(mainEntry.relativePath));
+      const prefix = folder ? `${folder}/` : '';
+      const packageEntries = entries.filter(entry => !prefix || entry.relativePath.startsWith(prefix));
+      const referenceEntries = packageEntries.filter(entry => {
+        const localPath = prefix ? entry.relativePath.slice(prefix.length) : entry.relativePath;
+        return localPath.toLowerCase().startsWith('references/') && PACKAGE_TEXT_EXTENSIONS.has(path.extname(localPath).toLowerCase());
+      });
+      if (referenceEntries.length) {
+        const references = referenceEntries.map(entry => {
+          const localPath = prefix ? entry.relativePath.slice(prefix.length) : entry.relativePath;
+          return `## Reference: ${localPath}\n\n${entry.data.toString('utf8').trim()}`;
+        }).join('\n\n');
+        parsed.systemPrompt = `${parsed.systemPrompt.trim()}\n\n---\n\n# Teemo 已加载的参考资料\n\n以下资料来自当前 Skill 包的 references 目录，执行相关步骤时直接使用。\n\n${references}`;
+      }
+      const originalSkillName = parsed.name;
+      const stableKey = `${folder}|${originalSkillName}`;
+      const generatedId = 'teemo_package_' + crypto.createHash('sha1').update(stableKey).digest('hex').slice(0, 12);
+      const localFiles = packageEntries.map(entry => prefix ? entry.relativePath.slice(prefix.length) : entry.relativePath);
+      return {
+        ...parsed,
+        id: override.id || generatedId,
+        name: override.name || parsed.name,
+        desc: override.description || parsed.desc,
+        icon: override.icon || parsed.icon || '📜',
+        originalSkillName,
+        packageSource: String(sourceName || ''),
+        packageFiles: localFiles,
+        bundleVersion: override.bundleVersion || '',
+        rawSource: mainText,
+      };
+    }
+
+    _storeSkillPackage(skillId, entries, folder) {
+      const prefix = folder ? `${folder}/` : '';
+      const targetRoot = path.resolve(PACKAGES_DIR, skillId);
+      if (!fs.existsSync(targetRoot)) fs.mkdirSync(targetRoot, { recursive: true });
+      entries.forEach(entry => {
+        if (prefix && !entry.relativePath.startsWith(prefix)) return;
+        const localPath = prefix ? entry.relativePath.slice(prefix.length) : entry.relativePath;
+        if (!localPath) return;
+        const target = path.resolve(targetRoot, ...localPath.split('/'));
+        if (target !== targetRoot && !target.startsWith(targetRoot + path.sep)) throw new Error(`Skill 文件路径越界：${localPath}`);
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.writeFileSync(target, entry.data);
+      });
+    }
+
+    _assignSkillsToGroup(skillIds, groupName) {
+      this.groupState = this.groupState || { groups: [], assignments: {} };
+      this.groupState.groups = this.groupState.groups || [];
+      this.groupState.assignments = this.groupState.assignments || {};
+      let group = this.groupState.groups.find(item => item.name.toLowerCase() === String(groupName).toLowerCase());
+      if (!group) {
+        group = {
+          id: 'skill_group_teemo_' + crypto.createHash('sha1').update(String(groupName)).digest('hex').slice(0, 10),
+          name: String(groupName).trim().slice(0, 30),
+          createdAt: Date.now(),
+        };
+        this.groupState.groups.push(group);
+      }
+      skillIds.forEach(skillId => { this.groupState.assignments[String(skillId)] = group.id; });
+      this._persistGroups();
+      return { ...group };
+    }
+
+    _readDirectoryEntries(rootDir) {
+      const output = [];
+      const visit = (dir, relativeRoot) => {
+        fs.readdirSync(dir, { withFileTypes: true }).forEach(entry => {
+          const fullPath = path.join(dir, entry.name);
+          const relativePath = relativeRoot ? `${relativeRoot}/${entry.name}` : entry.name;
+          if (entry.isDirectory()) visit(fullPath, relativePath);
+          else if (entry.isFile()) output.push({ relativePath, data: fs.readFileSync(fullPath) });
+        });
+      };
+      visit(rootDir, '');
+      return output;
+    }
+
+    _findBundledCollectionManifest() {
+      const candidates = [
+        path.join(process.cwd(), 'skills', 'Teemo-MiniMax-H3', 'Teemo-manifest.json'),
+        process.resourcesPath ? path.join(process.resourcesPath, 'app.asar', 'skills', 'Teemo-MiniMax-H3', 'Teemo-manifest.json') : '',
+        process.resourcesPath ? path.join(process.resourcesPath, 'app', 'skills', 'Teemo-MiniMax-H3', 'Teemo-manifest.json') : '',
+      ].filter(Boolean);
+      return candidates.find(candidate => fs.existsSync(candidate)) || '';
+    }
+
+    _installBundledSkillCollections() {
+      try {
+        const manifestPath = this._findBundledCollectionManifest();
+        if (!manifestPath) return;
+        const rootDir = path.dirname(manifestPath);
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+        const descriptors = Array.isArray(manifest.skills) ? manifest.skills : [];
+        const entries = this._readDirectoryEntries(rootDir);
+        const overrides = {};
+        descriptors.forEach(descriptor => {
+          if (!descriptor || !descriptor.folder) return;
+          overrides[String(descriptor.folder).replace(/\\/g, '/')] = descriptor;
+        });
+        this.uploadFromPackageEntries(entries, manifest.source || manifest.name || 'Teemo bundled skills', {
+          overrides,
+          bundleVersion: String(manifest.version || ''),
+          groupName: manifest.groupName || '',
+          persistPackage: false,
+        });
+      } catch (error) {
+        console.warn('[SkillService] install bundled skill collection failed:', error);
+      }
+    }
+
+    _findBundledProductPoster() {
+      const candidates = [
+        path.join(process.cwd(), 'skills', 'Teemo-product-poster', 'SKILL.md'),
+        process.resourcesPath ? path.join(process.resourcesPath, 'app.asar', 'skills', 'Teemo-product-poster', 'SKILL.md') : '',
+        process.resourcesPath ? path.join(process.resourcesPath, 'app', 'skills', 'Teemo-product-poster', 'SKILL.md') : '',
+      ].filter(Boolean);
+      return candidates.find(candidate => fs.existsSync(candidate)) || '';
+    }
+
+    _installBundledProductPoster() {
+      try {
+        const skillPath = this._findBundledProductPoster();
+        if (!skillPath) return;
+        const rootDir = path.dirname(skillPath);
+        const entries = this._readDirectoryEntries(rootDir);
+        this.uploadFromPackageEntries(entries, 'Teemo product poster', {
+          overrides: {
+            '': {
+              id: 'teemo_product_poster',
+              name: '产品海报',
+              description: '用当前启用的工作流，生成科技感新品 KV / 产品海报。',
+            },
+          },
+          bundleVersion: '2026.08.14-t1',
+          persistPackage: false,
+        });
+      } catch (error) {
+        console.warn('[SkillService] install bundled product poster skill failed:', error);
+      }
+    }
+
     /**
      * 解析 SKILL.md：front matter（YAML 子集）+ 正文
      * 支持的 front matter 字段：name, description, icon, allowed-tools, inputs（可选）
@@ -603,16 +851,17 @@ icon: 📋
 
       // 提取 front matter
       let body = mdText;
-      let hasExplicitDescription = false;
       const fm = mdText.match(/^---\s*\n([\s\S]*?)\n---\s*\n?/);
       if (fm) {
         body = mdText.slice(fm[0].length);
         const front = this._parseFrontMatter(fm[1]);
         if (front.name) result.name = String(front.name);
-        hasExplicitDescription = Object.prototype.hasOwnProperty.call(front, 'description');
-        if (hasExplicitDescription) result.desc = String(front.description);
+        if (front.description) result.desc = String(front.description);
         if (front.icon) result.icon = String(front.icon);
         if (front.triggers) result.triggers = String(front.triggers);  // 扩展触发词，逗号分隔
+        if (front.requires) result.requires = String(front.requires);
+        if (front.workflow) result.workflow = String(front.workflow);
+        if (front.aliases) result.aliases = String(front.aliases);
       }
 
       // 从「# Skill: 名称」标题提取名字
@@ -628,7 +877,7 @@ icon: 📋
       if (!result.name) result.name = '未命名 Skill';
 
       // desc 兜底：取正文第一段非标题文本（去 # 等）
-      if (!result.desc && !hasExplicitDescription) {
+      if (!result.desc) {
         const firstLine = body.split('\n').find(l => l.trim() && !l.startsWith('#') && !/^Skill[:：]/i.test(l.trim()));
         result.desc = (firstLine || '对话中自动新增的 Skill').slice(0, 80);
       }
@@ -646,11 +895,21 @@ icon: 📋
     _parseFrontMatter(yamlText) {
       const obj = {};
       const lines = yamlText.split('\n');
-      for (const line of lines) {
+      for (let index = 0; index < lines.length; index += 1) {
+        const line = lines[index];
         const m = line.match(/^([A-Za-z][\w-]*)\s*:\s*(.*)$/);
         if (!m) continue;
         let key = m[1].trim();
         let val = m[2].trim();
+        if (val === '|' || val === '>') {
+          const folded = val === '>';
+          const parts = [];
+          while (index + 1 < lines.length && (/^\s+/.test(lines[index + 1]) || !lines[index + 1].trim())) {
+            index += 1;
+            parts.push(lines[index].replace(/^\s{1,4}/, '').trimEnd());
+          }
+          val = folded ? parts.join(' ').replace(/\s+/g, ' ').trim() : parts.join('\n').trim();
+        }
         // 去除引号
         if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
           val = val.slice(1, -1);
@@ -675,8 +934,11 @@ icon: 📋
         if (typeof s.prompt === 'string') body = s.prompt;
         else if (s.promptTpl) body = s.promptTpl;
       }
-      // 正文可能来自一个旧 SKILL.md；移除旧元数据，再写入当前界面中的名称和简介。
-      body = body.trim().replace(/^---\s*\n[\s\S]*?\n---\s*\n?/, '');
+      // 若正文本身已含 front matter，直接原样导出，避免重复包裹
+      if (/^---\s*\n[\s\S]*?\n---/.test(body.trim())) {
+        const safeName0 = String(s.name || 'skill').replace(/[\/\\:*?"<>|]/g, '_');
+        return { filename: `SKILL-${safeName0}.md`, content: body.trim() + '\n' };
+      }
       const esc = (v) => String(v == null ? '' : v).replace(/\n/g, ' ');
       const fm = `---\nname: ${esc(s.name)}\ndescription: ${esc(s.desc)}\nicon: ${s.icon || '📜'}\n---\n\n`;
       const safeName = String(s.name || 'skill').replace(/[\/\\:*?"<>|]/g, '_');
@@ -705,14 +967,14 @@ icon: 📋
 
     _persistNames() {
       try {
-        storage.writeJson('skill-names.json', this.customNames || {});
+        fs.writeFileSync(NAMES_FILE, JSON.stringify(this.customNames || {}, null, 2), 'utf-8');
         this.listeners.forEach(fn => { try { fn(); } catch (e) { console.warn(e); } });
       } catch (e) { console.warn('[SkillService] save names failed:', e); }
     }
 
     _loadNames() {
       try {
-        if (storage.exists('skill-names.json')) return storage.readJson('skill-names.json', {});
+        if (fs.existsSync(NAMES_FILE)) return JSON.parse(fs.readFileSync(NAMES_FILE, 'utf-8'));
       } catch (e) { console.warn('[SkillService] load names failed:', e); }
       return {};
     }

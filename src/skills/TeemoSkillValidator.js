@@ -45,7 +45,14 @@
         }
       }
       if (!isObject(manifest.requirements)) errors.push('requirements is required');
-      else for (const field of ['toolsRequired', 'toolsOptional', 'permissions', 'dependencies']) stringArray(manifest.requirements[field], `requirements.${field}`, errors);
+      else {
+        for (const field of ['toolsRequired', 'toolsOptional', 'permissions', 'dependencies']) {
+          stringArray(manifest.requirements[field], `requirements.${field}`, errors);
+        }
+        for (const field of ['capabilities', 'workflows']) {
+          if (manifest.requirements[field] != null) stringArray(manifest.requirements[field], `requirements.${field}`, errors);
+        }
+      }
       if (!isObject(manifest.content) || !Spec.SENSITIVITIES.includes(manifest.content.sensitivity)) errors.push('content.sensitivity is invalid');
       if (manifest.content && Array.isArray(manifest.content.domains)) stringArray(manifest.content.domains, 'content.domains', errors);
       if (!isObject(manifest.overrides)) errors.push('overrides must be an object');

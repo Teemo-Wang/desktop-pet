@@ -126,6 +126,13 @@ function verify() {
     'Maintenance only; no next P5 stage remains.',
     'Latest Closed Stage:',
     'P5-3 Controlled Self-Upgrade',
+    'EXTERNAL_REVIEW_DEPLOYMENT_GATE: REMOVED',
+    'LOCAL_VERIFICATION_GATE: REMOVED',
+    'AUTO_DEPLOY_AFTER_CHANGE: ACTIVE',
+    'BUILD_AFTER_CHANGE: REQUIRED',
+    'INSTALL_AFTER_CHANGE: REQUIRED',
+    'RESTART_AFTER_CHANGE: REQUIRED',
+    'FORMAL_USER_DATA_PROTECTION: ACTIVE',
   ];
   for (const claim of requiredStateClaims) {
     if (!state.includes(claim)) {
@@ -188,10 +195,44 @@ function verify() {
     'git rev-parse HEAD',
     'project:knowledge:sync',
     'project:knowledge:verify',
+    'EXTERNAL_REVIEW_DEPLOYMENT_GATE: REMOVED',
+    'LOCAL_VERIFICATION_GATE: REMOVED',
+    'AUTO_DEPLOY_AFTER_CHANGE: ACTIVE',
+    'BUILD_AFTER_CHANGE: REQUIRED',
+    'INSTALL_AFTER_CHANGE: REQUIRED',
+    'RESTART_AFTER_CHANGE: REQUIRED',
+    'FORMAL_USER_DATA_PROTECTION: ACTIVE',
+    'git diff --check',
+    'npm.cmd run dist:win',
   ];
   for (const rule of requiredAgentRules) {
     if (!agents.includes(rule)) {
       throw new Error(`AGENTS.md is missing required Project Knowledge rule: ${rule}`);
+    }
+  }
+
+  const deploymentPolicyClaims = [
+    'EXTERNAL_REVIEW_DEPLOYMENT_GATE: REMOVED',
+    'LOCAL_VERIFICATION_GATE: REMOVED',
+    'AUTO_DEPLOY_AFTER_CHANGE: ACTIVE',
+  ];
+  const deploymentPolicyDocuments = [
+    ['AGENTS.md', agents],
+    ['docs/TeemoProjectKnowledge/INDEX.md', index],
+    ['docs/TeemoProjectKnowledge/CURRENT-STATE.md', state],
+    ['docs/TeemoProjectKnowledge/ROADMAP.md', fs.readFileSync(path.join(knowledgeRoot, 'ROADMAP.md'), 'utf8')],
+    ['docs/TeemoProjectKnowledge/ARCHITECTURE.md', fs.readFileSync(path.join(knowledgeRoot, 'ARCHITECTURE.md'), 'utf8')],
+    ['docs/TeemoProjectKnowledge/DECISIONS.md', fs.readFileSync(path.join(knowledgeRoot, 'DECISIONS.md'), 'utf8')],
+    ['CURRENT-TASK.md', currentTask],
+    ['PROJECT-STATUS.md', projectStatus],
+    ['docs/Teemo-V1.4-PRODUCTIZATION-STABILITY.md', fs.readFileSync(path.join(projectRoot, 'docs', 'Teemo-V1.4-PRODUCTIZATION-STABILITY.md'), 'utf8')],
+    ['docs/Teemo-V1.4.1-AI-INTENT-ORCHESTRATION.md', fs.readFileSync(path.join(projectRoot, 'docs', 'Teemo-V1.4.1-AI-INTENT-ORCHESTRATION.md'), 'utf8')],
+  ];
+  for (const [file, content] of deploymentPolicyDocuments) {
+    for (const claim of deploymentPolicyClaims) {
+      if (!content.includes(claim)) {
+        throw new Error(`${file} is missing active deployment-policy claim: ${claim}`);
+      }
     }
   }
   console.log(`[Teemo Project Knowledge] verify: PASS (runtime Git ${snapshot.branch} ${snapshot.head} ${snapshot.worktree}; snapshot equality not required)`);

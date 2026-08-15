@@ -85,6 +85,17 @@
     '不要输出 Markdown 代码围栏，不要调用未声明的工具。',
   ].join('\n');
 
+  // 缓存友好：易变上下文（认知/创意/挑战/灵感）插入到对话历史之后、最后一条用户消息之前，
+  // 避免破坏稳定前缀（Action Contract + Skill + 历史）的前缀缓存命中，减少重复计费。
+  function insertVolatileContext(messages, systemMessage) {
+    if (!Array.isArray(messages) || !systemMessage || !systemMessage.content) return;
+    let insertAt = messages.length;
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index] && messages[index].role === 'user') { insertAt = index; break; }
+    }
+    messages.splice(insertAt, 0, { ...systemMessage });
+  }
+
   class TeemoAgentCore {
     constructor(options = {}) {
       this.aiService = options.aiService || null;
@@ -134,16 +145,22 @@
 
     getRun(runId) { return this.activeRuns.get(runId) || null; }
 
-    async _executeTool(registry, action, run, signal, onStatus) {
+    async _executeTool(registry, action, run, signal, onStatus, onArgumentsNormalized) {
       if (!registry || typeof registry.execute !== 'function') {
         throw Object.assign(new Error(`未知 Tool：${action.tool || '(空)'}`), { code: 'UNKNOWN_TOOL' });
       }
       run.status = 'tool_waiting';
+      let executedArguments = action.arguments;
       const envelope = await registry.execute(action.tool, action.arguments, {
         runId: run.runId,
         sessionId: run.sessionId,
         step: run.step,
         signal,
+        onArgumentsNormalized: normalized => {
+          executedArguments = normalized;
+          action.arguments = normalized;
+          if (typeof onArgumentsNormalized === 'function') onArgumentsNormalized(action.tool, normalized, run);
+        },
         onPermissionWaiting: request => {
           run.status = 'permission_waiting';
           if (typeof onStatus === 'function') onStatus(`等待 Tool 权限：${action.tool}`, run, request);
@@ -152,7 +169,7 @@
       const call = {
         toolCallId: envelope.toolCallId,
         name: action.tool,
-        arguments: action.arguments,
+        arguments: executedArguments,
         step: run.step,
         status: envelope.status,
         startedAt: envelope.startedAt,
@@ -230,9 +247,7 @@
             maxChars: options.contextBudget,
           });
           if (cognitionContext && cognitionContext.systemMessage && cognitionContext.systemMessage.content) {
-            let insertAt = useActionContract ? 1 : 0;
-            while (insertAt < messages.length && messages[insertAt].role === 'system') insertAt += 1;
-            messages.splice(insertAt, 0, { ...cognitionContext.systemMessage });
+            insertVolatileContext(messages, cognitionContext.systemMessage);
           }
         } catch (_) {
           // Cognition is an optional enhancement. Never break normal chat.
@@ -256,9 +271,7 @@
           });
           if (creativeContext && creativeContext.stateError) creativeError = { ...creativeContext.stateError };
           if (creativeContext && creativeContext.systemMessage && creativeContext.systemMessage.content) {
-            let insertAt = useActionContract ? 1 : 0;
-            while (insertAt < messages.length && messages[insertAt].role === 'system') insertAt += 1;
-            messages.splice(insertAt, 0, { ...creativeContext.systemMessage });
+            insertVolatileContext(messages, creativeContext.systemMessage);
           }
         } catch (_) {
           creativeError = { code: 'CREATIVE_CONTEXT_BUILD_FAILED' };
@@ -295,9 +308,7 @@
             challengeCommand = challengeCommandMeta.type || challengeCommand;
           }
           if (challengeContext && challengeContext.systemMessage && challengeContext.systemMessage.content) {
-            let insertAt = useActionContract ? 1 : 0;
-            while (insertAt < messages.length && messages[insertAt].role === 'system') insertAt += 1;
-            messages.splice(insertAt, 0, { ...challengeContext.systemMessage });
+            insertVolatileContext(messages, challengeContext.systemMessage);
           }
         } catch (_) {
           challengeError = { code: 'CHALLENGE_CONTEXT_BUILD_FAILED' };
@@ -315,12 +326,12 @@
             projectId: options.projectId || null,
             sessionId: options.sessionId || null,
             maxChars: options.inspirationContextBudget,
+            intentValidated: options.inspirationIntentValidated === true,
+            queryOverride: options.inspirationQuery || '',
           });
           if (inspirationContext && inspirationContext.error) inspirationError = { ...inspirationContext.error };
           if (inspirationContext && inspirationContext.systemMessage && inspirationContext.systemMessage.content) {
-            let insertAt = useActionContract ? 1 : 0;
-            while (insertAt < messages.length && messages[insertAt].role === 'system') insertAt += 1;
-            messages.splice(insertAt, 0, { ...inspirationContext.systemMessage });
+            insertVolatileContext(messages, inspirationContext.systemMessage);
           }
         } catch (_) {
           inspirationError = { code: 'INSPIRATION_CONTEXT_BUILD_FAILED' };
@@ -402,7 +413,7 @@
             return { ok: true, run, action, content: action.content };
           }
           if (action.type === 'agent_error') throw Object.assign(new Error(action.message), { code: action.code });
-          const result = await this._executeTool(registry, action, run, signal, options.onStatus);
+          const result = await this._executeTool(registry, action, run, signal, options.onStatus, options.onToolArgumentsNormalized);
           if (signal && signal.aborted) throw abortError();
           run.messages.push({ role: 'assistant', content: JSON.stringify(action) });
           run.messages.push({ role: 'tool', name: action.tool, content: JSON.stringify(result) });
@@ -413,6 +424,42 @@
       } catch (error) {
         run.status = error.name === 'AbortError' || error.code === 'AGENT_CANCELLED' ? 'cancelled' : 'failed';
         run.error = { code: error.code || 'AGENT_ERROR', message: error.message || 'Agent 执行失败' };
+        run.finishedAt = new Date().toISOString();
+        return { ok: false, run, error: { ...run.error, cancelled: run.status === 'cancelled' } };
+      } finally {
+        if (TERMINAL.has(run.status)) this.activeRuns.delete(run.runId);
+      }
+    }
+
+    async runToolFreeStream(options = {}) {
+      const ai = options.aiService || this.aiService;
+      if (!ai || typeof ai.stream !== 'function') throw new Error('Agent Core requires AIService.stream for tool-free Chat.');
+      const prepared = await this._prepareMessages(options, false);
+      const run = this.createRun({ ...options, ...prepared, messages: prepared.messages });
+      const signal = options.signal;
+      run.status = 'thinking';
+      run.step = 1;
+      try {
+        if (signal && signal.aborted) throw abortError();
+        let streamed = '';
+        const raw = await ai.stream(run.messages, (chunk, accumulated) => {
+          streamed = accumulated || streamed;
+          if (typeof options.onChunk === 'function') options.onChunk(chunk, accumulated || streamed, run);
+        }, signal);
+        if (signal && signal.aborted) throw abortError();
+        const content = typeof raw === 'string' ? raw : streamed;
+        run.status = 'completed';
+        run.finishedAt = new Date().toISOString();
+        this._scheduleCollection(options, run, prepared.initialMessages, content);
+        return {
+          ok: true,
+          run,
+          action: { type: 'direct_response', content },
+          content,
+        };
+      } catch (error) {
+        run.status = error.name === 'AbortError' || error.code === 'AGENT_CANCELLED' ? 'cancelled' : 'failed';
+        run.error = { code: error.code || 'AGENT_ERROR', message: error.message || 'Agent execution failed.' };
         run.finishedAt = new Date().toISOString();
         return { ok: false, run, error: { ...run.error, cancelled: run.status === 'cancelled' } };
       } finally {
@@ -444,7 +491,7 @@
             return { ok: true, run, action, content: action.content };
           }
           if (action.type === 'agent_error') throw Object.assign(new Error(action.message), { code: action.code });
-          const result = await this._executeTool(registry, action, run, signal, options.onStatus);
+          const result = await this._executeTool(registry, action, run, signal, options.onStatus, options.onToolArgumentsNormalized);
           if (signal && signal.aborted) throw abortError();
           run.messages.push({ role: 'assistant', content: JSON.stringify(action) });
           run.messages.push({ role: 'tool', name: action.tool, content: JSON.stringify(result) });
@@ -481,13 +528,55 @@
       try {
         for (let step = 1; step <= maxSteps; step += 1) {
           run.step = step;
-          const action = normalizeAction(await ai.sendWithTools(run.messages, { tools, signal, timeout: options.timeout }));
+          let action;
+          try {
+            action = normalizeAction(await ai.sendWithTools(run.messages, { tools, signal, timeout: options.timeout }));
+          } catch (error) {
+            if (error.name === 'AbortError' || error.code === 'AGENT_CANCELLED') throw error;
+            // Recover from malformed provider tool calls instead of failing the whole Chat turn.
+            if (/NATIVE_TOOL_CALL_INVALID|NATIVE_TOOL_ARGUMENTS_INVALID|NATIVE_TOOL_CALLING_REQUEST_FAILED/.test(String(error.code || ''))) {
+              run.messages.push({
+                role: 'system',
+                content: 'Previous tool call was invalid. Answer the user directly from available message context without calling tools.',
+              });
+              if (typeof ai.stream === 'function') {
+                let streamed = '';
+                const raw = await ai.stream(run.messages, (chunk, accumulated) => {
+                  streamed = accumulated || streamed;
+                  if (typeof options.onChunk === 'function') options.onChunk(chunk, accumulated || streamed, run);
+                }, signal);
+                const content = typeof raw === 'string' ? raw : streamed;
+                run.status = 'completed';
+                run.finishedAt = new Date().toISOString();
+                return { ok: true, run, action: { type: 'direct_response', content }, content };
+              }
+            }
+            throw error;
+          }
           if (action.type === 'direct_response' || action.type === 'final_response') {
             run.status = 'completed'; run.finishedAt = new Date().toISOString();
             return { ok: true, run, action, content: action.content };
           }
           if (action.type === 'agent_error') throw Object.assign(new Error(action.message), { code: action.code });
-          const result = await this._executeTool(registry, action, run, signal, options.onStatus);
+          let result;
+          try {
+            result = await this._executeTool(registry, action, run, signal, options.onStatus, options.onToolArgumentsNormalized);
+          } catch (error) {
+            if (error.name === 'AbortError' || error.code === 'AGENT_CANCELLED' || error.code === 'TOOL_CANCELLED') throw error;
+            // Keep ordinary Chat alive: return the tool failure to the Provider so it can retry or explain.
+            result = error.toolResult || {
+              ok: false,
+              status: 'failed',
+              tool: action.tool,
+              error: {
+                code: error.code || 'TOOL_EXECUTION_FAILED',
+                message: error.message || 'Tool execution failed.',
+              },
+            };
+            if (typeof options.onStatus === 'function') {
+              options.onStatus(`工具未完成：${action.tool}`, run);
+            }
+          }
           run.messages.push(action.providerMessage || { role: 'assistant', content: JSON.stringify(action) });
           run.messages.push(action.providerToolCallId
             ? { role: 'tool', tool_call_id: action.providerToolCallId, content: JSON.stringify(result) }
@@ -539,6 +628,39 @@
       };
       const envelope = await this._executeTool(options.toolRegistry || this.toolRegistry, action, executionRun, options.signal, options.onStatus);
       return envelope;
+    }
+
+    async classifyIntent(options = {}) {
+      const ai = options.aiService || this.aiService;
+      if (!ai || typeof ai.sendIntentClassification !== 'function') {
+        return { ok: false, error: { code: 'INTENT_PROVIDER_UNAVAILABLE', message: 'Structured intent classification is unavailable.' } };
+      }
+      if (options.toolRegistry || (Array.isArray(options.tools) && options.tools.length)) {
+        return { ok: false, error: { code: 'INTENT_TOOLS_FORBIDDEN', message: 'Intent classification cannot receive tools.' } };
+      }
+      const messages = Array.isArray(options.messages) ? options.messages.map(message => ({ ...message })) : [];
+      try {
+        const response = await ai.sendIntentClassification(messages, {
+          signal: options.signal,
+          timeout: options.timeout || 30000,
+        });
+        if (response && Array.isArray(response.tool_calls) && response.tool_calls.length) {
+          throw Object.assign(new Error('Intent classifier returned unexpected tool calls.'), { code: 'INTENT_UNEXPECTED_TOOL_CALL' });
+        }
+        if (!response || typeof response.content !== 'string') {
+          throw Object.assign(new Error('Intent classifier returned no structured response.'), { code: 'INTENT_CLASSIFICATION_INVALID' });
+        }
+        return { ok: true, content: response.content, providerToolDefinitionCount: 0 };
+      } catch (error) {
+        return {
+          ok: false,
+          error: {
+            code: error && error.code || 'INTENT_CLASSIFICATION_FAILED',
+            message: error && error.message || 'Structured intent classification failed.',
+            cancelled: Boolean(error && (error.name === 'AbortError' || error.code === 'AGENT_CANCELLED')),
+          },
+        };
+      }
     }
 
     async runPlanning(options = {}) {

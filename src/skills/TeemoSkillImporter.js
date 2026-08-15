@@ -148,6 +148,8 @@
           toolsOptional: splitIdentifiers(fields.toolsoptional),
           permissions: splitIdentifiers(fields.permissions),
           dependencies: splitIdentifiers(fields.dependencies),
+          capabilities: splitIdentifiers(source && source.requires || fields.requires || fields.capabilities),
+          workflows: splitIdentifiers(source && source.workflow || fields.workflow || fields.workflows),
         },
         content,
         overrides,

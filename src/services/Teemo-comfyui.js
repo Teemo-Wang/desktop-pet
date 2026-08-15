@@ -285,9 +285,33 @@
       return workflow;
     }
 
+    getWorkflowByRef(ref) {
+      const value = String(ref || '').trim();
+      if (!value || /^(current|active|default)$/i.test(value)) return this.getActiveWorkflow();
+      if (/^builtin$/i.test(value)) return null;
+      const workflows = this.getWorkflows();
+      const lower = value.toLowerCase();
+      const found = workflows.find(item => item && (
+        String(item.id) === value
+        || String(item.name || '').toLowerCase() === lower
+        || String(item.name || '').replace(/\s+/g, '-').toLowerCase() === lower
+      ));
+      return found || undefined;
+    }
+
     buildWorkflow(options = {}) {
-      const imported = this.getActiveWorkflow();
-      if (imported) return this._buildImportedWorkflow(imported, options);
+      const requested = options.workflowId || options.workflowName;
+      if (requested) {
+        const record = this.getWorkflowByRef(requested);
+        if (record === undefined) {
+          const names = this.getWorkflows().map(item => item && item.name).filter(Boolean);
+          throw new Error(`找不到工作流「${requested}」。${names.length ? `当前已导入：${names.join('、')}。` : '请先在设置里导入一条 API 工作流。'}`);
+        }
+        if (record) return this._buildImportedWorkflow(record, options);
+      } else {
+        const imported = this.getActiveWorkflow();
+        if (imported) return this._buildImportedWorkflow(imported, options);
+      }
       const dimensions = this._resolveDimensions(options);
       const seed = Number.isFinite(Number(options.seed))
         ? Number(options.seed)

@@ -76,9 +76,12 @@
     async build(options = {}) {
       const userMessage = text(options.userMessage || '', MAX_QUERY_LENGTH);
       const result = { enabled: true, triggered: false, query: '', items: [], total: 0, status: 'BYPASS', systemMessage: null, error: null };
-      if (!explicitIntent(userMessage)) return result;
+      const validatedIntent = options.intentValidated === true;
+      if (!validatedIntent && !explicitIntent(userMessage)) return result;
       result.triggered = true;
-      result.query = extractQuery(userMessage);
+      result.query = validatedIntent
+        ? text(options.queryOverride || userMessage, MAX_QUERY_LENGTH)
+        : extractQuery(userMessage);
       if (!result.query || !this.retrievalClient || typeof this.retrievalClient.search !== 'function') {
         result.status = 'NO_QUERY';
         return result;

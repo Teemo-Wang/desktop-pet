@@ -6,6 +6,8 @@
   if (typeof module === 'object' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   const CHANNELS = Object.freeze({
+    listRoots: 'teemo-file-tool:list-roots',
+    normalize: 'teemo-file-tool:normalize',
     prepare: 'teemo-file-tool:prepare',
     execute: 'teemo-file-tool:execute',
     release: 'teemo-file-tool:release',
@@ -23,6 +25,33 @@
   class TeemoFileClient {
     constructor(options = {}) {
       this.ipcRenderer = options.ipcRenderer || null;
+    }
+
+    async listAuthorizedRoots() {
+      if (!this.ipcRenderer || typeof this.ipcRenderer.invoke !== 'function') {
+        throw safeError(null, 'Authorized roots are unavailable.');
+      }
+      const result = await this.ipcRenderer.invoke(CHANNELS.listRoots);
+      if (!result || !result.ok || !Array.isArray(result.roots)) {
+        throw safeError(result && result.error, 'Authorized roots are unavailable.');
+      }
+      return result.roots.map(root => ({
+        rootId: String(root.rootId || ''),
+        displayName: String(root.displayName || ''),
+        capabilities: Array.isArray(root.capabilities) ? root.capabilities.map(String) : [],
+        aliases: Array.isArray(root.aliases) ? root.aliases.map(String) : [],
+      }));
+    }
+
+    async normalize(tool, args) {
+      if (!this.ipcRenderer || typeof this.ipcRenderer.invoke !== 'function') {
+        throw safeError(null, 'File argument normalization is unavailable.');
+      }
+      const result = await this.ipcRenderer.invoke(CHANNELS.normalize, { tool, args });
+      if (!result || !result.ok || !result.args || typeof result.args !== 'object' || Array.isArray(result.args)) {
+        throw safeError(result && result.error, 'File arguments could not be normalized safely.');
+      }
+      return result.args;
     }
 
     async prepare(tool, args, context = {}) {

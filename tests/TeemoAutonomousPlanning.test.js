@@ -47,6 +47,8 @@ async function main() {
   assert.equal(result.run.toolCalls.length, 0);
   assert.equal(calls.length, 1);
   assert.match(calls[0].messages[0].content, /planning-only/);
+  assert.match(calls[0].messages[0].content, /does not make a step blocked/);
+  assert.match(calls[0].messages[0].content, /concrete prerequisite is currently missing/);
   assert.equal(Object.prototype.hasOwnProperty.call(calls[0].options, 'tools'), false);
 
   const unexpectedCore = new TeemoAgentCore({

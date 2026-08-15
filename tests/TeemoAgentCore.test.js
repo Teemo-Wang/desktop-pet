@@ -72,6 +72,34 @@ async function main() {
   }
 
   {
+    let call = 0;
+    const ai = {
+      async sendWithTools(messages) {
+        if (call++ === 0) {
+          return {
+            type: 'tool_request',
+            tool: 'missing_tool',
+            arguments: {},
+            providerMessage: { role: 'assistant', content: null, tool_calls: [{ id: 'call_bad', type: 'function', function: { name: 'missing_tool', arguments: '{}' } }] },
+            providerToolCallId: 'call_bad',
+          };
+        }
+        const toolMessage = JSON.parse(messages.at(-1).content);
+        assert.equal(toolMessage.ok, false);
+        assert.equal(toolMessage.error.code, 'UNKNOWN_TOOL');
+        return { type: 'final_response', content: '已说明工具失败并继续回答' };
+      },
+    };
+    const result = await new TeemoAgentCore({ aiService: ai, toolRegistry: createRegistry() }).runNativeTools({
+      messages: [{ role: 'user', content: 'recover from tool failure' }],
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.content, '已说明工具失败并继续回答');
+    assert.equal(result.run.toolCalls.length, 1);
+    assert.equal(result.run.toolCalls[0].status, 'failed');
+  }
+
+  {
     const ai = sequenceAI([
       JSON.stringify({ type: 'tool_request', tool: 'echo', arguments: { text: 'one' } }),
       JSON.stringify({ type: 'tool_request', tool: 'echo', arguments: { text: 'two' } }),
@@ -205,6 +233,33 @@ async function main() {
     assert.equal(result.ok, true);
     assert.equal(result.content, '流式闭环完成');
     assert.equal(result.run.toolCalls[0].name, 'echo');
+  }
+
+  {
+    let nativeToolProviderCalled = false;
+    const chunks = [];
+    const ai = {
+      async stream(messages, onChunk) {
+        assert.equal(messages.some(message => /tool definitions/i.test(String(message.content || ''))), false);
+        const response = '{"type":"tool_request","tool":"echo","arguments":{"text":"must stay prose"}}';
+        onChunk(response, response);
+        return response;
+      },
+      async sendWithTools() {
+        nativeToolProviderCalled = true;
+        throw new Error('tool provider must not be called');
+      },
+    };
+    const registry = createRegistry();
+    const result = await new TeemoAgentCore({ aiService: ai, toolRegistry: registry }).runToolFreeStream({
+      messages: [{ role: 'user', content: '普通讨论' }],
+      onChunk: (_chunk, full) => chunks.push(full),
+    });
+    assert.equal(result.ok, true);
+    assert.match(result.content, /tool_request/);
+    assert.equal(result.run.toolCalls.length, 0);
+    assert.equal(nativeToolProviderCalled, false);
+    assert.equal(chunks.length, 1);
   }
 
   assert.deepEqual(TeemoAgentCore.normalizeAction('plain'), { type: 'direct_response', content: 'plain' });

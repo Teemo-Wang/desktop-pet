@@ -38,6 +38,30 @@
     </div>`;
   }
 
+  function decodeBasicEntities(value) {
+    return String(value || '')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, '&');
+  }
+
+  /** Normalize markdown link targets: <C:\path>, bare Windows paths, file:// */
+  function normalizeMarkdownHref(raw) {
+    let href = decodeBasicEntities(raw).trim();
+    if ((href.startsWith('<') && href.endsWith('>'))
+      || (href.startsWith('"') && href.endsWith('"'))
+      || (href.startsWith("'") && href.endsWith("'"))) {
+      href = href.slice(1, -1).trim();
+    }
+    if (/^[A-Za-z]:[\\/]/.test(href) || href.startsWith('\\\\')) {
+      if (/^[A-Za-z]:/.test(href)) href = href.replace(/\\\\+/g, '\\');
+      return `file:///${href.replace(/\\/g, '/')}`;
+    }
+    return href;
+  }
+
   function renderInline(text) {
     let s = escapeHTML(text);
     // 行内代码：`code`
@@ -47,12 +71,22 @@
     // 斜体：*text*（避免与上面 ** 冲突）
     s = s.replace(/(^|[\s])\*([^*\n]+)\*(?=[\s.,!?;:)]|$)/g, '$1<em>$2</em>');
     // 图片：![alt](url) —— 必须在链接规则之前处理；file:/// 本地路径也支持
-    s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g,
-      '<img class="md-img" src="$2" alt="$1" loading="lazy">');
-    // 链接：[text](url)
-    s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) => {
+      const src = escapeHTML(normalizeMarkdownHref(url));
+      return `<img class="md-img" src="${src}" alt="${alt}" loading="lazy">`;
+    });
+    // 链接：[text](url) —— 支持 [名字](<C:\路径>) 这类写法
+    s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
+      const href = escapeHTML(normalizeMarkdownHref(url));
+      return `<a href="${href}" rel="noopener">${label}</a>`;
+    });
     // 自动链接：纯 URL（排除已在标签属性中的，简单用前导空白/括号约束）
-    s = s.replace(/(^|[\s(])((https?:\/\/)[^\s)<]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+    s = s.replace(/(^|[\s(])((https?:\/\/)[^\s)<]+)/g, '$1<a href="$2" rel="noopener">$2</a>');
+    // 自动链接：裸 Windows 路径（C:\... 或 \\server\share）；不含空格，避免吃进后文
+    s = s.replace(/(^|[\s(>（])(([A-Za-z]:\\|\\\\)[^\\/:*?"<>|\r\n\s]+(?:\\[^\\/:*?"<>|\r\n\s]+)*)/g, (_, prefix, winPath) => {
+      const href = escapeHTML(normalizeMarkdownHref(winPath));
+      return `${prefix}<a href="${href}" rel="noopener">${winPath}</a>`;
+    });
     return s;
   }
 

@@ -31,24 +31,67 @@
       this._docked = null;     // null | 'left' | 'right'
       this._animTimer = null;
 
-      // 初始位置：右下角（兜底用屏幕宽，避免 innerWidth 还未就绪时算出 0）
+      this._hasValidViewportPosition = false;
+
+      // 初始位置：只在窗口尺寸可信时写入坐标。CSS 会在此之前保留右下角兜底。
       this._initPosition();
 
       this._bind();
+      this._bindMainProcessState();
 
       // window 完全加载后再校正一次位置，防止首屏 innerWidth 为 0 导致桌宠卡左上角
+      const retryInitialPosition = () => {
+        if (this._hasValidViewportPosition || this._initPosition()) return;
+        setTimeout(() => this._initPosition(), 120);
+      };
       if (document.readyState === 'complete') {
         // 已加载完成，下一帧再校正
-        requestAnimationFrame(() => this._initPosition());
+        requestAnimationFrame(retryInitialPosition);
       } else {
-        window.addEventListener('load', () => this._initPosition(), { once: true });
+        window.addEventListener('load', () => requestAnimationFrame(retryInitialPosition), { once: true });
       }
+    }
+
+    _bindMainProcessState() {
+      const publish = () => this._publishInteractiveRegions();
+      window.addEventListener('resize', publish);
+      window.addEventListener('load', () => requestAnimationFrame(publish), { once: true });
+      let publishQueued = false;
+      const queuePublish = () => {
+        if (publishQueued) return;
+        publishQueued = true;
+        requestAnimationFrame(() => {
+          publishQueued = false;
+          publish();
+        });
+      };
+      this._interactiveRegionObserver = new MutationObserver(queuePublish);
+      this._interactiveRegionObserver.observe(document.body, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: ['class', 'style'],
+      });
+      requestAnimationFrame(publish);
+    }
+
+    _publishInteractiveRegions() {
+      const selectors = ['#petArea', '#hoverBubble.visible', '#quickDock.visible', '#systemDock.visible', '.panel.open', '.ctx-menu.visible', '#dailyBriefCard.visible', '#notifyBubble.visible'];
+      const regions = [];
+      document.querySelectorAll(selectors.join(',')).forEach(element => {
+        const rect = element.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          regions.push({ x: rect.left, y: rect.top, width: rect.width, height: rect.height });
+        }
+      });
+      ipcRenderer.send('desktop-interactive-regions', regions);
     }
 
     /** 初始化/重置位置到右下角 */
     _initPosition() {
-      const w = window.innerWidth || screen.width || 1440;
-      const h = window.innerHeight || screen.height || 900;
+      const w = Math.max(window.innerWidth || 0, document.documentElement.clientWidth || 0);
+      const h = Math.max(window.innerHeight || 0, document.documentElement.clientHeight || 0);
+      if (w < PET_W + 32 || h < PET_H + 32) return false;
       this._posX = w - PET_W - 32;
       this._posY = h - PET_H - 32;
       // 防御：如果算出来还是负数（极端情况），强行放到 100,100
@@ -58,7 +101,9 @@
       }
       this._clampPosition(false);
       this._updatePosition();
+      this._hasValidViewportPosition = true;
       console.log('[pet] 初始化位置:', this._posX, this._posY, '窗口:', w, 'x', h);
+      return true;
     }
 
     /**
@@ -86,6 +131,7 @@
       this.el.style.bottom = 'auto';
       this.el.style.transform = 'none';
       this._syncPanelPosition();
+      this._publishInteractiveRegions();
     }
 
     /** 给 IP 加过渡动画（吸附 / 弹回时调用） */
@@ -174,35 +220,25 @@
     }
 
     _bind() {
-      // 鼠标穿透状态去重，避免重渲时频繁切换 IPC 导致窗口失焦
-      let lastInside = null;
-      // 鼠标穿透控制 + 拖拽
+      // The main process owns desktop hit testing. Renderer events only drive drag
+      // semantics once the pointer is inside a published interactive region.
       document.addEventListener('mousemove', (e) => {
-        const el = document.elementFromPoint(e.clientX, e.clientY);
-        const insideContent = !!(el && el !== document.body && el !== document.documentElement && !el.classList.contains('app'));
-        if (insideContent !== lastInside) {
-          lastInside = insideContent;
-          ipcRenderer.send(insideContent ? 'mouse-enter-content' : 'mouse-leave-content');
-        }
-
-        // 拖拽
-        if (this._downTime === 0) return;
-        const dx = e.clientX - this._lx;
-        const dy = e.clientY - this._ly;
-        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
-          this._dragging = true;
-          this._posX += dx;
-          this._posY += dy;
-          this._lx = e.clientX;
-          this._ly = e.clientY;
-          // 拖拽中允许越界，预览吸附
-          this._clampPosition(true);
-          this._updatePosition();
-
-          // 实时给一个候选反馈：将要吸附时 IP 加 will-dock 标记
-          const centerX = this._posX + HALF_W;
-          this.el.classList.toggle('will-dock-left', centerX < DOCK_TRIGGER);
-          this.el.classList.toggle('will-dock-right', centerX > window.innerWidth - DOCK_TRIGGER);
+        if (this._downTime !== 0) {
+          const dx = e.clientX - this._lx;
+          const dy = e.clientY - this._ly;
+          if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+            this._dragging = true;
+            this._posX += dx;
+            this._posY += dy;
+            this._lx = e.clientX;
+            this._ly = e.clientY;
+            this._clampPosition(true);
+            this._updatePosition();
+            const centerX = this._posX + HALF_W;
+            this.el.classList.toggle('will-dock-left', centerX < DOCK_TRIGGER);
+            this.el.classList.toggle('will-dock-right', centerX > window.innerWidth - DOCK_TRIGGER);
+          }
+          return;
         }
       });
 
@@ -212,6 +248,7 @@
         this._dragging = false;
         this._lx = e.clientX;
         this._ly = e.clientY;
+        ipcRenderer.send('desktop-drag-state', true);
       });
 
       document.addEventListener('mouseup', () => {
@@ -240,6 +277,8 @@
             this._animate();
             this._updatePosition();
           }
+          ipcRenderer.send('desktop-drag-state', false);
+          this._publishInteractiveRegions();
           return;
         }
 
@@ -255,6 +294,8 @@
             }, 260);
           }
         }
+        ipcRenderer.send('desktop-drag-state', false);
+        this._publishInteractiveRegions();
       });
 
       this.el.addEventListener('dblclick', e => {
@@ -264,6 +305,7 @@
         this._clickTimer = null;
         this._downTime = 0;
         this._dragging = false;
+        ipcRenderer.send('desktop-drag-state', false);
         if (this._docked) this._undock();
         if (this.onDoubleClick) this.onDoubleClick();
       });

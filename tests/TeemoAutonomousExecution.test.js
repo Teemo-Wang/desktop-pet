@@ -112,6 +112,21 @@ async function main() {
     assert.ok(file.counts().executions >= 3);
     assert.ok(file.permission.listAudit().length >= 3, 'every action and verification must traverse P1');
 
+    const blockedObserved = [];
+    let blockedApprovals = 0;
+    const blockedAi = makeAi([action('read_file', { path: source })], blockedObserved);
+    const blockedExecution = new TeemoAutonomousExecution({ agentCore: new TeemoAgentCore({ aiService: blockedAi, toolRegistry: file.registry }), aiService: blockedAi, toolRegistry: file.registry });
+    const blockedResult = await blockedExecution.run(runOptions(plan([{
+      title: 'Wait for a prerequisite',
+      description: 'The required reference is not available yet.',
+      status: 'blocked',
+    }]), { requestRunApproval: async () => { blockedApprovals += 1; return true; } }));
+    assert.equal(blockedResult.ok, false);
+    assert.equal(blockedResult.run.state, 'blocked');
+    assert.equal(blockedResult.error.code, 'EXECUTION_PLAN_BLOCKED');
+    assert.equal(blockedApprovals, 0, 'blocked plans must fail before asking for run approval');
+    assert.equal(blockedObserved.length, 0, 'blocked plans must not call the Provider');
+
     const noApprovalObserved = [];
     const noApprovalAi = makeAi([action('read_file', { path: source })], noApprovalObserved);
     const noApproval = new TeemoAutonomousExecution({ agentCore: new TeemoAgentCore({ aiService: noApprovalAi, toolRegistry: file.registry }), aiService: noApprovalAi, toolRegistry: file.registry });

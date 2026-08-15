@@ -1,0 +1,71 @@
+{
+  "name": "Teemo MiniMax H3 Skills",
+  "version": "2026.08.06",
+  "source": "https://github.com/MiniMax-AI/MiniMax-H3/tree/main/skills",
+  "groupName": "MiniMax H3",
+  "skills": [
+    {
+      "id": "teemo_h3_prompt_writing",
+      "folder": "h3-prompt-writing",
+      "main": "SKILL.md",
+      "name": "Teemo H3 提示词编写",
+      "description": "把文字、图片、视频和音频需求改写为 MiniMax H3 官方结构化提示词。"
+    },
+    {
+      "id": "teemo_h3_minimalist_product_ad",
+      "folder": "minimalist-product-ad-generator",
+      "main": "SKILL.cn.md",
+      "name": "Teemo H3 极简产品广告",
+      "description": "根据产品素材策划并生成干净、克制、有节奏的高质感产品广告。"
+    },
+    {
+      "id": "teemo_h3_brand_promo",
+      "folder": "brand-promo-video-generator",
+      "main": "SKILL.cn.md",
+      "name": "Teemo H3 品牌宣传片",
+      "description": "根据品牌事实、素材和传播目标规划品牌宣传短片。"
+    },
+    {
+      "id": "teemo_h3_3d_animation_short",
+      "folder": "3d-animation-short-generator",
+      "main": "SKILL.cn.md",
+      "name": "Teemo H3 三维动画短片",
+      "description": "从故事设定到分镜、生成和质检，制作连续一致的三维动画短片。"
+    },
+    {
+      "id": "teemo_h3_papercraft_stop_motion",
+      "folder": "papercraft-stop-motion-explainer",
+      "main": "SKILL.cn.md",
+      "name": "Teemo H3 纸艺定格科普",
+      "description": "把知识内容转化为纸雕、剪纸和微缩定格风格的科普视频。"
+    },
+    {
+      "id": "teemo_h3_paper_collage",
+      "folder": "paper-collage-explainer-generator",
+      "main": "SKILL.cn.md",
+      "name": "Teemo H3 纸张拼贴讲解",
+      "description": "用半色调纸张拼贴和触感定格语言呈现观点、知识或旁白。"
+    },
+    {
+      "id": "teemo_h3_handdrawn_live",
+      "folder": "handdrawn-live-video-generator",
+      "main": "SKILL.cn.md",
+      "name": "Teemo H3 真人手绘融合",
+      "description": "制作真人空间与粗粝发光手绘动画连续互动的创意短片。"
+    },
+    {
+      "id": "teemo_h3_music_video_subtitle",
+      "folder": "mv-subtitle-skill-confirmed",
+      "main": "SKILL.cn.md",
+      "name": "Teemo H3 音乐视频字幕",
+      "description": "分析音乐节拍与演唱时序，规划动态歌词、镜头和连续的音乐视频。"
+    },
+    {
+      "id": "teemo_h3_coop_game_intro",
+      "folder": "co-op-game-intro-generator",
+      "main": "SKILL.cn.md",
+      "name": "Teemo H3 双人游戏开场",
+      "description": "制作包含双人角色、玩家信息卡和菜单交互的游戏开场动画。"
+    }
+  ]
+}

@@ -21,6 +21,8 @@
   const skills = new window.SkillService();
   const history = new window.ChatHistoryService();
   const ai = new window.AIService();
+  const chatProductization = window.TeemoChatProductization || null;
+  const unifiedStateTracker = chatProductization ? chatProductization.createExecutionStateTracker() : null;
   const planningSessionState = window.TeemoPlanningSessionState ? new window.TeemoPlanningSessionState() : null;
   window.teemoAIService = ai;
   window.teemoPlanningSessionState = planningSessionState;
@@ -46,6 +48,39 @@
   window.teemoCreativeDirectorState = creativeDirectorState;
   window.teemoChallengeContextBuilder = challengeContextBuilder;
   const permissionClient = window.TeemoPermissionClient ? new window.TeemoPermissionClient({ ipcRenderer }) : null;
+  const approvalModeApi = window.TeemoApprovalMode || null;
+
+  function getApprovalMode() {
+    if (approvalModeApi && typeof approvalModeApi.normalizeMode === 'function') {
+      return approvalModeApi.normalizeMode((store.get('permission') || {}).approvalMode);
+    }
+    return 'full';
+  }
+
+  function setApprovalMode(modeInput, options = {}) {
+    const mode = approvalModeApi && typeof approvalModeApi.normalizeMode === 'function'
+      ? approvalModeApi.normalizeMode(modeInput)
+      : String(modeInput || 'full');
+    store.setGroup('permission', {
+      ...(store.get('permission') || {}),
+      approvalMode: mode,
+    });
+    renderApprovalModeUi();
+    if (options.announce !== false && els.approvalModeStatus) {
+      const label = (approvalModeApi && approvalModeApi.LABELS && approvalModeApi.LABELS[mode]) || mode;
+      els.approvalModeStatus.textContent = `已切换：${label}`;
+    }
+    return mode;
+  }
+
+  if (permissionClient && approvalModeApi && typeof approvalModeApi.createDecisionProvider === 'function') {
+    permissionClient.decisionProvider = approvalModeApi.createDecisionProvider(
+      getApprovalMode,
+      (request) => (window.TeemoPermissionPrompt && typeof window.TeemoPermissionPrompt.request === 'function'
+        ? window.TeemoPermissionPrompt.request(request)
+        : Promise.resolve({ decision: 'deny', reason: 'prompt_unavailable' })),
+    );
+  }
   const screenClient = window.TeemoScreenClient ? new window.TeemoScreenClient({ ipcRenderer }) : null;
   const desktopActionClient = window.TeemoDesktopActionClient ? new window.TeemoDesktopActionClient({ ipcRenderer }) : null;
   const comfyWorkflowClient = window.TeemoComfyWorkflowClient ? new window.TeemoComfyWorkflowClient({ ipcRenderer }) : null;
@@ -103,7 +138,10 @@
   if (toolRegistry && window.TeemoFileTools && fileClient) {
     window.TeemoFileTools.register(toolRegistry, { fileClient });
   }
-  // Ordinary chat exposes only P1 file tools. Git and controlled execution stay unavailable.
+  const ordinaryChatToolRegistry = chatProductization
+    ? chatProductization.createSafeFileRegistryView(toolRegistry)
+    : toolRegistry;
+  // Only the deterministic safe-file route exposes these P1 tools. Git and controlled execution stay unavailable.
   window.teemoPermissionClient = permissionClient;
   window.teemoScreenClient = screenClient;
   window.teemoDesktopActionClient = desktopActionClient;
@@ -112,6 +150,8 @@
   window.teemoGitClient = gitClient;
   window.teemoExecuteClient = executeClient;
   window.teemoToolRegistry = toolRegistry;
+  window.teemoOrdinaryChatToolRegistry = ordinaryChatToolRegistry;
+  window.teemoChatProductization = chatProductization;
   const skillManifestService = window.TeemoSkillManifestService ? new window.TeemoSkillManifestService({ skillService: skills }) : null;
   const skillSessionState = window.TeemoSkillSessionState ? new window.TeemoSkillSessionState() : null;
   const skillRouter = window.TeemoSkillRouter && skillManifestService ? new window.TeemoSkillRouter({
@@ -156,6 +196,20 @@
   const ruleCapture = window.RuleCaptureService ? new window.RuleCaptureService(skills, ai) : null;
   const comfyui = new window.TeemoComfyUIService(store);
   window.comfyUIService = comfyui;
+  const capabilityRegistry = window.TeemoCapabilityRegistry ? new window.TeemoCapabilityRegistry() : null;
+  const pluginRuntime = window.TeemoPluginRuntime && capabilityRegistry
+    ? new window.TeemoPluginRuntime({ registry: capabilityRegistry })
+    : null;
+  const comfyPlugin = window.TeemoComfyUIPlugin && capabilityRegistry
+    ? new window.TeemoComfyUIPlugin({ service: comfyui, registry: capabilityRegistry })
+    : null;
+  if (pluginRuntime && comfyPlugin) {
+    pluginRuntime.register(comfyPlugin);
+    pluginRuntime.activate('teemo-comfyui');
+  }
+  window.teemoCapabilityRegistry = capabilityRegistry;
+  window.teemoPluginRuntime = pluginRuntime;
+  window.teemoComfyUIPlugin = comfyPlugin;
   const audioAnalysis = new window.TeemoAudioAnalysisService(store);
   const fileService = new window.TeemoFileService();
   const projectService = window.ProjectService ? new window.ProjectService() : null;
@@ -244,6 +298,11 @@
     localAccessStatus: document.getElementById('localAccessStatus'),
     localAccessList: document.getElementById('localAccessList'),
     addLocalAccess: document.getElementById('addLocalAccessButton'),
+    approvalModeStatus: document.getElementById('TeemoApprovalModeStatus'),
+    approvalModeButton: document.getElementById('TeemoApprovalModeButton'),
+    approvalModeLabel: document.getElementById('TeemoApprovalModeLabel'),
+    approvalModeMenu: document.getElementById('TeemoApprovalModeMenu'),
+    approvalModeSelect: document.getElementById('TeemoApprovalModeSelect'),
     apiProvider: document.getElementById('apiProvider'),
     apiRemarkName: document.getElementById('apiRemarkName'),
     apiModelName: document.getElementById('apiModelName'),
@@ -512,6 +571,34 @@
     });
   }
 
+  function closeApprovalModeMenu() {
+    if (!els.approvalModeMenu || !els.approvalModeButton) return;
+    els.approvalModeMenu.hidden = true;
+    els.approvalModeButton.setAttribute('aria-expanded', 'false');
+  }
+
+  function renderApprovalModeUi() {
+    const mode = getApprovalMode();
+    const labels = (approvalModeApi && approvalModeApi.LABELS) || {};
+    const label = labels[mode] || mode;
+    if (els.approvalModeLabel) els.approvalModeLabel.textContent = label;
+    if (els.approvalModeButton) {
+      els.approvalModeButton.dataset.mode = mode;
+      els.approvalModeButton.title = ((approvalModeApi && approvalModeApi.DESCRIPTIONS) || {})[mode] || '选择 Teemo 操作批准等级';
+    }
+    if (els.approvalModeMenu) {
+      els.approvalModeMenu.querySelectorAll('[data-approval-mode]').forEach((button) => {
+        const selected = button.dataset.approvalMode === mode;
+        button.classList.toggle('is-selected', selected);
+        button.setAttribute('aria-selected', selected ? 'true' : 'false');
+      });
+    }
+    document.querySelectorAll('input[name="TeemoApprovalMode"]').forEach((input) => {
+      input.checked = input.value === mode;
+    });
+    if (els.approvalModeSelect) els.approvalModeSelect.dataset.mode = mode;
+  }
+
   async function pickLocalDocument() {
     let result = await ipcRenderer.invoke('teemo:local-pick-document');
     if (result && result.needsAuthorization) {
@@ -528,10 +615,15 @@
 
   function extractLocalDocumentPath(text) {
     const extensions = '(?:txt|md|json|csv|log|html|css|js|ts|jsx|tsx|py|java|c|cpp|h|yaml|yml|xml|sql|sh|ps1|pdf|docx)';
-    const quoted = String(text || '').match(new RegExp('["“\']([A-Za-z]:\\\\[^"”\'\\r\\n]+?\\.' + extensions + ')["”\']', 'i'));
+    const source = String(text || '');
+    const quoted = source.match(new RegExp('["“\']([A-Za-z]:\\\\[^"”\'\\r\\n]+?\\.' + extensions + ')["”\']', 'i'));
     if (quoted) return quoted[1];
-    const trailing = String(text || '').match(new RegExp('([A-Za-z]:\\\\[^\\r\\n]+?\\.' + extensions + ')\\s*$', 'i'));
-    return trailing ? trailing[1].trim() : '';
+    // Absolute path may appear mid-sentence, not only at the end.
+    const embedded = source.match(new RegExp(
+      '([A-Za-z]:\\\\(?:[^\\\\/:*?"<>|\\r\\n]+\\\\)*[^\\\\/:*?"<>|\\r\\n]+\\.' + extensions + ')',
+      'i',
+    ));
+    return embedded ? embedded[1] : '';
   }
 
   async function attachLocalDocumentFromText(text) {
@@ -544,6 +636,11 @@
     }
     addParsedLocalDocument(result);
     return true;
+  }
+
+  function requestsSafeFileRead(text) {
+    if (!agentCore || !fileClient || !extractLocalDocumentPath(text)) return false;
+    return /(?:读取|阅读|查看|告诉我.*内容|read\b|show\b.*content)/i.test(String(text || ''));
   }
 
   /** 从剪贴板提取图片（截图 / 复制图片后 Ctrl+V） */
@@ -619,6 +716,39 @@
     els.status.textContent = text;
     els.status.style.color = isError ? '#e58b8b' : '';
   }
+
+  const unifiedStateLabels = {
+    idle: '就绪', planning: '正在规划', waiting_permission: '等待授权', running: '正在执行',
+    verifying: '正在核验', succeeded: '已完成', failed: '失败', cancelled: '已取消',
+  };
+  let unifiedStateOwner = null;
+
+  function beginUnifiedExecutionState(sessionId) {
+    unifiedStateOwner = unifiedStateTracker
+      ? unifiedStateTracker.begin(sessionId)
+      : `${sessionId || 'session'}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+    return unifiedStateOwner;
+  }
+
+  function setUnifiedExecutionState(sourceState, detail = '', ownerToken = null) {
+    let state;
+    if (ownerToken && unifiedStateTracker) {
+      const update = unifiedStateTracker.update(ownerToken, sourceState);
+      if (!update.accepted) return window.__TeemoV14ExecutionState;
+      state = update.state;
+    } else {
+      if (ownerToken && unifiedStateOwner && ownerToken !== unifiedStateOwner) return window.__TeemoV14ExecutionState;
+      state = chatProductization
+        ? chatProductization.mapExecutionState(sourceState, chatProductization.STATES.RUNNING)
+        : String(sourceState || 'running');
+    }
+    window.__TeemoV14ExecutionState = state;
+    els.status.dataset.executionState = state;
+    setStatus(detail || unifiedStateLabels[state] || state, state === 'failed');
+    return state;
+  }
+  window.__TeemoV14ExecutionState = 'idle';
+  els.status.dataset.executionState = 'idle';
 
   function ensureSession() {
     let active = history.getActive();
@@ -737,6 +867,95 @@
     const resolver = confirmDialogResolver;
     confirmDialogResolver = null;
     if (resolver) resolver(!!result);
+  }
+
+  function getBrowserControlSettings() {
+    const raw = store.get('browserControl') || {};
+    return {
+      enabled: raw.enabled !== false,
+      preferredBrowser: ['edge', 'chrome', 'default'].includes(String(raw.preferredBrowser || '').toLowerCase())
+        ? String(raw.preferredBrowser).toLowerCase()
+        : 'default',
+    };
+  }
+
+  function setBrowserControlForm() {
+    const cfg = getBrowserControlSettings();
+    const enabled = document.getElementById('TeemoBrowserControlEnabled');
+    const preferred = document.getElementById('TeemoBrowserControlPreferred');
+    if (enabled) enabled.checked = cfg.enabled;
+    if (preferred) preferred.value = cfg.preferredBrowser;
+  }
+
+  function saveBrowserControlSettings() {
+    const enabled = document.getElementById('TeemoBrowserControlEnabled');
+    const preferred = document.getElementById('TeemoBrowserControlPreferred');
+    const status = document.getElementById('TeemoBrowserControlStatus');
+    const next = {
+      enabled: enabled ? enabled.checked : true,
+      preferredBrowser: preferred ? preferred.value : 'default',
+    };
+    store.set('browserControl', next);
+    if (status) {
+      status.style.color = '#77b490';
+      status.textContent = next.enabled ? '已启用' : '已关闭';
+    }
+  }
+
+  async function finalizeBrowserControlRequest(options = {}) {
+    const payload = options.payload || {};
+    const mode = String(payload.mode || 'new_window');
+    const cfg = getBrowserControlSettings();
+    const finish = (content, state, statusText) => {
+      if (options.pendingAssistantArticle) {
+        options.pendingAssistantArticle.innerHTML = `<div class="teemo-message-body">${window.Markdown.render(content)}</div>`;
+        delete options.pendingAssistantArticle.dataset.teemoPendingIntent;
+      }
+      if (options.pendingUserArticle) delete options.pendingUserArticle.dataset.teemoPendingIntent;
+      history.addMessage('user', options.displayText || '');
+      history.addMessage('assistant', content);
+      sending = false;
+      setUnifiedExecutionState(state, statusText, options.stateOwnerToken);
+      scrollToBottom();
+    };
+
+    if (!cfg.enabled) {
+      finish(
+        '浏览器控制已关闭。请打开 **设置 → 操作批准 → 浏览器控制**，勾选「启用浏览器控制」后再试。',
+        'failed',
+        '浏览器控制未启用'
+      );
+      return;
+    }
+
+    let openMode = mode === 'comfyui' ? 'url' : mode;
+    let url = String(payload.url || '').trim();
+    if (mode === 'comfyui') {
+      url = String(((store.get('comfyui') || {}).baseUrl) || 'http://127.0.0.1:8188').trim().replace(/\/$/, '');
+    }
+    const confirmTip = openMode === 'url'
+      ? `允许 Teemo 用浏览器打开：\n${url}`
+      : '允许 Teemo 新建一个浏览器窗口？';
+    const allowed = await askConfirm('浏览器控制', confirmTip);
+    if (!allowed) {
+      finish('已取消打开浏览器。', 'cancelled', '已取消');
+      return;
+    }
+
+    const result = await ipcRenderer.invoke('teemo:browser-open', {
+      mode: openMode,
+      url,
+      browser: cfg.preferredBrowser,
+    });
+    if (!result || !result.ok) {
+      finish(`打开失败：${(result && result.error) || '未知错误'}`, 'failed', '打开失败');
+      return;
+    }
+    if (openMode === 'url') {
+      finish(`已打开浏览器：[${url}](${url})`, 'succeeded', '已打开浏览器');
+    } else {
+      finish('已新建浏览器窗口。', 'succeeded', '已新建浏览器窗口');
+    }
   }
 
   function renderSessionRow(session, activeId) {
@@ -1082,6 +1301,56 @@
     return run && !executionTerminalStates.has(run.state) ? run : null;
   }
 
+  async function runPlanningExecution(sessionId, planState, hooks = {}) {
+    const active = history.getActive();
+    if (!active || active.id !== sessionId || !autonomousExecution || activeExecution(sessionId)) {
+      return { ok: false, error: { code: 'EXECUTION_INVALID', message: 'A current idle planning session is required.' } };
+    }
+    const plan = planState && planState.plan;
+    if (!plan || !Array.isArray(plan.steps) || !plan.steps.length) {
+      return { ok: false, error: { code: 'EXECUTION_PLAN_INVALID', message: 'A valid current plan is required.' } };
+    }
+    const blockedStep = plan.steps.findIndex(step => step.status !== 'proposed');
+    if (blockedStep >= 0) {
+      return {
+        ok: false,
+        error: {
+          code: 'EXECUTION_PLAN_BLOCKED',
+          message: `规划第 ${blockedStep + 1} 步仍有未满足的前置条件，请先补充条件或修订规划。`,
+        },
+      };
+    }
+    return autonomousExecution.run({
+      sessionId,
+      planState,
+      maxSteps: plan.steps.length,
+      maxRetries: 0,
+      runTimeoutMs: 5 * 60 * 1000,
+      stepTimeoutMs: 60 * 1000,
+      getCurrentSessionId: () => {
+        const current = history.getActive();
+        return current && current.id || null;
+      },
+      getCurrentPlanState: () => planningSessionState && planningSessionState.get(sessionId),
+      requestRunApproval: run => askConfirm(
+        '确认执行这份规划',
+        `将按当前 ${run.steps.length} 个步骤执行一次有界运行。只允许现有安全文件工具；写操作仍会逐项确认。`,
+      ),
+      requestStepConfirmation: action => askConfirm(
+        `确认步骤 ${action.step}：${action.tool}`,
+        `目标：${executionTarget(action)}`,
+      ),
+      onState: run => {
+        setUnifiedExecutionState(run.state, '', hooks.stateOwnerToken || null);
+        if (typeof hooks.onState === 'function') hooks.onState(run);
+      },
+      onToolStatus: message => {
+        setStatus(message);
+        if (typeof hooks.onToolStatus === 'function') hooks.onToolStatus(message);
+      },
+    });
+  }
+
   function activeUpgrade(sessionId) {
     const run = controlledSelfUpgrade && controlledSelfUpgrade.getLatestRun(sessionId, sessionId);
     return run && !upgradeTerminalStates.has(run.state) ? run : null;
@@ -1089,9 +1358,11 @@
 
   async function chooseUpgradeRoot() {
     if (!ipcRenderer) return null;
-    const response = await ipcRenderer.invoke('teemo-file-tool:list-roots').catch(() => ({ roots: [] }));
+    // Controlled Self-Upgrade is an explicit local UI flow and needs the real
+    // repository path. Provider-facing root discovery intentionally does not.
+    const response = await ipcRenderer.invoke('teemo:local-access-list').catch(() => ({ roots: [] }));
     const roots = Array.isArray(response && response.roots) ? response.roots : [];
-    const values = roots.map(item => typeof item === 'string' ? item : item.path).filter(Boolean);
+    const values = roots.filter(item => typeof item === 'string' && item);
     if (!values.length) {
       setStatus('请先在设置中授权 Teemo 源码所在文件夹', true);
       return null;
@@ -1102,9 +1373,46 @@
     return Number.isInteger(index) && values[index] ? values[index] : null;
   }
 
+  async function runControlledSelfUpgrade(sessionId, planState, hooks = {}) {
+    const active = history.getActive();
+    if (!active || active.id !== sessionId || !controlledSelfUpgrade || activeExecution(sessionId) || activeUpgrade(sessionId)) {
+      return { ok: false, error: { code: 'UPGRADE_CONTEXT_INVALID', message: 'A current idle owner session is required.' } };
+    }
+    const plan = planState && planState.plan;
+    if (!plan || !Array.isArray(plan.steps) || !plan.steps.length || plan.steps.some(step => step.status !== 'proposed')) {
+      return { ok: false, error: { code: 'UPGRADE_CONTEXT_INVALID', message: 'A current valid unblocked plan is required.' } };
+    }
+    const repoRoot = hooks.repoRoot || await chooseUpgradeRoot();
+    if (!repoRoot) return { ok: false, error: { code: 'UPGRADE_CONTEXT_INVALID', message: 'An authorized Teemo repository is required.' } };
+    return controlledSelfUpgrade.start({
+      ownerId: sessionId,
+      sessionId,
+      repoRoot,
+      planState,
+      getCurrentOwnerId: () => {
+        const current = history.getActive();
+        return current && current.id || null;
+      },
+      getCurrentSessionId: () => {
+        const current = history.getActive();
+        return current && current.id || null;
+      },
+      getCurrentPlanState: () => planningSessionState && planningSessionState.get(sessionId),
+      requestBeginApproval: hooks.requestBeginApproval || (() => askConfirm('开始受控升级', '将先验证已授权目录中的 Teemo Git 基线，并且不会开始普通聊天之外的工具。')),
+      requestManifestApproval: hooks.requestManifestApproval || (manifest => askConfirm('确认不可变升级清单', `文件：${manifest.files.map(item => item.path).join('、')}；验证：${manifest.scripts.join('、')}。批准后清单不可改变。`)),
+      requestPatchConfirmation: hooks.requestPatchConfirmation || (item => askConfirm(`确认补丁 ${item.index}`, `${item.path}\n基线：${item.baselineSha256}\n目标：${item.postPatchSha256}`)),
+      requestScriptConfirmation: hooks.requestScriptConfirmation || (item => askConfirm(`确认验证 ${item.index}`, `运行已绑定的 npm 脚本：${item.script}`)),
+      onState: run => {
+        setUnifiedExecutionState(run.state, '', hooks.stateOwnerToken || null);
+        if (typeof hooks.onState === 'function') hooks.onState(run);
+      },
+    });
+  }
+
   function createPlanningArticle(sessionId, planState) {
     if (!planState || !planState.plan) return null;
     const plan = planState.plan;
+    const blockedStepCount = plan.steps.filter(step => step.status !== 'proposed').length;
     const article = document.createElement('article');
     article.className = 'teemo-message assistant teemo-plan-message';
     const body = document.createElement('div');
@@ -1127,7 +1435,7 @@
       if (step.status === 'blocked') {
         const status = document.createElement('span');
         status.className = 'teemo-plan-step-status';
-        status.textContent = '（待确认）';
+        status.textContent = '（阻塞：需先解决前置条件）';
         item.appendChild(document.createTextNode(' '));
         item.appendChild(status);
       }
@@ -1139,16 +1447,19 @@
     const executionStatus = document.createElement('p');
     executionStatus.className = 'teemo-plan-execution-status';
     const latestRun = autonomousExecution && autonomousExecution.getLatestRun(sessionId);
-    executionStatus.textContent = latestRun
-      ? `执行状态：${executionStateLabels[latestRun.state] || latestRun.state}${latestRun.currentStep ? `（步骤 ${latestRun.currentStep}/${latestRun.steps.length}）` : ''}`
-      : '执行状态：尚未开始';
+    executionStatus.textContent = blockedStepCount
+      ? `执行状态：规划包含 ${blockedStepCount} 个阻塞步骤，请先修订规划`
+      : latestRun
+        ? `执行状态：${executionStateLabels[latestRun.state] || latestRun.state}${latestRun.currentStep ? `（步骤 ${latestRun.currentStep}/${latestRun.steps.length}）` : ''}`
+        : '执行状态：尚未开始';
     body.appendChild(executionStatus);
     const actions = document.createElement('div');
     actions.className = 'teemo-plan-actions';
     const execute = document.createElement('button');
     execute.type = 'button';
     execute.textContent = '执行规划';
-    execute.disabled = !autonomousExecution || Boolean(activeExecution(sessionId));
+    execute.disabled = !autonomousExecution || Boolean(activeExecution(sessionId)) || blockedStepCount > 0;
+    if (blockedStepCount) execute.title = '规划包含阻塞步骤，请先点击“修订规划”补充前置条件';
     const cancelExecution = document.createElement('button');
     cancelExecution.type = 'button';
     cancelExecution.textContent = '取消执行';
@@ -1166,37 +1477,22 @@
       if (!active || active.id !== sessionId || !autonomousExecution || activeExecution(sessionId)) return;
       execute.disabled = true;
       cancelExecution.hidden = false;
-      const result = await autonomousExecution.run({
-        sessionId,
-        planState,
-        maxSteps: plan.steps.length,
-        maxRetries: 0,
-        runTimeoutMs: 5 * 60 * 1000,
-        stepTimeoutMs: 60 * 1000,
-        getCurrentSessionId: () => {
-          const current = history.getActive();
-          return current && current.id || null;
-        },
-        getCurrentPlanState: () => planningSessionState && planningSessionState.get(sessionId),
-        requestRunApproval: run => askConfirm(
-          '确认执行这份规划',
-          `将按当前 ${run.steps.length} 个步骤执行一次有界运行。只允许现有安全文件工具；写操作仍会逐项确认。`,
-        ),
-        requestStepConfirmation: action => askConfirm(
-          `确认步骤 ${action.step}：${action.tool}`,
-          `目标：${executionTarget(action)}`,
-        ),
+      const stateOwnerToken = beginUnifiedExecutionState(sessionId);
+      const result = await runPlanningExecution(sessionId, planState, {
+        stateOwnerToken,
         onState: run => {
           executionStatus.textContent = `执行状态：${executionStateLabels[run.state] || run.state}${run.currentStep ? `（步骤 ${run.currentStep}/${run.steps.length}）` : ''}`;
           const terminal = executionTerminalStates.has(run.state);
           cancelExecution.hidden = terminal;
           execute.disabled = !terminal;
         },
-        onToolStatus: message => setStatus(message),
       });
       cancelExecution.hidden = true;
       execute.disabled = false;
-      setStatus(result.ok ? '规划已执行并通过本地核验' : (result.error && result.error.message || '规划执行已停止'), !result.ok);
+      const executionError = result.error && chatProductization
+        ? chatProductization.normalizeError(result.error).userMessage
+        : (result.error && result.error.message || '规划执行已停止');
+      setStatus(result.ok ? '规划已执行并通过本地核验' : executionError, !result.ok);
       renderMessages();
     });
     const revise = document.createElement('button');
@@ -1247,28 +1543,9 @@
     startUpgrade.addEventListener('click', async () => {
       const active = history.getActive();
       if (!active || active.id !== sessionId || !controlledSelfUpgrade || activeExecution(sessionId) || activeUpgrade(sessionId)) return;
-      const repoRoot = await chooseUpgradeRoot();
-      if (!repoRoot) return;
       startUpgrade.disabled = true;
       cancelUpgrade.hidden = false;
-      const result = await controlledSelfUpgrade.start({
-        ownerId: sessionId,
-        sessionId,
-        repoRoot,
-        planState,
-        getCurrentOwnerId: () => {
-          const current = history.getActive();
-          return current && current.id || null;
-        },
-        getCurrentSessionId: () => {
-          const current = history.getActive();
-          return current && current.id || null;
-        },
-        getCurrentPlanState: () => planningSessionState && planningSessionState.get(sessionId),
-        requestBeginApproval: () => askConfirm('开始受控升级', '将先验证已授权目录中的 Teemo Git 基线，并且不会开始普通聊天之外的工具。'),
-        requestManifestApproval: manifest => askConfirm('确认不可变升级清单', `文件：${manifest.files.map(item => item.path).join('、')}；验证：${manifest.scripts.join('、')}。批准后清单不可改变。`),
-        requestPatchConfirmation: item => askConfirm(`确认补丁 ${item.index}`, `${item.path}\n基线：${item.baselineSha256}\n目标：${item.postPatchSha256}`),
-        requestScriptConfirmation: item => askConfirm(`确认验证 ${item.index}`, `运行已绑定的 npm 脚本：${item.script}`),
+      const result = await runControlledSelfUpgrade(sessionId, planState, {
         onState: run => {
           upgradeStatus.textContent = `受控升级状态：${upgradeStateLabels[run.state] || run.state}`;
           const terminal = upgradeTerminalStates.has(run.state);
@@ -1296,7 +1573,7 @@
       els.messages.innerHTML = `<div class="teemo-welcome">
         <img src="../icon/Teemo-app.png" alt="Teemo">
         <h2>今天想一起做点什么？</h2>
-        <p>可以直接聊天，也可以上传图片、PDF、Word、文本或代码文件，我会先读取内容再回答。</p>
+        <p>可以直接聊天，也可以自然地让我读取已授权文件、检索灵感、制定计划，或执行当前已确认的计划；涉及本地操作时仍会按权限与核验规则处理。</p>
       </div>`;
       updateContextMeter();
       return;
@@ -1372,6 +1649,56 @@
           shell.openExternal(src);
         }
       });
+    });
+  }
+
+  function normalizeChatOpenTarget(rawHref) {
+    let href = String(rawHref || '').trim();
+    if (!href) return '';
+    if ((href.startsWith('<') && href.endsWith('>'))
+      || (href.startsWith('"') && href.endsWith('"'))
+      || (href.startsWith("'") && href.endsWith("'"))) {
+      href = href.slice(1, -1).trim();
+    }
+    href = href.replace(/^<|>$/g, '').trim();
+    try {
+      if (/%[0-9A-Fa-f]{2}/.test(href)) href = decodeURIComponent(href);
+    } catch (_) { /* keep raw */ }
+    return href;
+  }
+
+  async function openChatHref(rawHref) {
+    const href = normalizeChatOpenTarget(rawHref);
+    if (!href || href.startsWith('#')) return;
+    try {
+      if (/^https?:\/\//i.test(href) || /^mailto:/i.test(href)) {
+        await shell.openExternal(href);
+        return;
+      }
+      if (/^file:/i.test(href)) {
+        const filePath = decodeURIComponent(new URL(href).pathname).replace(/^\/([A-Za-z]:)/, '$1').replace(/\//g, '\\');
+        const error = await shell.openPath(filePath);
+        if (error) setStatus(`无法打开：${error}`, true);
+        return;
+      }
+      if (/^[A-Za-z]:[\\/]/.test(href) || href.startsWith('\\\\')) {
+        const error = await shell.openPath(href.replace(/\//g, '\\'));
+        if (error) setStatus(`无法打开：${error}`, true);
+      }
+    } catch (error) {
+      setStatus(error && error.message ? error.message : '无法打开链接', true);
+    }
+  }
+
+  function bindChatLinkOpen(root = els.messages) {
+    if (!root || root.dataset.teemoLinkBound === '1') return;
+    root.dataset.teemoLinkBound = '1';
+    root.addEventListener('click', event => {
+      const anchor = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+      if (!anchor || !root.contains(anchor)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void openChatHref(anchor.getAttribute('href') || '');
     });
   }
 
@@ -1946,6 +2273,54 @@
     }
   }
 
+  function selectSettingsPanel(panelId) {
+    const id = String(panelId || 'api');
+    const nav = document.getElementById('TeemoSettingsNav');
+    const panels = document.getElementById('TeemoSettingsPanels');
+    if (nav) {
+      nav.querySelectorAll('[data-settings-panel]').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-settings-panel') === id);
+      });
+      nav.querySelectorAll('[data-settings-capability]').forEach(btn => btn.classList.remove('active'));
+    }
+    if (panels) {
+      panels.querySelectorAll('.teemo-settings-panel').forEach(panel => {
+        panel.hidden = panel.getAttribute('data-panel') !== id;
+      });
+    }
+  }
+
+  let settingsCapabilityReturn = false;
+
+  function hideCapabilityViews() {
+    if (els.memoryView) els.memoryView.hidden = true;
+    if (els.creativeView) els.creativeView.hidden = true;
+    if (els.inspirationView) els.inspirationView.hidden = true;
+    if (els.runtimeView) els.runtimeView.hidden = true;
+  }
+
+  function returnFromCapability() {
+    hideCapabilityViews();
+    if (settingsCapabilityReturn) {
+      settingsCapabilityReturn = false;
+      showSettings({ keepPanel: true });
+      return;
+    }
+    if (els.settingsView) els.settingsView.hidden = true;
+    els.chatView.hidden = false;
+    renderAll();
+    els.input.focus();
+  }
+
+  function openSettingsCapability(kind) {
+    settingsCapabilityReturn = true;
+    if (els.settingsView) els.settingsView.hidden = true;
+    if (kind === 'memory') showMemory({ fromSettings: true });
+    else if (kind === 'creative') showCreativeProfile({ fromSettings: true });
+    else if (kind === 'inspiration') showInspiration({ fromSettings: true });
+    else if (kind === 'runtime') showRuntime({ fromSettings: true });
+  }
+
   function populateSettings() {
     if (typeof store.reload === 'function') store.reload();
     if (typeof skills.reload === 'function') skills.reload();
@@ -1957,6 +2332,8 @@
     setAudioApiForm();
     setImageApiForm();
     renderLocalAccess();
+    renderApprovalModeUi();
+    setBrowserControlForm();
     populateComfySettings();
     resetSkillEditor();
     renderSkills();
@@ -1972,23 +2349,18 @@
     }
   }
 
-  function showSettings() {
+  function showSettings(options = {}) {
     populateSettings();
-    els.chatView.hidden = true;
-    if (els.memoryView) els.memoryView.hidden = true;
-    if (els.creativeView) els.creativeView.hidden = true;
-    if (els.inspirationView) els.inspirationView.hidden = true;
-    if (els.runtimeView) els.runtimeView.hidden = true;
-    els.settingsView.hidden = false;
+    hideCapabilityViews();
+    if (!options.keepPanel) selectSettingsPanel('api');
+    els.chatView.hidden = false;
+    if (els.settingsView) els.settingsView.hidden = false;
   }
 
   function hideSettings() {
     refreshModelConfig();
-    els.settingsView.hidden = true;
-    if (els.memoryView) els.memoryView.hidden = true;
-    if (els.creativeView) els.creativeView.hidden = true;
-    if (els.inspirationView) els.inspirationView.hidden = true;
-    if (els.runtimeView) els.runtimeView.hidden = true;
+    if (els.settingsView) els.settingsView.hidden = true;
+    hideCapabilityViews();
     els.chatView.hidden = false;
     renderAll();
     els.input.focus();
@@ -2008,25 +2380,18 @@
     return cognitionCenter;
   }
 
-  function showMemory() {
-    els.chatView.hidden = true;
-    els.settingsView.hidden = true;
-    if (els.creativeView) els.creativeView.hidden = true;
-    if (els.inspirationView) els.inspirationView.hidden = true;
-    if (els.runtimeView) els.runtimeView.hidden = true;
+  function showMemory(options = {}) {
+    if (options.fromSettings) settingsCapabilityReturn = true;
+    els.chatView.hidden = false;
+    if (els.settingsView) els.settingsView.hidden = true;
+    hideCapabilityViews();
     if (els.memoryView) els.memoryView.hidden = false;
     const center = ensureCognitionCenter();
     if (center) center.show();
   }
 
   function hideMemory() {
-    if (els.memoryView) els.memoryView.hidden = true;
-    if (els.inspirationView) els.inspirationView.hidden = true;
-    if (els.runtimeView) els.runtimeView.hidden = true;
-    els.settingsView.hidden = true;
-    els.chatView.hidden = false;
-    renderAll();
-    els.input.focus();
+    returnFromCapability();
   }
 
   let creativeProfileCenter = null;
@@ -2042,26 +2407,18 @@
     return creativeProfileCenter;
   }
 
-  function showCreativeProfile() {
-    els.chatView.hidden = true;
-    els.settingsView.hidden = true;
-    if (els.memoryView) els.memoryView.hidden = true;
-    if (els.inspirationView) els.inspirationView.hidden = true;
-    if (els.runtimeView) els.runtimeView.hidden = true;
+  function showCreativeProfile(options = {}) {
+    if (options.fromSettings) settingsCapabilityReturn = true;
+    els.chatView.hidden = false;
+    if (els.settingsView) els.settingsView.hidden = true;
+    hideCapabilityViews();
     if (els.creativeView) els.creativeView.hidden = false;
     const center = ensureCreativeProfileCenter();
     if (center) center.show();
   }
 
   function hideCreativeProfile() {
-    if (els.creativeView) els.creativeView.hidden = true;
-    if (els.memoryView) els.memoryView.hidden = true;
-    if (els.inspirationView) els.inspirationView.hidden = true;
-    if (els.runtimeView) els.runtimeView.hidden = true;
-    els.settingsView.hidden = true;
-    els.chatView.hidden = false;
-    renderAll();
-    els.input.focus();
+    returnFromCapability();
   }
 
   let inspirationCenter = null;
@@ -2080,26 +2437,18 @@
     return inspirationCenter;
   }
 
-  function showInspiration() {
-    els.chatView.hidden = true;
-    els.settingsView.hidden = true;
-    if (els.memoryView) els.memoryView.hidden = true;
-    if (els.creativeView) els.creativeView.hidden = true;
-    if (els.runtimeView) els.runtimeView.hidden = true;
+  function showInspiration(options = {}) {
+    if (options.fromSettings) settingsCapabilityReturn = true;
+    els.chatView.hidden = false;
+    if (els.settingsView) els.settingsView.hidden = true;
+    hideCapabilityViews();
     if (els.inspirationView) els.inspirationView.hidden = false;
     const center = ensureInspirationCenter();
     if (center) center.show();
   }
 
   function hideInspiration() {
-    if (els.inspirationView) els.inspirationView.hidden = true;
-    if (els.memoryView) els.memoryView.hidden = true;
-    if (els.creativeView) els.creativeView.hidden = true;
-    if (els.runtimeView) els.runtimeView.hidden = true;
-    els.settingsView.hidden = true;
-    els.chatView.hidden = false;
-    renderAll();
-    els.input.focus();
+    returnFromCapability();
   }
 
   let activeScreenSnapshotId = null;
@@ -2455,28 +2804,20 @@
     }
   }
 
-  function showRuntime() {
-    els.chatView.hidden = true;
-    els.settingsView.hidden = true;
-    if (els.memoryView) els.memoryView.hidden = true;
-    if (els.creativeView) els.creativeView.hidden = true;
-    if (els.inspirationView) els.inspirationView.hidden = true;
+  function showRuntime(options = {}) {
+    if (options.fromSettings) settingsCapabilityReturn = true;
+    els.chatView.hidden = false;
+    if (els.settingsView) els.settingsView.hidden = true;
+    hideCapabilityViews();
     if (els.runtimeView) els.runtimeView.hidden = false;
     updateComfyRuntimeControls();
     void loadRuntimeDisplays();
   }
 
   function hideRuntime() {
-    if (els.runtimeView) els.runtimeView.hidden = true;
-    if (els.memoryView) els.memoryView.hidden = true;
-    if (els.creativeView) els.creativeView.hidden = true;
-    if (els.inspirationView) els.inspirationView.hidden = true;
-    els.settingsView.hidden = true;
-    els.chatView.hidden = false;
     void discardRuntimePreview();
     void discardComfyRuntimePreview();
-    renderAll();
-    els.input.focus();
+    returnFromCapability();
   }
 
   async function testApiConnection() {
@@ -2801,6 +3142,7 @@
     store.setGroup('imageArchive', readArchiveForm());
     comfyui.configure(next);
     if (window.comfyUIService) window.comfyUIService.configure(next);
+    syncComfyPlugin();
     els.comfySaveStatus.style.color = '';
     els.comfySaveStatus.textContent = '已保存并同步到桌宠';
   }
@@ -3400,6 +3742,44 @@
     return attachment && attachment.kind === 'document' ? 'document' : 'unknown';
   }
 
+  function syncComfyPlugin() {
+    if (!pluginRuntime) return false;
+    if (comfyui && typeof comfyui.reload === 'function') comfyui.reload();
+    if (comfyui && comfyui.isEnabled()) return pluginRuntime.activate('teemo-comfyui');
+    pluginRuntime.deactivate('teemo-comfyui');
+    return false;
+  }
+
+  function skillImageRequest(userText) {
+    const empty = { route: null, wantsImage: false, workflowName: 'current' };
+    if (!skillRouter) return empty;
+    try {
+      const active = history.getActive();
+      const route = skillRouter.route({
+        text: userText,
+        modalities: ['text'],
+        sessionId: active && active.id || null,
+      });
+      const selected = route && Array.isArray(route.selectedSkillIds) ? route.selectedSkillIds : [];
+      let wantsImage = false;
+      let workflowName = '';
+      selected.forEach(id => {
+        const manifest = skillManifestService && skillManifestService.getSkillManifest(id);
+        const caps = manifest && manifest.requirements && Array.isArray(manifest.requirements.capabilities)
+          ? manifest.requirements.capabilities
+          : [];
+        const workflows = manifest && manifest.requirements && Array.isArray(manifest.requirements.workflows)
+          ? manifest.requirements.workflows
+          : [];
+        if (caps.indexOf('image.generate') >= 0) wantsImage = true;
+        if (!workflowName && workflows.length) workflowName = workflows[0];
+      });
+      return { route, wantsImage, workflowName: workflowName || 'current' };
+    } catch (_) {
+      return empty;
+    }
+  }
+
   async function buildComfyPrompt(userText) {
     if (comfyui.isBareImageCommand(userText)) return userText;
     let routedSkillContext = '';
@@ -3481,6 +3861,62 @@
     messageElement.insertBefore(chip, messageElement.firstChild);
   }
 
+  function currentPlanIsExecutable(planState) {
+    const plan = planState && planState.plan;
+    return Boolean(plan && Array.isArray(plan.steps) && plan.steps.length && plan.steps.every(step => step.status === 'proposed'));
+  }
+
+  async function resolveChatIntent(text, currentPlanState, options = {}) {
+    const active = history.getActive();
+    const sessionId = active && active.id || null;
+    const authorizedRoots = fileClient
+      ? await fileClient.listAuthorizedRoots().catch(() => [])
+      : [];
+    const capabilitySnapshot = chatProductization
+      ? chatProductization.buildCapabilitySnapshot({
+        aiAvailable: Boolean(ai),
+        toolRegistry: ordinaryChatToolRegistry,
+        authorizedRoots,
+        inspirationContextBuilder: inspirationContextBuilder
+          && inspirationRegistry && inspirationRegistry.listDefinitions().length
+          ? inspirationContextBuilder
+          : null,
+        planningAvailable: Boolean(agentCore && planningSessionState),
+        autonomousExecutionAvailable: Boolean(autonomousExecution),
+        currentPlanAvailable: Boolean(currentPlanState && currentPlanState.plan),
+        currentPlanExecutable: currentPlanIsExecutable(currentPlanState),
+        controlledSelfUpgradeAvailable: Boolean(controlledSelfUpgrade),
+        activeExecution: Boolean(sessionId && activeExecution(sessionId)),
+        activeUpgrade: Boolean(sessionId && activeUpgrade(sessionId)),
+        intentClassificationAvailable: false,
+        browserControlEnabled: Boolean((store.get('browserControl') || {}).enabled),
+      })
+      : null;
+    if (!chatProductization || !capabilitySnapshot) {
+      return { route: options.planningMode ? 'planning' : 'normal_chat', decision: null, capabilitySnapshot, authorizedRoots };
+    }
+    const resolved = chatProductization.resolveSinglePassIntent({
+      text,
+      planningMode: options.planningMode,
+      hasAttachments: options.hasAttachments,
+      activeRun: Boolean(sessionId && (activeExecution(sessionId) || activeUpgrade(sessionId))),
+      capabilitySnapshot,
+    });
+    window.__TeemoV141ClassifierRequest = null;
+    return {
+      route: resolved.route,
+      decision: resolved.decision,
+      capabilitySnapshot,
+      authorizedRoots,
+      localControl: resolved.localControl || null,
+      localControlPayload: resolved.localControlPayload || null,
+      singlePass: true,
+      singlePassSource: resolved.source || null,
+      softFallbackReason: resolved.softFallbackReason || null,
+      clarificationRequired: false,
+    };
+  }
+
   async function sendMessage() {
     if (sending) {
       if (abortController) abortController.abort();
@@ -3488,19 +3924,109 @@
     }
     refreshModelConfig();
     const text = els.input.value.trim();
-    const planningRequest = planningMode;
-    if (!planningRequest && !pendingFiles.some(file => file.state === 'ready')) {
+    const readyFilesBeforeRoute = pendingFiles.filter(file => file.state === 'ready');
+    if (!text && !readyFilesBeforeRoute.length) return;
+    if (pendingFiles.some(file => file.state === 'reading')) {
+      setStatus('请等待文件读取完成', true);
+      return;
+    }
+    const activeBeforeRoute = history.getActive();
+    const currentPlanState = activeBeforeRoute && planningSessionState
+      ? planningSessionState.get(activeBeforeRoute.id)
+      : null;
+    const stateOwnerToken = beginUnifiedExecutionState(activeBeforeRoute && activeBeforeRoute.id);
+    const originalInputValue = els.input.value;
+    const pendingDisplayText = text || (readyFilesBeforeRoute.length
+      ? `📎 ${readyFilesBeforeRoute.map(file => file.name || '附件').join('、')}`
+      : '（媒体）');
+    const pendingWelcome = els.messages.querySelector('.teemo-welcome');
+    if (pendingWelcome) pendingWelcome.hidden = true;
+    const pendingUserArticle = document.createElement('article');
+    pendingUserArticle.className = 'teemo-message user';
+    pendingUserArticle.dataset.teemoPendingIntent = 'user';
+    pendingUserArticle.innerHTML = `<div class="teemo-message-body">${window.Markdown.render(pendingDisplayText)}</div>`;
+    const pendingAssistantArticle = document.createElement('article');
+    pendingAssistantArticle.className = 'teemo-message assistant';
+    pendingAssistantArticle.dataset.teemoPendingIntent = 'assistant';
+    pendingAssistantArticle.innerHTML = '<div class="teemo-message-body teemo-thinking">正在处理…</div>';
+    els.messages.append(pendingUserArticle, pendingAssistantArticle);
+    els.input.value = '';
+    resizeInput();
+    sending = true;
+    setUnifiedExecutionState('running', '正在处理…', stateOwnerToken);
+    scrollToBottom();
+    await new Promise(resolve => requestAnimationFrame(resolve));
+
+    const releasePendingIntentPreview = (restoreInput = false) => {
+      pendingUserArticle.remove();
+      pendingAssistantArticle.remove();
+      if (pendingWelcome && pendingWelcome.isConnected) pendingWelcome.hidden = false;
+      if (restoreInput && !els.input.value) {
+        els.input.value = originalInputValue;
+        resizeInput();
+      }
+      sending = false;
+    };
+
+    let intentResolution;
+    try {
+      intentResolution = await resolveChatIntent(text, currentPlanState, {
+        planningMode,
+        hasAttachments: readyFilesBeforeRoute.length > 0,
+      });
+    } catch (error) {
+      releasePendingIntentPreview(true);
+      const normalized = chatProductization
+        ? chatProductization.normalizeError(error)
+        : { userMessage: '请求失败。' };
+      setUnifiedExecutionState('failed', normalized.userMessage, stateOwnerToken);
+      return;
+    }
+    if (intentResolution.localControl === 'cancel_current_task') {
+      const activeSessionId = activeBeforeRoute && activeBeforeRoute.id;
+      const executionRun = activeSessionId && activeExecution(activeSessionId);
+      const upgradeRun = activeSessionId && activeUpgrade(activeSessionId);
+      if (executionRun) autonomousExecution.cancel(executionRun.runId, activeSessionId);
+      if (upgradeRun) controlledSelfUpgrade.cancel(upgradeRun.runId, activeSessionId, activeSessionId);
+      if (abortController) abortController.abort();
+      releasePendingIntentPreview();
+      setUnifiedExecutionState('cancelled', executionRun || upgradeRun || abortController ? '正在取消当前任务…' : '当前没有正在运行的任务', stateOwnerToken);
+      return;
+    }
+    if (intentResolution.localControl === 'open_browser') {
+      await finalizeBrowserControlRequest({
+        payload: intentResolution.localControlPayload || {},
+        displayText: pendingDisplayText,
+        pendingUserArticle,
+        pendingAssistantArticle,
+        pendingWelcome,
+        stateOwnerToken,
+      });
+      return;
+    }
+    const intentRoute = intentResolution.route;
+    window.__TeemoV14LastRoute = intentRoute;
+    window.__TeemoV141LastIntent = intentResolution;
+    window.__TeemoV141LastSessionId = activeBeforeRoute && activeBeforeRoute.id || null;
+    const planningRequest = intentRoute === 'planning';
+    const autonomousRequest = intentRoute === 'autonomous_execution';
+    const controlledUpgradeRequest = intentRoute === 'controlled_self_upgrade';
+    const safeFileRequest = intentRoute === 'safe_file_operation';
+    // Always try to preload an explicit local file path into chat context.
+    // Safe-file routes previously skipped this and relied only on tool args, which often failed.
+    if (!planningRequest && !autonomousRequest && !controlledUpgradeRequest) {
       const attached = await attachLocalDocumentFromText(text);
-      if (!attached) return;
+      if (!attached) {
+        releasePendingIntentPreview(true);
+        setUnifiedExecutionState('cancelled', '发送已取消', stateOwnerToken);
+        return;
+      }
     }
     const readyFiles = pendingFiles.filter(file => file.state === 'ready');
     if (!text && !readyFiles.length) return;
-    if (planningRequest && readyFiles.length) {
-      setStatus('规划请求不接受附件，请仅输入目标文字', true);
-      return;
-    }
-    if (pendingFiles.some(file => file.state === 'reading')) {
-      setStatus('请等待文件读取完成', true);
+    if ((planningRequest || autonomousRequest || controlledUpgradeRequest) && readyFiles.length) {
+      releasePendingIntentPreview(true);
+      setUnifiedExecutionState('failed', '规划与计划执行请求不接受附件，请仅输入目标文字', stateOwnerToken);
       return;
     }
 
@@ -3510,10 +4036,10 @@
     const images = attachments.filter(file => file.kind === 'image');
     const videos = attachments.filter(file => file.kind === 'video');
 
-    els.input.value = '';
-    resizeInput();
-    pendingFiles = [];
+    pendingFiles = pendingFiles.filter(file => !attachments.includes(file));
     renderAttachments();
+    pendingUserArticle.remove();
+    pendingAssistantArticle.remove();
     history.addMessage('user', displayText);
     renderMessages();
 
@@ -3521,7 +4047,7 @@
     renderHistory();
     const article = document.createElement('article');
     article.className = 'teemo-message assistant';
-    article.innerHTML = '<div class="teemo-message-body teemo-thinking">正在理解你的需求…</div>';
+    article.innerHTML = '<div class="teemo-message-body teemo-thinking">正在思考…</div>';
     article.hidden = false;
     els.messages.appendChild(article);
     const body = article.querySelector('.teemo-message-body');
@@ -3531,13 +4057,17 @@
     abortController = new AbortController();
     els.send.classList.add('stop');
     els.send.title = '停止';
-    setStatus('正在处理…');
+    setUnifiedExecutionState(planningRequest ? 'planning' : 'running', planningRequest ? '正在规划…' : '正在处理…', stateOwnerToken);
     let full = '';
     let completedChallengeContext = null;
-    // 先让浏览器绘制用户消息和助手状态，再开始联网、意图识别等异步预处理。
-    // 避免发送后消息区短暂空白，让用户能立即确认 Teemo 已经开始处理。
+    // 先让浏览器绘制用户消息和助手状态，再开始联网等异步预处理。
     await new Promise(resolve => requestAnimationFrame(resolve));
     try {
+      if (intentResolution.error) {
+        throw Object.assign(new Error(intentResolution.error.message || 'Intent routing failed.'), {
+          code: intentResolution.error.code || 'INTENT_CLASSIFICATION_FAILED',
+        });
+      }
       if (planningRequest) {
         const activePlanningSession = history.getActive();
         // Planning receives the explicit goal only, never prior Chat/attachment content.
@@ -3551,7 +4081,7 @@
         });
         if (!planningResult.ok) {
           if (planningResult.error.cancelled) throw new DOMException('已停止生成', 'AbortError');
-          throw new Error(planningResult.error.message);
+          throw Object.assign(new Error(planningResult.error.message), { code: planningResult.error.code });
         }
         const ownerId = activePlanningSession && activePlanningSession.id;
         const existing = planningSessionState && planningSessionState.get(ownerId);
@@ -3567,7 +4097,47 @@
         }
         body.remove();
         article.remove();
-        setStatus(existing ? '规划已修订' : '规划已生成');
+        setUnifiedExecutionState('succeeded', existing ? '规划已修订' : '规划已生成', stateOwnerToken);
+        return;
+      }
+      if (autonomousRequest) {
+        const activeExecutionSession = history.getActive();
+        const ownerId = activeExecutionSession && activeExecutionSession.id;
+        const planState = ownerId && planningSessionState && planningSessionState.get(ownerId);
+        const result = await runPlanningExecution(ownerId, planState, { stateOwnerToken });
+        if (!result.ok) {
+          throw Object.assign(new Error(result.error && result.error.message || 'Planning execution failed.'), {
+            code: result.error && result.error.code || 'EXECUTION_FAILED',
+          });
+        }
+        full = '✅ 当前计划已执行，并通过本地核验。';
+        assistant.content = full;
+        history.updateLastMessage(full);
+        history.flush();
+        body.classList.remove('teemo-thinking');
+        body.innerHTML = window.Markdown.render(full);
+        setUnifiedExecutionState('succeeded', '规划已执行并通过本地核验', stateOwnerToken);
+        renderMessages();
+        return;
+      }
+      if (controlledUpgradeRequest) {
+        const activeUpgradeSession = history.getActive();
+        const ownerId = activeUpgradeSession && activeUpgradeSession.id;
+        const planState = ownerId && planningSessionState && planningSessionState.get(ownerId);
+        const result = await runControlledSelfUpgrade(ownerId, planState, { stateOwnerToken });
+        if (!result.ok) {
+          throw Object.assign(new Error(result.error && result.error.message || 'Controlled self-upgrade failed.'), {
+            code: result.error && result.error.code || 'UPGRADE_FAILED',
+          });
+        }
+        full = '✅ 受控升级已完成补丁与本地验证，正在等待外部 Strict Review。';
+        assistant.content = full;
+        history.updateLastMessage(full);
+        history.flush();
+        body.classList.remove('teemo-thinking');
+        body.innerHTML = window.Markdown.render(full);
+        setUnifiedExecutionState('succeeded', '受控升级已验证，等待外部审查', stateOwnerToken);
+        renderMessages();
         return;
       }
       if (window.teemoWebBrowse && window.teemoWebBrowse.extractUrls(requestText).length) {
@@ -3670,27 +4240,31 @@
 
       const localImageReady = comfyui.isEnabled();
       const cloudImageReady = isCloudImageReady(ai.imageConfig || store.get('imageModel') || {}, modelConfig);
+      const skillImage = !attachments.length ? skillImageRequest(text) : { wantsImage: false, workflowName: 'current' };
       let useImageGen = false;
-      let useComfy = false;
       let imagePrompt = text;
-      // 只有本地 ComfyUI 或云端生图 API 可用时，才做生图意图判断。
       if (!attachments.length && (localImageReady || cloudImageReady) && window.teemoImageIntent) {
         const intent = await window.teemoImageIntent.detect(ai, text, { signal: abortController.signal });
         if (intent.wantImage) {
           useImageGen = true;
-          useComfy = localImageReady;
           imagePrompt = intent.prompt || text;
         }
       }
-      if (useImageGen && useComfy) {
+      if (!useImageGen && skillImage.wantsImage && window.teemoImageIntent && window.teemoImageIntent.looksLikeKeyword(text)) {
+        useImageGen = true;
+        imagePrompt = text;
+      }
+      const canUseComfyPlugin = useImageGen && capabilityRegistry && capabilityRegistry.has('image.generate');
+      if (useImageGen && canUseComfyPlugin) {
         article.hidden = false;
         setStatus('正在整理生图提示词…');
         body.classList.remove('teemo-thinking');
-        body.textContent = '✨ 正在为 SDXL 整理提示词…';
+        body.textContent = '✨ 正在为生图整理提示词…';
         const prompt = await buildComfyPrompt(imagePrompt);
         const sizeMatch = text.match(/(\d{2,5})\s*[x×*]\s*(\d{2,5})/i);
-        const result = await comfyui.generate({
+        const result = await capabilityRegistry.invoke('image.generate', {
           prompt,
+          workflowName: skillImage.workflowName || 'current',
           size: sizeMatch ? `${sizeMatch[1]}x${sizeMatch[2]}` : undefined,
           signal: abortController.signal,
           onProgress: progress => {
@@ -3708,7 +4282,7 @@
         const reply = buildImageReply('✅ ComfyUI 图片已生成：', archived);
         full = reply.display;
         assistant.content = reply.stored;
-      } else if (useImageGen) {
+      } else if (useImageGen && cloudImageReady) {
         article.hidden = false;
         setStatus('正在整理生图提示词…');
         body.classList.remove('teemo-thinking');
@@ -3730,6 +4304,11 @@
         const reply = buildImageReply('✅ 图片已生成：', archived);
         full = reply.display;
         assistant.content = reply.stored;
+      } else if (useImageGen) {
+        article.hidden = false;
+        body.classList.remove('teemo-thinking');
+        full = '当前没有可用的生图能力。请先在设置里开启本机 ComfyUI，或配置云端生图。';
+        assistant.content = full;
       } else {
         article.hidden = false;
         body.classList.add('teemo-thinking');
@@ -3754,22 +4333,79 @@
           }
         };
         if (agentCore) {
-          const rootRefs = await ipcRenderer.invoke('teemo-file-tool:list-roots').catch(() => ({ roots: [] }));
-          const rootContext = Array.isArray(rootRefs && rootRefs.roots) && rootRefs.roots.length
-            ? [{ role: 'system', content: `Authorized local roots (use rootId + relativePath; never guess an absolute path): ${JSON.stringify(rootRefs.roots)}` }]
+          const hasDocumentContext = attachments.some(file => (
+            file
+            && file.kind === 'document'
+            && file.state === 'ready'
+            && String(file.content || '').trim()
+          ));
+          const exposeSafeFileTools = (chatProductization
+            ? chatProductization.shouldExposeSafeFileTools(intentRoute)
+            : safeFileRequest)
+            && Array.isArray(intentResolution.authorizedRoots)
+            && intentResolution.authorizedRoots.length > 0
+            // File already preloaded into the prompt — answer directly instead of risking broken tool args.
+            && !hasDocumentContext;
+          const rootRefs = intentResolution.authorizedRoots || [];
+          const rootContext = exposeSafeFileTools && rootRefs.length
+            ? [{
+              role: 'system',
+              content: [
+                'Trusted authorized-root summary for Safe File Tools.',
+                'Prefer path when the user already gave an exact Windows absolute path; pass that absolute path unchanged as path.',
+                'Otherwise use rootId + relativePath whenever a unique root is known.',
+                'You may use rootReference + relativePath only for an exact unique displayName or alias.',
+                'Submit exactly one root selector: rootId or rootReference, never both.',
+                'When rootId or rootReference is present, always include relativePath. For the root directory itself use relativePath as an empty string.',
+                'search_files and search_text also require a non-empty query.',
+                'When rootId or rootReference is present, never include legacy path.',
+                'If a displayName or alias matches multiple roots, ask the user to choose; never guess.',
+                'Never invent an absolute path. This summary grants no new access.',
+                'If a tool call fails, explain the missing field in Chinese and retry once with corrected arguments.',
+                'Drive-letter roots like C盘/D盘 mean full local access is enabled; still prefer the user absolute path when present.',
+                JSON.stringify(rootRefs),
+              ].join('\n'),
+            }]
             : [];
-          const agentResult = await agentCore.runNativeTools({
-            messages: [...rootContext, ...apiMessages],
+          const documentContextHint = hasDocumentContext
+            ? [{
+              role: 'system',
+              content: 'The user message already includes the full text of the attached local document(s). Answer from that content directly. Do not request file tools for files already attached.',
+            }]
+            : [];
+          const capabilitySnapshot = intentResolution.capabilitySnapshot || null;
+          const capabilityContext = capabilitySnapshot
+            ? [chatProductization.buildCapabilityContext(capabilitySnapshot, intentRoute)]
+            : [];
+          window.__TeemoV14CapabilitySnapshot = capabilitySnapshot;
+          const commonAgentOptions = {
+            messages: [...capabilityContext, ...documentContextHint, ...rootContext, ...apiMessages],
             sessionId: active.id || null,
             userMessage: text || displayText,
             modalities: attachments.length ? [...new Set(attachments.map(attachmentModality))] : ['text'],
             signal: abortController.signal,
-            toolRegistry,
             inspirationContextBuilder,
-          });
+            inspirationIntentValidated: intentRoute === 'inspiration_retrieval',
+            inspirationQuery: intentResolution.decision && intentResolution.decision.target || '',
+            onChunk,
+            onStatus: (message, run) => {
+              const state = run && run.status || 'running';
+              setUnifiedExecutionState(state, message, stateOwnerToken);
+            },
+          };
+          let agentResult = exposeSafeFileTools
+            ? await agentCore.runNativeTools({
+              ...commonAgentOptions,
+              toolRegistry: ordinaryChatToolRegistry,
+            })
+            : await agentCore.runToolFreeStream(commonAgentOptions);
+          // If native tools fail after a document was preloaded, fall back to plain answer.
+          if (!agentResult.ok && hasDocumentContext && !agentResult.error?.cancelled) {
+            agentResult = await agentCore.runToolFreeStream(commonAgentOptions);
+          }
           if (!agentResult.ok) {
             if (agentResult.error.cancelled) throw new DOMException('已停止生成', 'AbortError');
-            throw new Error(agentResult.error.message);
+            throw Object.assign(new Error(agentResult.error.message), { code: agentResult.error.code });
           }
           completedChallengeContext = agentResult.run && agentResult.run.challengeContext;
           renderSkillRouteIndicator(article, agentResult.run && agentResult.run.skillRouting);
@@ -3800,11 +4436,14 @@
       if (window.Markdown && window.Markdown.bindCopyButtons) {
         window.Markdown.bindCopyButtons(article);
       }
-      setStatus(useImageGen ? '图片生成完成' : '回复完成');
+      setUnifiedExecutionState('succeeded', useImageGen ? '图片生成完成' : '回复完成', stateOwnerToken);
     } catch (error) {
       article.hidden = false;
       const stopped = abortController && abortController.signal.aborted;
-      const errorText = stopped ? (full || '已停止生成') : `⚠️ ${error.message || '请求失败'}`;
+      const normalizedError = chatProductization
+        ? chatProductization.normalizeError(error)
+        : { userMessage: '请求失败。' };
+      const errorText = stopped ? (full || '已停止生成') : `⚠️ ${normalizedError.userMessage}`;
       if (!planningRequest) {
         assistant.content = errorText;
         history.updateLastMessage(errorText);
@@ -3814,7 +4453,7 @@
       }
       body.classList.remove('teemo-thinking');
       body.innerHTML = window.Markdown.render(errorText);
-      setStatus(stopped ? '已停止' : '回复失败', !stopped);
+      setUnifiedExecutionState(stopped ? 'cancelled' : 'failed', stopped ? '已停止' : '回复失败', stateOwnerToken);
     } finally {
       sending = false;
       abortController = null;
@@ -3901,12 +4540,30 @@
       if (!sending) setPlanningMode(!planningMode);
     });
   }
-  els.settingsButton.addEventListener('click', showSettings);
+  els.settingsButton.addEventListener('click', () => showSettings());
   els.settingsBack.addEventListener('click', hideSettings);
-  if (els.memoryButton) els.memoryButton.addEventListener('click', showMemory);
-  if (els.creativeButton) els.creativeButton.addEventListener('click', showCreativeProfile);
-  if (els.inspirationButton) els.inspirationButton.addEventListener('click', showInspiration);
-  if (els.runtimeButton) els.runtimeButton.addEventListener('click', showRuntime);
+  const settingsNav = document.getElementById('TeemoSettingsNav');
+  if (settingsNav) {
+    settingsNav.addEventListener('click', event => {
+      const panelBtn = event.target && event.target.closest ? event.target.closest('[data-settings-panel]') : null;
+      if (panelBtn) {
+        selectSettingsPanel(panelBtn.getAttribute('data-settings-panel'));
+        return;
+      }
+      const capBtn = event.target && event.target.closest ? event.target.closest('[data-settings-capability]') : null;
+      if (capBtn) openSettingsCapability(capBtn.getAttribute('data-settings-capability'));
+    });
+  }
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    const openModal = document.querySelector('.teemo-modal-backdrop:not([hidden])');
+    if (openModal) return;
+    if (els.memoryView && !els.memoryView.hidden) { hideMemory(); return; }
+    if (els.creativeView && !els.creativeView.hidden) { hideCreativeProfile(); return; }
+    if (els.inspirationView && !els.inspirationView.hidden) { hideInspiration(); return; }
+    if (els.runtimeView && !els.runtimeView.hidden) { hideRuntime(); return; }
+    if (els.settingsView && !els.settingsView.hidden) hideSettings();
+  });
   if (els.runtimeBack) els.runtimeBack.addEventListener('click', hideRuntime);
   if (els.runtimeCapture) els.runtimeCapture.addEventListener('click', () => { void captureRuntimePreview(); });
   if (els.runtimeDiscard) els.runtimeDiscard.addEventListener('click', () => { void discardRuntimePreview({ showStatus: true }); });
@@ -3931,6 +4588,33 @@
     });
   }
   if (els.addLocalAccess) els.addLocalAccess.addEventListener('click', authorizeLocalFolder);
+  if (els.approvalModeButton && els.approvalModeMenu) {
+    els.approvalModeButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const open = els.approvalModeMenu.hidden;
+      closeApprovalModeMenu();
+      if (open) {
+        els.approvalModeMenu.hidden = false;
+        els.approvalModeButton.setAttribute('aria-expanded', 'true');
+      }
+    });
+    els.approvalModeMenu.addEventListener('click', (event) => {
+      const option = event.target.closest('[data-approval-mode]');
+      if (!option) return;
+      setApprovalMode(option.dataset.approvalMode);
+      closeApprovalModeMenu();
+    });
+  }
+  document.querySelectorAll('input[name="TeemoApprovalMode"]').forEach((input) => {
+    input.addEventListener('change', () => {
+      if (input.checked) setApprovalMode(input.value);
+    });
+  });
+  document.addEventListener('click', (event) => {
+    if (!els.approvalModeSelect) return;
+    if (els.approvalModeSelect.contains(event.target)) return;
+    closeApprovalModeMenu();
+  });
   if (els.checkUpdate) {
     els.checkUpdate.addEventListener('click', async () => {
       els.checkUpdate.disabled = true;
@@ -4021,6 +4705,8 @@
     });
   }
   if (els.saveAudioApi) els.saveAudioApi.addEventListener('click', saveAudioApiSettings);
+  const browserControlSave = document.getElementById('TeemoBrowserControlSave');
+  if (browserControlSave) browserControlSave.addEventListener('click', saveBrowserControlSettings);
   if (els.toggleAudioApiKey) {
     els.toggleAudioApiKey.addEventListener('click', () => {
       const showing = els.audioApiKey.type === 'text';
@@ -4085,7 +4771,6 @@
     }
   });
   els.upload.addEventListener('click', () => els.fileInput.click());
-  if (els.localDocument) els.localDocument.addEventListener('click', pickLocalDocument);
   els.fileInput.addEventListener('change', event => {
     addFiles(event.target.files);
     event.target.value = '';
@@ -4164,6 +4849,7 @@
 
   if (els.messages) {
     els.messages.addEventListener('scroll', updateScrollBottomButton, { passive: true });
+    bindChatLinkOpen(els.messages);
   }
   if (els.scrollBottom) {
     els.scrollBottom.addEventListener('click', () => {
@@ -4176,6 +4862,7 @@
   scrubLeakedStyleText();
   ensureSession();
   applyChatFontSize((store.get('appearance') || {}).chatFontSize || 16);
+  renderApprovalModeUi();
   renderQuickModelSelect();
   renderAll();
   resizeInput();

@@ -50,6 +50,11 @@
     imageIntent: { mode:'keyword' },
     // 联网读取：消息里含 http(s) 链接时，先抓取网页正文再交给模型
     webBrowse: { enabled:true, maxPages:3, maxChars:12000, timeoutMs:20000 },
+    // 浏览器控制：允许打开 http(s) / 新建浏览器窗口 / 打开 ComfyUI 页面（不做网页内点击自动化）
+    browserControl: { enabled:true, preferredBrowser:'default', confirmBeforeOpen:false },
+    // Chat 操作批准等级（不绕过已授权文件夹边界）
+    // ask=每次询问 | assisted=读自动允许、写再问 | full=本会话读写自动允许（三者均可访问本机各盘）
+    permission: { approvalMode: 'full' },
     // 聊天生图自动存档到本机文件夹
     imageArchive: {
       enabled: true,

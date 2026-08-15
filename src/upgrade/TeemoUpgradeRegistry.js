@@ -8,7 +8,7 @@
   );
   if (root) root.TeemoUpgradeRegistry = api;
   if (typeof window !== 'undefined') window.TeemoUpgradeRegistry = api;
-  if (typeof module === 'object' && module.exports) {
+  if (typeof module === 'object' && module.exports && typeof window === 'undefined') {
     module.exports = factory(
       require('../tools/TeemoToolRegistry'),
       require('../tools/file/TeemoFileTools'),

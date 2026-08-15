@@ -168,7 +168,7 @@
       if (typeof definition.handler !== 'function') {
         throw registryError('INVALID_TOOL_DEFINITION', 'Tool handler must be a function.');
       }
-      for (const hook of ['resolvePermissionResource', 'releasePermissionResource']) {
+      for (const hook of ['normalizeArguments', 'resolvePermissionResource', 'releasePermissionResource']) {
         if (definition[hook] != null && typeof definition[hook] !== 'function') {
           throw registryError('INVALID_TOOL_DEFINITION', `${hook} must be a function.`);
         }
@@ -190,6 +190,9 @@
         inputSchema,
         metadata,
         handler: definition.handler,
+        normalizeArguments: typeof definition.normalizeArguments === 'function'
+          ? definition.normalizeArguments
+          : null,
         resolvePermissionResource: typeof definition.resolvePermissionResource === 'function'
           ? definition.resolvePermissionResource
           : null,
@@ -214,6 +217,7 @@
         inputSchema: clone(definition.inputSchema),
         metadata: clone(definition.metadata),
         handler: definition.handler,
+        normalizeArguments: definition.normalizeArguments,
         resolvePermissionResource: definition.resolvePermissionResource,
         releasePermissionResource: definition.releasePermissionResource,
       };
@@ -252,13 +256,32 @@
             code: 'TOOL_CANCELLED', message: 'Tool execution was cancelled.',
           });
         }
-        const input = args === undefined ? {} : args;
+        let input = args === undefined ? {} : args;
+        if (typeof definition.normalizeArguments === 'function') {
+          try {
+            input = await definition.normalizeArguments(input, Object.freeze({
+              toolCallId,
+              runId: context.runId || null,
+              sessionId: context.sessionId || null,
+              signal: signal || null,
+            }));
+          } catch (error) {
+            const failure = publicFailure(error, 'TOOL_ARGUMENT_NORMALIZATION_FAILED', 'Tool arguments could not be normalized safely.');
+            return resultEnvelope({
+              ok: false, tool, toolCallId, startedAt,
+              code: failure.code, message: failure.message,
+            });
+          }
+        }
         const validationError = validateValue(input, definition.inputSchema);
         if (validationError) {
           return resultEnvelope({
             ok: false, tool, toolCallId, startedAt,
             code: 'TOOL_ARGUMENT_VALIDATION_FAILED', message: validationError,
           });
+        }
+        if (typeof context.onArgumentsNormalized === 'function') {
+          try { context.onArgumentsNormalized(clone(input)); } catch (_) { /* observation must not affect execution */ }
         }
         const permission = definition.metadata && definition.metadata.permission;
         if (!PERMISSIONS.has(permission)) {

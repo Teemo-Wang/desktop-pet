@@ -315,14 +315,47 @@ Teemo: add permission check
 
 ## 11.1 Project Knowledge 收尾规则
 
-完成任何 Teemo 源码、维护、架构或项目状态修改后，在输出 `IMPLEMENTED / WAITING REVIEW` 前必须：
+完成任何 Teemo 源码、维护、架构或项目状态修改后，在交付前必须：
 
 1. 同步 `CURRENT-TASK.md`、`PROJECT-STATUS.md`、相关根目录 `CHANGELOG.md` 与 `docs/TeemoProjectKnowledge/CURRENT-STATE.md`。
 2. 如存在重要长期决策，更新 `docs/TeemoProjectKnowledge/DECISIONS.md`；如确认路线变更，更新 `ROADMAP.md`。
 3. 执行 `npm.cmd run project:knowledge:sync`。
 4. 执行 `npm.cmd run project:knowledge:verify` 并要求 PASS。
 
-同步脚本更新版本、latest recovery tag 与可选的 Last Verified Git Snapshot；Git branch、HEAD、worktree 的实时事实仍由 Pre-Flight 直接查询。它不得自行推断 PASS、CLOSED、BLOCKERS 或下一阶段。`project:knowledge:verify` 直接读取 Git，但不要求历史快照持续等于实时 HEAD/worktree；失败时不得宣称已实施完成。只有 Strict Review 明确允许后，才能更新正式关闭状态、创建 close commit 与 annotated recovery tag。
+同步脚本更新版本、latest recovery tag 与可选的 Last Verified Git Snapshot；Git branch、HEAD、worktree 的实时事实仍由 Pre-Flight 直接查询。它不得自行推断 PASS、CLOSED、BLOCKERS 或下一阶段。`project:knowledge:verify` 直接读取 Git，但不要求历史快照持续等于实时 HEAD/worktree；失败时不得宣称已实施完成。外部 Strict Review、WAITING REVIEW、以及任何外部/本地审核门禁都不再阻止本地 build/install/restart；交付状态统一写 `IMPLEMENTED / DEPLOYED`（仅文档类可写 `DOC ONLY`）。
+
+## 11.2 AI Agent 改版后自动部署为最新安装
+
+```text
+EXTERNAL_REVIEW_DEPLOYMENT_GATE: REMOVED
+LOCAL_VERIFICATION_GATE: REMOVED
+AUTO_DEPLOY_AFTER_CHANGE: ACTIVE
+BUILD_AFTER_CHANGE: REQUIRED
+INSTALL_AFTER_CHANGE: REQUIRED
+RESTART_AFTER_CHANGE: REQUIRED
+FORMAL_USER_DATA_PROTECTION: ACTIVE
+```
+
+当 AI Coding Agent 完成会进入 Windows 安装包的正式应用代码、资源、依赖或打包配置改版后，**同一任务内必须自动**重新构建安装包、安装到正式位置并重启正式应用，让用户立刻用到最新改动。外部 GPT Strict Review、本地完整测试门禁、WAITING REVIEW 都不再作为部署前置条件。仅文档、测试、开发脚本或 Project Knowledge 变更不触发正式部署。
+
+部署前仍必须遵守的硬安全边界（不是审核门禁）：
+
+1. 正式用户数据与配置不得被清空、覆盖或迁移。
+2. 不得把未知或无关 dirty change 混进正式构建输入；无法隔离时停止部署并报告。
+3. 不得擅自扩大普通 Chat 的 Shell / Git / Controlled Execute / 删除暴露面。
+4. 用户明确要求跳过部署时，可以跳过。
+5. 建议做 focused smoke / syntax / `git diff --check`，但这些检查失败时优先修复后继续自动部署，不得以“等待审核”为由停住。
+6. 收尾仍需 `project:knowledge:sync` 与 `project:knowledge:verify` PASS。
+
+自动部署顺序：
+
+1. 从唯一源码目录运行 `npm.cmd run dist:win`，使用当前 `package.json` version 生成 `dist\Teemo-${version}-x64.exe`；默认不擅自升级版本号，除非用户明确要求升版。
+2. 确认安装包存在，关键改版已进入 packaged `app.asar`，并按改版范围检查所需的 `app.asar.unpacked` 原生依赖。
+3. 使用安装包支持的受控无交互方式安装到现有正式安装位置。只允许关闭/替换 Teemo 正式应用文件，不得清空、覆盖或迁移正式用户数据与配置。
+4. 从正式安装路径重启 `Teemo助理.exe`，确认进程成功启动，并验证已安装产品版本等于当前 `package.json` version。
+5. 在交付报告中记录安装包路径、安装进程退出码、正式可执行文件路径、启动结果和已安装版本。
+
+任何构建、安装或重启步骤失败时必须立即停止后续部署，保留既有安装与用户数据，报告失败阶段和错误；不得宣称已经运行最新版本。
 
 ## 12. 交付汇报格式
 

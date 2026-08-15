@@ -4,8 +4,9 @@
  * 数据目录默认保持 ~/.hellobike-pet；测试时可用 TEEMO_ASSISTANT_DATA_DIR 隔离。
  */
 (function (root, factory) {
-  if (typeof module !== 'undefined' && module.exports) module.exports = factory();
-  else root.TeemoStorageService = factory();
+  const Service = factory();
+  if (root) root.TeemoStorageService = Service;
+  if (typeof module !== 'undefined' && module.exports) module.exports = Service;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   const fs = require('fs');
   const path = require('path');
@@ -87,7 +88,8 @@
         return fallback;
       }
       try {
-        const value = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        const text = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
+        const value = JSON.parse(text);
         this._setReadState(filePath, 'ok');
         return value;
       } catch (error) {

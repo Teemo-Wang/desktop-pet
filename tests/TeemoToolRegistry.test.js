@@ -41,6 +41,7 @@ async function main() {
     definition({ inputSchema: null }),
     definition({ metadata: 'private' }),
     definition({ handler: 'not-a-function' }),
+    definition({ normalizeArguments: 'not-a-function' }),
     definition({ resolvePermissionResource: 'not-a-function' }),
   ]) {
     const isolatedRegistry = new TeemoToolRegistry();
@@ -79,6 +80,36 @@ async function main() {
     assert.equal(result.error.code, 'TOOL_ARGUMENT_VALIDATION_FAILED');
   }
   assert.equal(handlerCalls, 0, 'invalid arguments must never reach the handler');
+
+  let normalizedObservation = null;
+  let normalizedHandlerInput = null;
+  const normalizationRegistry = new TeemoToolRegistry();
+  normalizationRegistry.register(definition({
+    normalizeArguments: async args => ({ left: Number(args.left), right: Number(args.right) }),
+    handler: async args => { normalizedHandlerInput = args; return { total: args.left + args.right }; },
+  }));
+  const normalizedResult = await normalizationRegistry.execute('add_numbers', {
+    left: '4', right: '5', legacy: true,
+  }, {
+    onArgumentsNormalized: args => { normalizedObservation = args; },
+  });
+  assert.equal(normalizedResult.ok, true, 'normalization must run before schema validation');
+  assert.deepEqual(normalizedObservation, { left: 4, right: 5 });
+  assert.deepEqual(normalizedHandlerInput, { left: 4, right: 5 });
+  assert.equal(Object.prototype.hasOwnProperty.call(registry.listDefinitions()[0], 'normalizeArguments'), false);
+
+  const normalizationFailureRegistry = new TeemoToolRegistry();
+  normalizationFailureRegistry.register(definition({
+    normalizeArguments: async () => {
+      const error = new Error('normalized safely');
+      error.code = 'TEST_NORMALIZATION_FAILED';
+      error.teemoSafe = true;
+      throw error;
+    },
+  }));
+  const normalizationFailure = await normalizationFailureRegistry.execute('add_numbers', { left: 1, right: 2 });
+  assert.equal(normalizationFailure.ok, false);
+  assert.equal(normalizationFailure.error.code, 'TEST_NORMALIZATION_FAILED');
 
   const builtins = TeemoBuiltinTools.createRegistry();
   const echo = await builtins.execute('echo', { text: 'hello' });
